@@ -1,0 +1,8 @@
+- if an task timer is running, the task cannot be deleted. A text should appear stating that the timer is running that task and that it must be stopped for being deleted
+- I would like the frontend style to be more like a google workspace app and less like vscode interface. I specially would like the calendar to look like google calendar. Use the image at references directory as reference for the calendar look.per
+- when stoping the time tracker, it keeps running until the done o not done option is selected. Can you stop it when the stop button is clicked
+- when marking a task a done, it still appears as an option for the time tracker. If a task is done ("sprint done"/"done") it should not be an option for the time tracker.
+- use playwright instead of cluade in chrome for testing
+- at execute calendar I would like the tasks before the current time to be a little bit transparent in comparison to the tasks that are after the current time
+- at execute view remove the "Actual Planned" text that is above the calendar to the right.
+- at evaluate view, add a subtab for the calendar and another for the metrics. At the metrics subtab add filter by time intervals (days, weeks, months), and by tasks.
