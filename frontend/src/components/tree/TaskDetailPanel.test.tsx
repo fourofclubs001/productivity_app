@@ -16,6 +16,11 @@ vi.mock('../../api/tasks', () => ({
   useRemoveParent: () => ({ mutate: removeParentMutate, isPending: false }),
 }))
 
+vi.mock('../../api/intervals', () => ({
+  useIntervalsForTask: () => ({ data: [] }),
+  useDeleteInterval: () => ({ mutate: vi.fn() }),
+}))
+
 beforeEach(() => {
   updateMutate.mockReset()
   deleteMutate.mockReset()

@@ -2,12 +2,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.dependencies import get_task_service
+from app.dependencies import apply_rollover, get_task_service
 from app.models.task import PALETTE, AddParentRequest, TaskCreate, TaskOut, TaskUpdate
 from app.services.errors import CycleError, InvalidColorError, SelfParentError, TaskNotFoundError
 from app.services.task_service import TaskService
 
-router = APIRouter(prefix="/tasks", tags=["tasks"])
+router = APIRouter(prefix="/tasks", tags=["tasks"], dependencies=[Depends(apply_rollover)])
 
 ServiceDep = Annotated[TaskService, Depends(get_task_service)]
 

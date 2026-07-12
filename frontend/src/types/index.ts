@@ -13,3 +13,11 @@ export interface Task {
   parent_ids: string[]
   children_ids: string[]
 }
+
+export interface Interval {
+  id: string
+  task_id: string
+  start: string
+  end: string
+  week_start: string
+}

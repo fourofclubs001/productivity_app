@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useTasks } from '../api/tasks'
 import TaskTree from '../components/tree/TaskTree'
 import TaskDetailPanel from '../components/tree/TaskDetailPanel'
+import PlanCalendar from '../components/calendar/PlanCalendar'
 
 export default function PlanView() {
   const { data: tasks, isLoading, isError, error } = useTasks()
@@ -24,10 +25,10 @@ export default function PlanView() {
 
   return (
     <div className="flex h-[calc(100vh-49px)]">
-      <div className="w-80 shrink-0 border-r border-neutral-800">
+      <div className="w-56 shrink-0 border-r border-neutral-800">
         <TaskTree tasks={tasks ?? []} selectedId={selectedId} onSelect={setSelectedId} />
       </div>
-      <div className="flex-1">
+      <div className="w-72 shrink-0 border-r border-neutral-800">
         {selectedTask ? (
           <TaskDetailPanel task={selectedTask} tasksById={tasksById} />
         ) : (
@@ -35,6 +36,9 @@ export default function PlanView() {
             Select a task to see its details
           </div>
         )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <PlanCalendar selectedTask={selectedTask} tasksById={tasksById} />
       </div>
     </div>
   )

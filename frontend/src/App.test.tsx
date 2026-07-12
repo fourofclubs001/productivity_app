@@ -6,6 +6,12 @@ vi.mock('./api/tasks', () => ({
   useTasks: () => ({ data: [], isLoading: false, isError: false, error: null }),
 }))
 
+vi.mock('./api/intervals', () => ({
+  useIntervalsForWeek: () => ({ data: [] }),
+  useCreateInterval: () => ({ mutate: vi.fn() }),
+  useDeleteInterval: () => ({ mutate: vi.fn() }),
+}))
+
 describe('App', () => {
   it('renders the three view tabs and defaults to Plan', () => {
     render(<App />)

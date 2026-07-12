@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { format } from 'date-fns'
 import type { Task } from '../../types'
 import {
   useAddParent,
@@ -7,6 +8,7 @@ import {
   useRemoveParent,
   useUpdateTask,
 } from '../../api/tasks'
+import { useDeleteInterval, useIntervalsForTask } from '../../api/intervals'
 import { COLOR_HEX } from './colors'
 import StateBadge from './StateBadge'
 
@@ -34,6 +36,8 @@ export default function TaskDetailPanel({
   const deleteTask = useDeleteTask()
   const addParent = useAddParent()
   const removeParent = useRemoveParent()
+  const { data: intervals = [] } = useIntervalsForTask(task.id)
+  const deleteInterval = useDeleteInterval()
 
   const [name, setName] = useState(task.name)
   const [description, setDescription] = useState(task.description)
@@ -161,6 +165,44 @@ export default function TaskDetailPanel({
           </p>
         )}
       </div>
+
+      {task.is_leaf && (
+        <div className="mt-6">
+          <label className="block text-xs font-medium uppercase tracking-wide text-neutral-500">
+            Sprint schedule
+          </label>
+          {intervals.length === 0 ? (
+            <p className="mt-1 text-xs text-neutral-600">
+              Not scheduled. Select this task, then drag on the calendar to reserve time.
+            </p>
+          ) : (
+            <ul className="mt-2 space-y-1">
+              {intervals
+                .slice()
+                .sort((a, b) => a.start.localeCompare(b.start))
+                .map((interval) => (
+                  <li
+                    key={interval.id}
+                    className="flex items-center justify-between rounded bg-neutral-800 px-2 py-1 text-xs text-neutral-300"
+                  >
+                    <span>
+                      {format(new Date(interval.start), 'EEE MMM d, HH:mm')} –{' '}
+                      {format(new Date(interval.end), 'HH:mm')}
+                    </span>
+                    <button
+                      type="button"
+                      title="Remove this time slot"
+                      onClick={() => deleteInterval.mutate(interval.id)}
+                      className="text-neutral-500 hover:text-red-400"
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       <div className="mt-6">
         <label className="block text-xs font-medium uppercase tracking-wide text-neutral-500">

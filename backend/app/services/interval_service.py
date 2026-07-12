@@ -1,0 +1,79 @@
+from datetime import datetime
+from uuid import uuid4
+
+from app.models.interval import IntervalCreate, IntervalOut
+from app.models.task import TaskState
+from app.repositories.interval_repository import IntervalRepository
+from app.repositories.task_repository import TaskRepository
+from app.services.errors import (
+    IntervalNotFoundError,
+    InvalidIntervalError,
+    TaskNotFoundError,
+    TaskNotLeafError,
+)
+
+
+class IntervalService:
+    def __init__(self, interval_repo: IntervalRepository, task_repo: TaskRepository) -> None:
+        self._intervals = interval_repo
+        self._tasks = task_repo
+
+    async def create_interval(self, payload: IntervalCreate) -> IntervalOut:
+        if payload.end <= payload.start:
+            raise InvalidIntervalError
+
+        task_node = await self._tasks.load_node(payload.task_id)
+        if task_node is None:
+            raise TaskNotFoundError(payload.task_id)
+        if task_node.children:
+            raise TaskNotLeafError(payload.task_id)
+
+        interval_id = str(uuid4())
+        week_start = await self._intervals.create(
+            interval_id, payload.task_id, payload.start, payload.end
+        )
+
+        current_state = TaskState(task_node.fields.get("state", TaskState.backlog.value))
+        if current_state == TaskState.backlog:
+            await self._tasks.update_fields(
+                payload.task_id, {"state": TaskState.sprint_backlog.value}
+            )
+
+        return IntervalOut(
+            id=interval_id,
+            task_id=payload.task_id,
+            start=payload.start,
+            end=payload.end,
+            week_start=week_start,
+        )
+
+    async def delete_interval(self, interval_id: str) -> None:
+        data = await self._intervals.delete(interval_id)
+        if data is None:
+            raise IntervalNotFoundError(interval_id)
+
+        task_id = data["task_id"]
+        remaining = await self._intervals.count_for_task(task_id)
+        if remaining == 0:
+            task_node = await self._tasks.load_node(task_id)
+            if task_node is not None:
+                state = TaskState(task_node.fields.get("state", TaskState.backlog.value))
+                if state == TaskState.sprint_backlog:
+                    await self._tasks.update_fields(task_id, {"state": TaskState.backlog.value})
+
+    async def list_for_week(self, week_start: str) -> list[IntervalOut]:
+        intervals = await self._intervals.list_for_week(week_start)
+        return [self._to_out(interval) for interval in intervals]
+
+    async def list_for_task(self, task_id: str) -> list[IntervalOut]:
+        intervals = await self._intervals.list_for_task(task_id)
+        return [self._to_out(interval) for interval in intervals]
+
+    def _to_out(self, data: dict) -> IntervalOut:
+        return IntervalOut(
+            id=data["id"],
+            task_id=data["task_id"],
+            start=datetime.fromisoformat(data["start"]),
+            end=datetime.fromisoformat(data["end"]),
+            week_start=data["week_start"],
+        )
