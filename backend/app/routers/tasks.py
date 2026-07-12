@@ -1,9 +1,12 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
+from redis.asyncio import Redis
 
 from app.dependencies import apply_rollover, get_task_service
 from app.models.task import PALETTE, AddParentRequest, TaskCreate, TaskOut, TaskUpdate
+from app.redis_client import get_redis
+from app.repositories.interval_repository import IntervalRepository
 from app.services.errors import CycleError, InvalidColorError, SelfParentError, TaskNotFoundError
 from app.services.task_service import TaskService
 
@@ -49,11 +52,19 @@ async def update_task(task_id: str, payload: TaskUpdate, service: ServiceDep) ->
 
 
 @router.delete("/{task_id}", status_code=204)
-async def delete_task(task_id: str, service: ServiceDep) -> None:
+async def delete_task(
+    task_id: str, service: ServiceDep, redis: Annotated[Redis, Depends(get_redis)]
+) -> None:
     try:
         await service.delete_task(task_id)
     except TaskNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    # A deleted task's future plan no longer makes sense; drop its reserved
+    # intervals too. Past execution entries are left as historical record.
+    interval_repo = IntervalRepository(redis)
+    for interval in await interval_repo.list_for_task(task_id):
+        await interval_repo.delete(interval["id"])
 
 
 @router.post("/{task_id}/parents", response_model=TaskOut)
