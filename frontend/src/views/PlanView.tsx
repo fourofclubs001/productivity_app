@@ -1,8 +1,41 @@
+import { useMemo, useState } from 'react'
+import { useTasks } from '../api/tasks'
+import TaskTree from '../components/tree/TaskTree'
+import TaskDetailPanel from '../components/tree/TaskDetailPanel'
+
 export default function PlanView() {
+  const { data: tasks, isLoading, isError, error } = useTasks()
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  const tasksById = useMemo(() => new Map((tasks ?? []).map((task) => [task.id, task])), [tasks])
+  const selectedTask = selectedId ? tasksById.get(selectedId) : undefined
+
+  if (isLoading) {
+    return <div className="p-6 text-sm text-neutral-500">Loading tasks…</div>
+  }
+
+  if (isError) {
+    return (
+      <div className="p-6 text-sm text-red-400">
+        Failed to load tasks: {(error as Error).message}
+      </div>
+    )
+  }
+
   return (
-    <div className="p-6 text-neutral-300">
-      <h1 className="text-lg font-semibold">Plan</h1>
-      <p className="mt-2 text-sm text-neutral-500">Task tree and sprint scheduling coming soon.</p>
+    <div className="flex h-[calc(100vh-49px)]">
+      <div className="w-80 shrink-0 border-r border-neutral-800">
+        <TaskTree tasks={tasks ?? []} selectedId={selectedId} onSelect={setSelectedId} />
+      </div>
+      <div className="flex-1">
+        {selectedTask ? (
+          <TaskDetailPanel task={selectedTask} tasksById={tasksById} />
+        ) : (
+          <div className="flex h-full items-center justify-center text-sm text-neutral-600">
+            Select a task to see its details
+          </div>
+        )}
+      </div>
     </div>
   )
 }

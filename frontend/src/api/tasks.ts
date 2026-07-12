@@ -1,0 +1,88 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { apiFetch } from './client'
+import type { Task } from '../types'
+
+export interface CreateTaskInput {
+  name: string
+  definition_of_done: string
+  description?: string
+  parent_ids?: string[]
+}
+
+export interface UpdateTaskInput {
+  name?: string
+  description?: string
+  definition_of_done?: string
+  colors?: string[]
+}
+
+const tasksApi = {
+  list: () => apiFetch<Task[]>('/tasks'),
+  palette: () => apiFetch<string[]>('/tasks/palette'),
+  create: (input: CreateTaskInput) =>
+    apiFetch<Task>('/tasks', { method: 'POST', body: JSON.stringify(input) }),
+  update: (id: string, input: UpdateTaskInput) =>
+    apiFetch<Task>(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  remove: (id: string) => apiFetch<void>(`/tasks/${id}`, { method: 'DELETE' }),
+  addParent: (id: string, parentId: string) =>
+    apiFetch<Task>(`/tasks/${id}/parents`, {
+      method: 'POST',
+      body: JSON.stringify({ parent_id: parentId }),
+    }),
+  removeParent: (id: string, parentId: string) =>
+    apiFetch<Task>(`/tasks/${id}/parents/${parentId}`, { method: 'DELETE' }),
+}
+
+const TASKS_KEY = ['tasks']
+const PALETTE_KEY = ['palette']
+
+export function useTasks() {
+  return useQuery({ queryKey: TASKS_KEY, queryFn: tasksApi.list })
+}
+
+export function usePalette() {
+  return useQuery({ queryKey: PALETTE_KEY, queryFn: tasksApi.palette, staleTime: Infinity })
+}
+
+export function useCreateTask() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: tasksApi.create,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: TASKS_KEY }),
+  })
+}
+
+export function useUpdateTask() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdateTaskInput }) =>
+      tasksApi.update(id, input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: TASKS_KEY }),
+  })
+}
+
+export function useDeleteTask() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => tasksApi.remove(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: TASKS_KEY }),
+  })
+}
+
+export function useAddParent() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, parentId }: { id: string; parentId: string }) =>
+      tasksApi.addParent(id, parentId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: TASKS_KEY }),
+  })
+}
+
+export function useRemoveParent() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, parentId }: { id: string; parentId: string }) =>
+      tasksApi.removeParent(id, parentId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: TASKS_KEY }),
+  })
+}
