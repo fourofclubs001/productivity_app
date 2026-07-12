@@ -7,6 +7,7 @@ from app.redis_client import get_redis
 from app.repositories.entry_repository import EntryRepository
 from app.repositories.interval_repository import IntervalRepository
 from app.repositories.task_repository import TaskRepository
+from app.services.evaluate_service import EvaluateService
 from app.services.interval_service import IntervalService
 from app.services.rollover_service import RolloverService
 from app.services.task_service import TaskService
@@ -23,6 +24,10 @@ def get_interval_service(redis: Annotated[Redis, Depends(get_redis)]) -> Interva
 
 def get_timer_service(redis: Annotated[Redis, Depends(get_redis)]) -> TimerService:
     return TimerService(EntryRepository(redis), TaskRepository(redis))
+
+
+def get_evaluate_service(redis: Annotated[Redis, Depends(get_redis)]) -> EvaluateService:
+    return EvaluateService(TaskRepository(redis), IntervalRepository(redis), EntryRepository(redis))
 
 
 def get_rollover_service(redis: Annotated[Redis, Depends(get_redis)]) -> RolloverService:

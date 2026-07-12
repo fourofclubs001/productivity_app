@@ -4,7 +4,7 @@ from redis.exceptions import RedisError
 
 from app.config import settings
 from app.redis_client import get_redis_client
-from app.routers import intervals, tasks, timer
+from app.routers import evaluate, intervals, tasks, timer
 
 app = FastAPI(title="Productivity App API")
 
@@ -18,6 +18,7 @@ app.add_middleware(
 app.include_router(tasks.router)
 app.include_router(intervals.router)
 app.include_router(timer.router)
+app.include_router(evaluate.router)
 
 
 @app.get("/health")
