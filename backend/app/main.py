@@ -4,6 +4,7 @@ from redis.exceptions import RedisError
 
 from app.config import settings
 from app.redis_client import get_redis_client
+from app.routers import tasks
 
 app = FastAPI(title="Productivity App API")
 
@@ -13,6 +14,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(tasks.router)
 
 
 @app.get("/health")
