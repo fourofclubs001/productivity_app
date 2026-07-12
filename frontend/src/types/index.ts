@@ -21,3 +21,10 @@ export interface Interval {
   end: string
   week_start: string
 }
+
+export interface Entry {
+  id: string
+  task_id: string
+  start: string
+  end: string | null
+}

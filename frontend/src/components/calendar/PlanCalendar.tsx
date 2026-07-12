@@ -1,21 +1,12 @@
 import { useMemo, useState } from 'react'
-import { Calendar, dateFnsLocalizer, type SlotInfo } from 'react-big-calendar'
-import { format, getDay, parse, startOfWeek } from 'date-fns'
-import { enUS } from 'date-fns/locale'
+import { Calendar, type SlotInfo } from 'react-big-calendar'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import './calendar-dark.css'
 import type { Interval, Task } from '../../types'
 import { useCreateInterval, useDeleteInterval, useIntervalsForWeek } from '../../api/intervals'
 import { formatWeekLabel, mondayOf, shiftWeek, weekStartKey } from '../../lib/week'
+import { localizer } from '../../lib/calendarLocalizer'
 import { COLOR_HEX } from '../tree/colors'
-
-const localizer = dateFnsLocalizer({
-  format,
-  parse,
-  startOfWeek: (date: Date) => startOfWeek(date, { weekStartsOn: 1 }),
-  getDay,
-  locales: { 'en-US': enUS },
-})
 
 interface CalendarEvent {
   id: string

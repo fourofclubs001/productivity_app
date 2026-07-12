@@ -38,3 +38,8 @@ class IntervalNotFoundError(Exception):
     def __init__(self, interval_id: str) -> None:
         self.interval_id = interval_id
         super().__init__(f"Interval {interval_id!r} not found")
+
+
+class NoActiveTimerError(Exception):
+    def __init__(self) -> None:
+        super().__init__("No timer is currently running")
