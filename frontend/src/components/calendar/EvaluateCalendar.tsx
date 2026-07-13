@@ -4,7 +4,7 @@ import 'react-big-calendar/lib/css/react-big-calendar.css'
 import './calendar.css'
 import type { Entry, Interval, Task } from '../../types'
 import { localizer } from '../../lib/calendarLocalizer'
-import { COLOR_HEX } from '../tree/colors'
+import { chipFillStyle, primaryChipColor } from './eventColor'
 import CalendarDayHeader from './CalendarDayHeader'
 import CalendarTimezoneLabel from './CalendarTimezoneLabel'
 
@@ -15,7 +15,7 @@ interface CalendarEvent {
   title: string
   start: Date
   end: Date
-  color: string
+  colors: string[]
   kind: 'planned' | 'real'
 }
 
@@ -35,26 +35,24 @@ export default function EvaluateCalendar({
   const events = useMemo<CalendarEvent[]>(() => {
     const planned: CalendarEvent[] = intervals.map((interval) => {
       const task = tasksById.get(interval.task_id)
-      const color = task?.effective_colors[0]
       return {
         id: `interval-${interval.id}`,
         title: task?.name ?? 'Unknown task',
         start: new Date(interval.start),
         end: new Date(interval.end),
-        color: color ? COLOR_HEX[color] : '#616161',
+        colors: task?.effective_colors ?? [],
         kind: 'planned',
       }
     })
 
     const real: CalendarEvent[] = entries.map((entry) => {
       const task = tasksById.get(entry.task_id)
-      const color = task?.effective_colors[0]
       return {
         id: `entry-${entry.id}`,
         title: task?.name ?? 'Unknown task',
         start: new Date(entry.start),
         end: entry.end ? new Date(entry.end) : new Date(),
-        color: color ? COLOR_HEX[color] : '#616161',
+        colors: task?.effective_colors ?? [],
         kind: 'real',
       }
     })
@@ -77,11 +75,11 @@ export default function EvaluateCalendar({
       eventPropGetter={(event: CalendarEvent) => ({
         style:
           event.kind === 'real'
-            ? { backgroundColor: event.color, border: 'none' }
+            ? { ...chipFillStyle(event.colors), border: 'none' }
             : {
                 backgroundColor: 'transparent',
-                border: `1px dashed ${event.color}`,
-                color: event.color,
+                border: `1px dashed ${primaryChipColor(event.colors)}`,
+                color: primaryChipColor(event.colors),
               },
       })}
       components={{ header: CalendarDayHeader, timeGutterHeader: CalendarTimezoneLabel }}

@@ -8,7 +8,7 @@ import { useIntervalsForWeek } from '../../api/intervals'
 import { formatWeekLabel, mondayOf, shiftWeek, weekStartKey } from '../../lib/week'
 import { localizer } from '../../lib/calendarLocalizer'
 import { utcNow } from '../../lib/time'
-import { COLOR_HEX } from '../tree/colors'
+import { chipFillStyle } from './eventColor'
 import CalendarDayHeader from './CalendarDayHeader'
 import CalendarTimezoneLabel from './CalendarTimezoneLabel'
 
@@ -17,7 +17,7 @@ interface CalendarEvent {
   title: string
   start: Date
   end: Date
-  color: string
+  colors: string[]
 }
 
 export default function ExecuteCalendar({ tasksById }: { tasksById: Map<string, Task> }) {
@@ -38,13 +38,12 @@ export default function ExecuteCalendar({ tasksById }: { tasksById: Map<string, 
   const events = useMemo<CalendarEvent[]>(() => {
     const actual: CalendarEvent[] = entries.map((entry) => {
       const task = tasksById.get(entry.task_id)
-      const color = task?.effective_colors[0]
       return {
         id: `entry-${entry.id}`,
         title: task?.name ?? 'Unknown task',
         start: new Date(entry.start),
         end: entry.end ? new Date(entry.end) : now,
-        color: color ? COLOR_HEX[color] : '#616161',
+        colors: task?.effective_colors ?? [],
       }
     })
 
@@ -52,13 +51,12 @@ export default function ExecuteCalendar({ tasksById }: { tasksById: Map<string, 
       .filter((interval) => new Date(interval.start) >= now)
       .map((interval) => {
         const task = tasksById.get(interval.task_id)
-        const color = task?.effective_colors[0]
         return {
           id: `interval-${interval.id}`,
           title: task?.name ?? 'Unknown task',
           start: new Date(interval.start),
           end: new Date(interval.end),
-          color: color ? COLOR_HEX[color] : '#616161',
+          colors: task?.effective_colors ?? [],
         }
       })
 
@@ -101,7 +99,7 @@ export default function ExecuteCalendar({ tasksById }: { tasksById: Map<string, 
           selectable={false}
           eventPropGetter={(event: CalendarEvent) => ({
             style: {
-              backgroundColor: event.color,
+              ...chipFillStyle(event.colors),
               border: 'none',
               opacity: event.end <= now ? 0.55 : 1,
             },

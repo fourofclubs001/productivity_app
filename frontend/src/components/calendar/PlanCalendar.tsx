@@ -19,7 +19,7 @@ import { localizer } from '../../lib/calendarLocalizer'
 import { utcNow } from '../../lib/time'
 import { resolveDropSlot, slotToInterval } from '../../lib/calendarGeometry'
 import { useUndo } from '../../undo/UndoProvider'
-import { COLOR_HEX } from '../tree/colors'
+import { chipFillStyle } from './eventColor'
 import CalendarDayHeader from './CalendarDayHeader'
 import CalendarTimezoneLabel from './CalendarTimezoneLabel'
 import ContextMenu from './ContextMenu'
@@ -29,7 +29,7 @@ interface CalendarEvent {
   title: string
   start: Date
   end: Date
-  color: string
+  colors: string[]
 }
 
 // Vite's dev-server esbuild pre-bundling double-wraps this addon's default
@@ -156,13 +156,12 @@ export default function PlanCalendar({
     () =>
       intervals.map((interval) => {
         const task = tasksById.get(interval.task_id)
-        const color = task?.effective_colors[0]
         return {
           id: interval.id,
           title: task?.name ?? 'Unknown task',
           start: new Date(interval.start),
           end: new Date(interval.end),
-          color: color ? COLOR_HEX[color] : '#616161',
+          colors: task?.effective_colors ?? [],
         }
       }),
     [intervals, tasksById],
@@ -225,7 +224,7 @@ export default function PlanCalendar({
             if (interval) onOpenTask(interval.task_id)
           }}
           eventPropGetter={(event: CalendarEvent) => ({
-            style: { backgroundColor: event.color, border: 'none' },
+            style: { ...chipFillStyle(event.colors), border: 'none' },
           })}
           components={{
             header: CalendarDayHeader,
