@@ -1,18 +1,28 @@
 import { useState } from 'react'
-import { useCreateTask } from '../../api/tasks'
+import type { Task } from '../../types'
+import { useCreateTask, usePalette } from '../../api/tasks'
+import ColorSwatchPicker from './ColorSwatchPicker'
 
 export default function NewTaskDialog({
   parentId,
   onClose,
+  onCreated,
 }: {
   parentId: string | null
   onClose: () => void
+  onCreated: (task: Task) => void
 }) {
   const [name, setName] = useState('')
   const [definitionOfDone, setDefinitionOfDone] = useState('')
+  const [colors, setColors] = useState<string[]>([])
+  const { data: palette = [] } = usePalette()
   const createTask = useCreateTask()
 
   const canSubmit = name.trim().length > 0 && definitionOfDone.trim().length > 0
+
+  function toggleColor(color: string) {
+    setColors((prev) => (prev.includes(color) ? prev.filter((c) => c !== color) : [...prev, color]))
+  }
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
@@ -22,8 +32,9 @@ export default function NewTaskDialog({
         name: name.trim(),
         definition_of_done: definitionOfDone.trim(),
         parent_ids: parentId ? [parentId] : [],
+        colors,
       },
-      { onSuccess: onClose },
+      { onSuccess: onCreated },
     )
   }
 
@@ -53,6 +64,12 @@ export default function NewTaskDialog({
             rows={3}
             className="mt-1 w-full rounded border border-border bg-surface px-2 py-1 text-sm text-text-primary focus:border-accent focus:outline-none"
           />
+        </label>
+        <label className="mb-3 block text-xs text-text-secondary">
+          Colors
+          <div className="mt-1">
+            <ColorSwatchPicker palette={palette} selected={colors} onToggle={toggleColor} />
+          </div>
         </label>
         <div className="flex justify-end gap-2">
           <button

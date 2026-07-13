@@ -27,6 +27,8 @@ async def create_task(payload: TaskCreate, service: ServiceDep) -> TaskOut:
         return await service.create_task(payload)
     except TaskNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except InvalidColorError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("", response_model=list[TaskOut])

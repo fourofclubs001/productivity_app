@@ -5,7 +5,7 @@ test('stops immediately on click and only marks done via explicit choice', async
 
   await page.goto('/')
   await page.getByTitle('New task').click()
-  await page.getByLabel('Name').fill(taskName)
+  await page.getByLabel('Name', { exact: true }).fill(taskName)
   await page.getByLabel('Definition of done').fill('done')
   await page.getByRole('button', { name: 'Create' }).click()
   await expect(page.getByTestId('task-tree').getByText(taskName)).toBeVisible()
@@ -34,7 +34,7 @@ test('stopping without marking done keeps the task selectable again', async ({ p
 
   await page.goto('/')
   await page.getByTitle('New task').click()
-  await page.getByLabel('Name').fill(taskName)
+  await page.getByLabel('Name', { exact: true }).fill(taskName)
   await page.getByLabel('Definition of done').fill('done')
   await page.getByRole('button', { name: 'Create' }).click()
 

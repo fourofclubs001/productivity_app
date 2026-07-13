@@ -96,6 +96,10 @@ class TaskService:
             if not await self._repo.exists(parent_id):
                 raise TaskNotFoundError(parent_id)
 
+        invalid = sorted(set(payload.colors) - set(PALETTE))
+        if invalid:
+            raise InvalidColorError(invalid)
+
         await self._repo.create(
             task_id,
             {
@@ -108,6 +112,8 @@ class TaskService:
         )
         for parent_id in parent_ids:
             await self._repo.add_child_edge(parent_id, task_id)
+        if payload.colors:
+            await self._repo.set_colors(task_id, payload.colors)
 
         return await self.get_task(task_id)
 

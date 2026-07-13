@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 
 async function createTask(page: import('@playwright/test').Page, name: string) {
   await page.getByTitle('New task').click()
-  await page.getByLabel('Name').fill(name)
+  await page.getByLabel('Name', { exact: true }).fill(name)
   await page.getByLabel('Definition of done').fill('done')
   await page.getByRole('button', { name: 'Create' }).click()
   await expect(page.getByTestId('task-tree').getByText(name)).toBeVisible()

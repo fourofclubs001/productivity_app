@@ -7,6 +7,7 @@ export interface CreateTaskInput {
   definition_of_done: string
   description?: string
   parent_ids?: string[]
+  colors?: string[]
 }
 
 export interface UpdateTaskInput {

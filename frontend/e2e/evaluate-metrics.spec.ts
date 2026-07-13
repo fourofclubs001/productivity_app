@@ -8,12 +8,12 @@ test('Evaluate Metrics subtab: granularity switch and task filter', async ({ pag
 
   // Create and track task A briefly (executed time, no plan).
   await page.getByTitle('New task').click()
-  await page.getByLabel('Name').fill(taskAName)
+  await page.getByLabel('Name', { exact: true }).fill(taskAName)
   await page.getByLabel('Definition of done').fill('done')
   await page.getByRole('button', { name: 'Create' }).click()
 
   await page.getByTitle('New task').click()
-  await page.getByLabel('Name').fill(taskBName)
+  await page.getByLabel('Name', { exact: true }).fill(taskBName)
   await page.getByLabel('Definition of done').fill('done')
   await page.getByRole('button', { name: 'Create' }).click()
 

@@ -3,7 +3,19 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-PALETTE: list[str] = ["red", "orange", "yellow", "green", "blue", "purple", "pink", "gray"]
+PALETTE: list[str] = [
+    "red",
+    "orange",
+    "yellow",
+    "green",
+    "blue",
+    "purple",
+    "pink",
+    "gray",
+    "forest",
+    "indigo",
+    "magenta",
+]
 
 
 class TaskState(str, Enum):
@@ -19,6 +31,7 @@ class TaskCreate(BaseModel):
     definition_of_done: str = Field(min_length=1)
     description: str = ""
     parent_ids: list[str] = Field(default_factory=list)
+    colors: list[str] = Field(default_factory=list)
 
 
 class TaskUpdate(BaseModel):

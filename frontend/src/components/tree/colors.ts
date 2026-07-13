@@ -1,5 +1,5 @@
-// Hues inspired by Google Calendar's own event-color palette
-// (Tomato/Tangerine/Banana/Sage/Peacock/Lavender/Flamingo/Graphite).
+// Hues inspired by Google Calendar's own event-color palette (all 11: Tomato/
+// Tangerine/Banana/Sage/Basil/Peacock/Blueberry/Lavender/Grape/Flamingo/Graphite).
 export const COLOR_HEX: Record<string, string> = {
   red: '#d50000',
   orange: '#f4511e',
@@ -9,4 +9,7 @@ export const COLOR_HEX: Record<string, string> = {
   purple: '#7986cb',
   pink: '#e67c73',
   gray: '#616161',
+  forest: '#0b8043',
+  indigo: '#3f51b5',
+  magenta: '#8e24aa',
 }

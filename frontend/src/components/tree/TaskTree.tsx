@@ -1,19 +1,19 @@
 import { useMemo, useState } from 'react'
 import type { Task } from '../../types'
 import TaskTreeNode from './TaskTreeNode'
-import NewTaskDialog from './NewTaskDialog'
 
 export default function TaskTree({
   tasks,
   selectedId,
   onSelect,
+  onOpenNewTask,
 }: {
   tasks: Task[]
   selectedId: string | null
   onSelect: (id: string) => void
+  onOpenNewTask: (parentId: string | null) => void
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [dialogParentId, setDialogParentId] = useState<string | null>()
 
   const tasksById = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks])
   const rootIds = useMemo(
@@ -43,7 +43,7 @@ export default function TaskTree({
         <button
           type="button"
           title="New task"
-          onClick={() => setDialogParentId(null)}
+          onClick={() => onOpenNewTask(null)}
           className="flex h-5 w-5 items-center justify-center rounded text-text-secondary hover:bg-surface-hover hover:text-text-primary"
         >
           +
@@ -66,13 +66,10 @@ export default function TaskTree({
             ancestorPath={new Set()}
             onSelect={onSelect}
             onToggleExpand={toggleExpand}
-            onAddChild={(parentId) => setDialogParentId(parentId)}
+            onAddChild={onOpenNewTask}
           />
         ))}
       </div>
-      {dialogParentId !== undefined && (
-        <NewTaskDialog parentId={dialogParentId} onClose={() => setDialogParentId(undefined)} />
-      )}
     </div>
   )
 }

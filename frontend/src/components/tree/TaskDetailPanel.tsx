@@ -9,7 +9,7 @@ import {
   useUpdateTask,
 } from '../../api/tasks'
 import { useDeleteInterval, useIntervalsForTask } from '../../api/intervals'
-import { COLOR_HEX } from './colors'
+import ColorSwatchPicker from './ColorSwatchPicker'
 import StateBadge from './StateBadge'
 
 function descendantIds(taskId: string, tasksById: Map<string, Task>): Set<string> {
@@ -27,9 +27,11 @@ function descendantIds(taskId: string, tasksById: Map<string, Task>): Set<string
 export default function TaskDetailPanel({
   task,
   tasksById,
+  onAddChild,
 }: {
   task: Task
   tasksById: Map<string, Task>
+  onAddChild: (parentId: string) => void
 }) {
   const { data: palette = [] } = usePalette()
   const updateTask = useUpdateTask()
@@ -41,22 +43,19 @@ export default function TaskDetailPanel({
   const deleteInterval = useDeleteInterval()
 
   const [name, setName] = useState(task.name)
-  const [description, setDescription] = useState(task.description)
   const [dod, setDod] = useState(task.definition_of_done)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [addParentId, setAddParentId] = useState('')
 
   useEffect(() => {
     setName(task.name)
-    setDescription(task.description)
     setDod(task.definition_of_done)
     setConfirmingDelete(false)
     setAddParentId('')
     resetDeleteTask()
-  }, [task.id, task.name, task.description, task.definition_of_done, resetDeleteTask])
+  }, [task.id, task.name, task.definition_of_done, resetDeleteTask])
 
-  const isDirty =
-    name !== task.name || description !== task.description || dod !== task.definition_of_done
+  const isDirty = name !== task.name || dod !== task.definition_of_done
 
   const excludedFromParentPicker = useMemo(() => {
     const excluded = descendantIds(task.id, tasksById)
@@ -76,7 +75,7 @@ export default function TaskDetailPanel({
   function handleSave() {
     updateTask.mutate({
       id: task.id,
-      input: { name: name.trim(), description, definition_of_done: dod },
+      input: { name: name.trim(), definition_of_done: dod },
     })
   }
 
@@ -99,22 +98,21 @@ export default function TaskDetailPanel({
         )}
       </div>
 
-      <input
-        value={name}
-        onChange={(event) => setName(event.target.value)}
-        className="w-full border-none bg-transparent text-xl font-semibold text-text-primary focus:outline-none"
-      />
-
-      <div className="mt-4">
-        <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
-          Description
-        </label>
-        <textarea
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-          rows={4}
-          className="mt-1 w-full rounded border border-border bg-surface px-2 py-1.5 text-sm text-text-primary focus:border-accent focus:outline-none"
+      <div className="flex items-start justify-between gap-2">
+        <input
+          aria-label="Task name"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          className="w-full border-none bg-transparent text-xl font-semibold text-text-primary focus:outline-none"
         />
+        <button
+          type="button"
+          title="Create child task"
+          onClick={() => onAddChild(task.id)}
+          className="mt-1 shrink-0 rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-alt hover:text-text-primary"
+        >
+          + Child task
+        </button>
       </div>
 
       <div className="mt-4">
@@ -144,22 +142,8 @@ export default function TaskDetailPanel({
         <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
           Colors
         </label>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {palette.map((color) => {
-            const active = task.colors.includes(color)
-            return (
-              <button
-                key={color}
-                type="button"
-                title={color}
-                onClick={() => toggleColor(color)}
-                className={`h-6 w-6 rounded-full border-2 ${
-                  active ? 'border-text-primary' : 'border-transparent opacity-60'
-                }`}
-                style={{ backgroundColor: COLOR_HEX[color] }}
-              />
-            )
-          })}
+        <div className="mt-2">
+          <ColorSwatchPicker palette={palette} selected={task.colors} onToggle={toggleColor} />
         </div>
         {task.colors.length === 0 && task.effective_colors.length > 0 && (
           <p className="mt-1 text-xs text-text-secondary">

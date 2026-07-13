@@ -171,3 +171,22 @@ def test_get_palette(client):
     response = client.get("/tasks/palette")
     assert response.status_code == 200
     assert "red" in response.json()
+
+
+def test_create_task_with_colors(client):
+    response = client.post(
+        "/tasks",
+        json={"name": "Task", "definition_of_done": "d", "colors": ["red", "blue"]},
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["colors"] == ["blue", "red"]
+    assert body["effective_colors"] == ["blue", "red"]
+
+
+def test_create_task_with_invalid_color_rejected(client):
+    response = client.post(
+        "/tasks",
+        json={"name": "Task", "definition_of_done": "d", "colors": ["not-a-color"]},
+    )
+    assert response.status_code == 400

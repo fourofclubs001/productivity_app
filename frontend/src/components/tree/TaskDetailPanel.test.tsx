@@ -41,16 +41,20 @@ beforeEach(() => {
 describe('TaskDetailPanel', () => {
   it('renders task fields', () => {
     const task = makeTask({ id: 't1', name: 'Task one', description: 'desc', definition_of_done: 'dod' })
-    render(<TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} />)
+    render(
+      <TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} onAddChild={() => {}} />,
+    )
 
     expect(screen.getByDisplayValue('Task one')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('desc')).toBeInTheDocument()
     expect(screen.getByDisplayValue('dod')).toBeInTheDocument()
+    expect(screen.queryByDisplayValue('desc')).not.toBeInTheDocument()
   })
 
   it('only shows Save changes once a field is edited, and saves all fields', () => {
     const task = makeTask({ id: 't1', name: 'Task one', description: 'desc', definition_of_done: 'dod' })
-    render(<TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} />)
+    render(
+      <TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} onAddChild={() => {}} />,
+    )
 
     expect(screen.queryByText('Save changes')).not.toBeInTheDocument()
 
@@ -59,13 +63,15 @@ describe('TaskDetailPanel', () => {
 
     expect(updateMutate).toHaveBeenCalledWith({
       id: 't1',
-      input: { name: 'New name', description: 'desc', definition_of_done: 'dod' },
+      input: { name: 'New name', definition_of_done: 'dod' },
     })
   })
 
   it('toggles a color immediately without needing Save', () => {
     const task = makeTask({ id: 't1' })
-    render(<TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} />)
+    render(
+      <TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} onAddChild={() => {}} />,
+    )
 
     fireEvent.click(screen.getByTitle('red'))
     expect(updateMutate).toHaveBeenCalledWith({ id: 't1', input: { colors: ['red'] } })
@@ -73,13 +79,30 @@ describe('TaskDetailPanel', () => {
 
   it('requires a confirmation click before deleting', () => {
     const task = makeTask({ id: 't1' })
-    render(<TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} />)
+    render(
+      <TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} onAddChild={() => {}} />,
+    )
 
     fireEvent.click(screen.getByText('Delete task'))
     expect(deleteMutate).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByText('Confirm'))
     expect(deleteMutate).toHaveBeenCalledWith('t1')
+  })
+
+  it('calls onAddChild with this task id when "+ Child task" is clicked', () => {
+    const onAddChild = vi.fn()
+    const task = makeTask({ id: 't1' })
+    render(
+      <TaskDetailPanel
+        task={task}
+        tasksById={new Map([[task.id, task]])}
+        onAddChild={onAddChild}
+      />,
+    )
+
+    fireEvent.click(screen.getByTitle('Create child task'))
+    expect(onAddChild).toHaveBeenCalledWith('t1')
   })
 
   it('removes a parent when its chip is clicked', () => {
@@ -94,6 +117,7 @@ describe('TaskDetailPanel', () => {
             [parent.id, parent],
           ])
         }
+        onAddChild={() => {}}
       />,
     )
 
@@ -114,7 +138,9 @@ describe('TaskDetailPanel delete error', () => {
       ),
     })
     const task = makeTask({ id: 't1' })
-    render(<TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} />)
+    render(
+      <TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} onAddChild={() => {}} />,
+    )
 
     expect(screen.getByText(/timer is currently running/i)).toBeInTheDocument()
   })
