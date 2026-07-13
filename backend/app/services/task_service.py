@@ -10,8 +10,9 @@ from app.services.errors import (
     SelfParentError,
     SelfRequirementError,
     TaskNotFoundError,
+    TaskNotLeafError,
 )
-from app.services.graph_utils import is_reachable
+from app.services.graph_utils import is_reachable, leaf_descendants
 
 
 def _order_of(node: TaskNode) -> float:
@@ -54,6 +55,20 @@ def _compute_state(task_id: str, graph: dict[str, TaskNode]) -> TaskState:
     return TaskState.backlog
 
 
+def _estimated_hours(task_id: str, graph: dict[str, TaskNode]) -> float | None:
+    node = graph[task_id]
+    if not node.children:
+        raw = node.fields.get("estimated_hours")
+        return float(raw) if raw not in (None, "") else None
+
+    total = 0.0
+    for leaf_id in leaf_descendants(task_id, graph):
+        raw = graph[leaf_id].fields.get("estimated_hours")
+        if raw not in (None, ""):
+            total += float(raw)
+    return total
+
+
 def _compute_effective_colors(
     task_id: str, graph: dict[str, TaskNode], memo: dict[str, set[str]]
 ) -> set[str]:
@@ -93,6 +108,7 @@ class TaskService:
             order=_order_of(node),
             requires_ids=sorted(node.requires),
             required_by_ids=sorted(node.required_by),
+            estimated_hours=_estimated_hours(task_id, graph),
         )
 
     async def create_task(self, payload: TaskCreate) -> TaskOut:
@@ -138,7 +154,8 @@ class TaskService:
         return self._to_task_out(task_id, graph, {})
 
     async def update_task(self, task_id: str, payload: TaskUpdate) -> TaskOut:
-        if not await self._repo.exists(task_id):
+        node = await self._repo.load_node(task_id)
+        if node is None:
             raise TaskNotFoundError(task_id)
 
         fields = {}
@@ -148,6 +165,10 @@ class TaskService:
             fields["description"] = payload.description
         if payload.definition_of_done is not None:
             fields["definition_of_done"] = payload.definition_of_done
+        if payload.estimated_hours is not None:
+            if node.children:
+                raise TaskNotLeafError(task_id)
+            fields["estimated_hours"] = str(payload.estimated_hours)
         if fields:
             await self._repo.update_fields(task_id, fields)
 

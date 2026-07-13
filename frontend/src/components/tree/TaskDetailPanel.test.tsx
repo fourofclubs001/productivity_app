@@ -31,6 +31,7 @@ vi.mock('../../api/intervals', () => ({
   useDeleteInterval: () => ({ mutate: vi.fn() }),
   useUpdateInterval: () => ({ mutate: updateIntervalMutate, isPending: false }),
   useCreateInterval: () => ({ mutate: vi.fn(), isPending: false }),
+  useTaskCoverage: () => ({ data: { covered_hours: 0 } }),
 }))
 
 beforeEach(() => {
@@ -247,6 +248,40 @@ describe('TaskDetailPanel', () => {
       { id: 'iv1', input: expect.objectContaining({ start: expectedStart }) },
       expect.any(Object),
     )
+  })
+
+  it('lets a leaf task set an estimate, saved alongside name/DoD', () => {
+    const task = makeTask({ id: 't1', is_leaf: true })
+    render(
+      <TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} onAddChild={() => {}} />,
+    )
+
+    fireEvent.change(screen.getByLabelText('Estimated hours'), { target: { value: '2.5' } })
+    fireEvent.click(screen.getByText('Save changes'))
+
+    expect(updateMutate).toHaveBeenCalledWith({
+      id: 't1',
+      input: { name: task.name, definition_of_done: '', estimated_hours: 2.5 },
+    })
+  })
+
+  it('shows a read-only rollup for a non-leaf task instead of an input', () => {
+    const task = makeTask({ id: 't1', is_leaf: false, estimated_hours: 4.5 })
+    render(
+      <TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} onAddChild={() => {}} />,
+    )
+
+    expect(screen.queryByLabelText('Estimated hours')).not.toBeInTheDocument()
+    expect(screen.getByText(/4\.5h/)).toBeInTheDocument()
+  })
+
+  it('shows hours covered from the coverage query', () => {
+    const task = makeTask({ id: 't1', is_leaf: true })
+    render(
+      <TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} onAddChild={() => {}} />,
+    )
+
+    expect(screen.getByText(/0\.0h currently on the calendar/)).toBeInTheDocument()
   })
 })
 

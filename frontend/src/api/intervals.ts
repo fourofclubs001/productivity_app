@@ -22,6 +22,8 @@ const intervalsApi = {
   update: (id: string, input: UpdateIntervalInput) =>
     apiFetch<Interval>(`/intervals/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
   remove: (id: string) => apiFetch<void>(`/intervals/${id}`, { method: 'DELETE' }),
+  coverage: (taskId: string) =>
+    apiFetch<{ covered_hours: number }>(`/intervals/coverage/${taskId}`),
 }
 
 const TASKS_KEY = ['tasks']
@@ -60,6 +62,13 @@ export function useUpdateInterval() {
       queryClient.invalidateQueries({ queryKey: ['intervals'] })
       queryClient.invalidateQueries({ queryKey: TASKS_KEY })
     },
+  })
+}
+
+export function useTaskCoverage(taskId: string) {
+  return useQuery({
+    queryKey: ['intervals', 'coverage', taskId],
+    queryFn: () => intervalsApi.coverage(taskId),
   })
 }
 

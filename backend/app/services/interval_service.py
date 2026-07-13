@@ -12,6 +12,7 @@ from app.services.errors import (
     TaskNotLeafError,
     UnmetPrerequisiteError,
 )
+from app.services.graph_utils import leaf_descendants
 from app.services.task_service import TaskService
 
 
@@ -97,6 +98,25 @@ class IntervalService:
                 state = TaskState(task_node.fields.get("state", TaskState.backlog.value))
                 if state == TaskState.sprint_backlog:
                     await self._tasks.update_fields(task_id, {"state": TaskState.backlog.value})
+
+    async def get_coverage_hours(self, task_id: str) -> float:
+        """Hours currently reserved on the calendar for task_id -- its own
+        intervals if it's a leaf, or summed across its leaf descendants if
+        it's a goal. Computed on demand (not part of the bulk task list)
+        since it requires per-leaf interval lookups, unlike the graph-only
+        data list_tasks() already has loaded for free.
+        """
+        graph = await self._tasks.load_graph()
+        if task_id not in graph:
+            raise TaskNotFoundError(task_id)
+
+        total_seconds = 0.0
+        for leaf_id in leaf_descendants(task_id, graph):
+            for interval in await self._intervals.list_for_task(leaf_id):
+                start = datetime.fromisoformat(interval["start"])
+                end = datetime.fromisoformat(interval["end"])
+                total_seconds += (end - start).total_seconds()
+        return total_seconds / 3600
 
     async def list_for_week(self, week_start: str) -> list[IntervalOut]:
         intervals = await self._intervals.list_for_week(week_start)

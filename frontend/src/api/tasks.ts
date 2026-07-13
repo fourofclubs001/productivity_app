@@ -15,6 +15,7 @@ export interface UpdateTaskInput {
   description?: string
   definition_of_done?: string
   colors?: string[]
+  estimated_hours?: number
 }
 
 const tasksApi = {

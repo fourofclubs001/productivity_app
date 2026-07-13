@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react'
 import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core'
 import type { Task } from '../../types'
 import TaskTreeNode from './TaskTreeNode'
-import { rootIds as computeRootIds, resolveDropAction } from '../../lib/taskTree'
+import { isHiddenFromPlan, rootIds as computeRootIds, resolveDropAction } from '../../lib/taskTree'
 import { useAddParent, useRemoveParent, useReorderTask } from '../../api/tasks'
 import { useUndo } from '../../undo/UndoProvider'
+import { useParentDismissal } from '../../lib/useParentDismissal'
 
 export default function TaskTree({
   tasks,
@@ -18,9 +19,15 @@ export default function TaskTree({
   onOpenNewTask: (parentId: string | null) => void
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const { decisions, decide, undecide } = useParentDismissal()
 
   const tasksById = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks])
-  const rootIds = useMemo(() => computeRootIds(tasks), [tasks])
+  const rootIds = useMemo(() => {
+    return computeRootIds(tasks).filter((id) => {
+      const task = tasksById.get(id)
+      return task && !isHiddenFromPlan(task, decisions)
+    })
+  }, [tasks, tasksById, decisions])
 
   const addParent = useAddParent()
   const removeParent = useRemoveParent()
@@ -132,6 +139,9 @@ export default function TaskTree({
             onSelect={onSelect}
             onToggleExpand={toggleExpand}
             onAddChild={onOpenNewTask}
+            decisions={decisions}
+            onDecide={decide}
+            onUndecide={undecide}
           />
         ))}
       </div>

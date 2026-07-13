@@ -23,6 +23,7 @@ from app.services.errors import (
     SelfParentError,
     SelfRequirementError,
     TaskNotFoundError,
+    TaskNotLeafError,
 )
 from app.services.task_service import TaskService
 
@@ -65,7 +66,7 @@ async def update_task(task_id: str, payload: TaskUpdate, service: ServiceDep) ->
         return await service.update_task(task_id, payload)
     except TaskNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except InvalidColorError as exc:
+    except (InvalidColorError, TaskNotLeafError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 

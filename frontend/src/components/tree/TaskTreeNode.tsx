@@ -1,5 +1,8 @@
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import type { Task } from '../../types'
+import { isHiddenFromPlan, qualifiesForRemovalPrompt } from '../../lib/taskTree'
+import type { ParentDecision } from '../../lib/useParentDismissal'
+import { useUndo } from '../../undo/UndoProvider'
 import ColorDots from './ColorDots'
 import StateBadge from './StateBadge'
 
@@ -13,6 +16,9 @@ interface TaskTreeNodeProps {
   onSelect: (id: string) => void
   onToggleExpand: (id: string) => void
   onAddChild: (parentId: string) => void
+  decisions: Record<string, ParentDecision>
+  onDecide: (taskId: string, decision: ParentDecision) => void
+  onUndecide: (taskId: string) => void
 }
 
 export default function TaskTreeNode({
@@ -25,11 +31,15 @@ export default function TaskTreeNode({
   onSelect,
   onToggleExpand,
   onAddChild,
+  decisions,
+  onDecide,
+  onUndecide,
 }: TaskTreeNodeProps) {
   const { attributes, listeners, setNodeRef: setDraggableRef, isDragging } = useDraggable({
     id: taskId,
   })
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id: taskId })
+  const { pushUndo } = useUndo()
 
   const task = tasksById.get(taskId)
   if (!task) return null
@@ -42,9 +52,49 @@ export default function TaskTreeNode({
     )
   }
 
+  if (qualifiesForRemovalPrompt(task, tasksById, decisions)) {
+    return (
+      <div
+        className="rounded px-2 py-1.5 text-xs text-text-secondary"
+        style={{ paddingLeft: depth * 16 + 4 }}
+      >
+        <p>
+          <strong className="text-text-primary">{task.name}</strong>'s sub-tasks are all done —
+          remove it from Plan too?
+        </p>
+        <div className="mt-1 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={() => onDecide(taskId, 'kept')}
+            className="hover:text-text-primary"
+          >
+            No
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onDecide(taskId, 'hidden')
+              pushUndo({
+                label: 'Hide completed goal',
+                undo: () => onUndecide(taskId),
+              })
+            }}
+            className="font-medium text-accent hover:text-accent-hover"
+          >
+            Yes
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   const isExpanded = expanded.has(taskId)
   const isSelected = selectedId === taskId
   const nextAncestorPath = new Set(ancestorPath).add(taskId)
+  const visibleChildIds = task.children_ids.filter((childId) => {
+    const child = tasksById.get(childId)
+    return child && !isHiddenFromPlan(child, decisions)
+  })
 
   return (
     <div>
@@ -92,7 +142,7 @@ export default function TaskTreeNode({
       </div>
       {isExpanded && !task.is_leaf && (
         <div>
-          {task.children_ids.map((childId) => (
+          {visibleChildIds.map((childId) => (
             <TaskTreeNode
               key={childId}
               taskId={childId}
@@ -104,6 +154,9 @@ export default function TaskTreeNode({
               onSelect={onSelect}
               onToggleExpand={onToggleExpand}
               onAddChild={onAddChild}
+              decisions={decisions}
+              onDecide={onDecide}
+              onUndecide={onUndecide}
             />
           ))}
         </div>

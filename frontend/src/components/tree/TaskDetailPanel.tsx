@@ -10,7 +10,12 @@ import {
   useRemoveRequirement,
   useUpdateTask,
 } from '../../api/tasks'
-import { useDeleteInterval, useIntervalsForTask, useUpdateInterval } from '../../api/intervals'
+import {
+  useDeleteInterval,
+  useIntervalsForTask,
+  useTaskCoverage,
+  useUpdateInterval,
+} from '../../api/intervals'
 import { descendantIds } from '../../lib/taskTree'
 import AddToCalendarModal from '../calendar/AddToCalendarModal'
 import IntervalTimeFields, {
@@ -41,9 +46,13 @@ export default function TaskDetailPanel({
   const { data: intervals = [] } = useIntervalsForTask(task.id)
   const deleteInterval = useDeleteInterval()
   const updateInterval = useUpdateInterval()
+  const { data: coverage } = useTaskCoverage(task.id)
 
   const [name, setName] = useState(task.name)
   const [dod, setDod] = useState(task.definition_of_done)
+  const [estimatedHours, setEstimatedHours] = useState(
+    task.estimated_hours != null ? String(task.estimated_hours) : '',
+  )
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [addParentId, setAddParentId] = useState('')
   const [addRequiredId, setAddRequiredId] = useState('')
@@ -54,6 +63,7 @@ export default function TaskDetailPanel({
   useEffect(() => {
     setName(task.name)
     setDod(task.definition_of_done)
+    setEstimatedHours(task.estimated_hours != null ? String(task.estimated_hours) : '')
     setConfirmingDelete(false)
     setAddParentId('')
     setAddRequiredId('')
@@ -61,9 +71,13 @@ export default function TaskDetailPanel({
     setEditingIntervalId(null)
     setEditValue(null)
     resetDeleteTask()
-  }, [task.id, task.name, task.definition_of_done, resetDeleteTask])
+  }, [task.id, task.name, task.definition_of_done, task.estimated_hours, resetDeleteTask])
 
-  const isDirty = name !== task.name || dod !== task.definition_of_done
+  const isDirty =
+    name !== task.name ||
+    dod !== task.definition_of_done ||
+    (task.is_leaf &&
+      estimatedHours !== (task.estimated_hours != null ? String(task.estimated_hours) : ''))
 
   const excludedFromParentPicker = useMemo(() => {
     const excluded = descendantIds(task.id, tasksById)
@@ -89,9 +103,16 @@ export default function TaskDetailPanel({
   }, [task, tasksById])
 
   function handleSave() {
+    const parsedHours = estimatedHours.trim() === '' ? undefined : Number(estimatedHours)
     updateTask.mutate({
       id: task.id,
-      input: { name: name.trim(), definition_of_done: dod },
+      input: {
+        name: name.trim(),
+        definition_of_done: dod,
+        ...(task.is_leaf && parsedHours !== undefined && !Number.isNaN(parsedHours)
+          ? { estimated_hours: parsedHours }
+          : {}),
+      },
     })
   }
 
@@ -141,6 +162,34 @@ export default function TaskDetailPanel({
           rows={3}
           className="mt-1 w-full rounded border border-border bg-surface px-2 py-1.5 text-sm text-text-primary focus:border-accent focus:outline-none"
         />
+      </div>
+
+      <div className="mt-4">
+        <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
+          Estimated time
+        </label>
+        {task.is_leaf ? (
+          <input
+            aria-label="Estimated hours"
+            type="number"
+            min="0"
+            step="0.5"
+            placeholder="Hours"
+            value={estimatedHours}
+            onChange={(event) => setEstimatedHours(event.target.value)}
+            className="mt-1 w-24 rounded border border-border bg-surface px-2 py-1 text-sm text-text-primary focus:border-accent focus:outline-none"
+          />
+        ) : (
+          <p className="mt-1 text-sm text-text-primary">
+            {task.estimated_hours ?? 0}h (sum of sub-tasks)
+          </p>
+        )}
+        <p className="mt-1 text-xs text-text-secondary">
+          {coverage
+            ? `${coverage.covered_hours.toFixed(1)}h currently on the calendar`
+            : 'Loading calendar coverage…'}
+          {task.is_leaf && task.estimated_hours != null && ` of ${task.estimated_hours}h estimated`}
+        </p>
       </div>
 
       {isDirty && (

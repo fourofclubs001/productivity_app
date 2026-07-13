@@ -1,4 +1,5 @@
 import type { Task } from '../types'
+import type { ParentDecision } from './useParentDismissal'
 
 // Ordering is a single value shared across the whole DAG (not scoped per
 // parent) -- see prompts/interpreted_app_improvements_v01.md item 14/M3.
@@ -27,6 +28,38 @@ export function descendantIds(taskId: string, tasksById: Map<string, Task>): Set
     stack.push(...(tasksById.get(current)?.children_ids ?? []))
   }
   return result
+}
+
+// A sprint-done leaf is always hidden from the Plan tree (item 9). A parent
+// is hidden only once the user has confirmed removing it (item 10) -- see
+// qualifiesForRemovalPrompt below for when that's offered.
+export function isHiddenFromPlan(
+  task: Task,
+  decisions: Record<string, ParentDecision>,
+): boolean {
+  if (task.is_leaf) return task.state === 'sprint_done'
+  return decisions[task.id] === 'hidden'
+}
+
+/**
+ * A parent qualifies for the "all its sub-tasks are done, remove it too?"
+ * prompt once every one of its children is itself hidden from the Plan tree
+ * (sprint-done leaves, or already-hidden parents) and the user hasn't
+ * already answered for this parent (either way -- 'kept' means show the row
+ * normally, don't ask again).
+ */
+export function qualifiesForRemovalPrompt(
+  task: Task,
+  tasksById: Map<string, Task>,
+  decisions: Record<string, ParentDecision>,
+): boolean {
+  if (task.is_leaf) return false
+  if (task.children_ids.length === 0) return false
+  if (decisions[task.id]) return false
+  return task.children_ids.every((childId) => {
+    const child = tasksById.get(childId)
+    return child ? isHiddenFromPlan(child, decisions) : true
+  })
 }
 
 export type DropAction =

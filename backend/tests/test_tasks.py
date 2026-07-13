@@ -339,3 +339,40 @@ def test_deleting_a_task_cleans_up_requirement_edges(client):
 
     body = client.get(f"/tasks/{task['id']}").json()
     assert body["requires_ids"] == []
+
+
+def test_new_task_has_no_estimated_hours(client):
+    task = create_task(client, name="Task")
+    assert task["estimated_hours"] is None
+
+
+def test_set_estimated_hours_on_leaf(client):
+    task = create_task(client, name="Task")
+    response = client.patch(f"/tasks/{task['id']}", json={"estimated_hours": 2.5})
+    assert response.status_code == 200
+    assert response.json()["estimated_hours"] == 2.5
+
+
+def test_set_estimated_hours_on_non_leaf_rejected(client):
+    parent = create_task(client, name="Parent")
+    create_task(client, name="Child", parent_ids=[parent["id"]])
+    response = client.patch(f"/tasks/{parent['id']}", json={"estimated_hours": 3})
+    assert response.status_code == 400
+
+
+def test_estimated_hours_rolls_up_to_parent(client):
+    parent = create_task(client, name="Parent")
+    child_a = create_task(client, name="A", parent_ids=[parent["id"]])
+    child_b = create_task(client, name="B", parent_ids=[parent["id"]])
+    client.patch(f"/tasks/{child_a['id']}", json={"estimated_hours": 2})
+    client.patch(f"/tasks/{child_b['id']}", json={"estimated_hours": 1.5})
+
+    body = client.get(f"/tasks/{parent['id']}").json()
+    assert body["estimated_hours"] == 3.5
+
+
+def test_estimated_hours_rollup_is_zero_with_no_leaf_estimates(client):
+    parent = create_task(client, name="Parent")
+    create_task(client, name="Child", parent_ids=[parent["id"]])
+    body = client.get(f"/tasks/{parent['id']}").json()
+    assert body["estimated_hours"] == 0

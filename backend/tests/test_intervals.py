@@ -280,3 +280,42 @@ async def test_delete_interval_does_not_revert_in_progress_task(client, redis_cl
 
     task_after = client.get(f"/tasks/{task['id']}").json()
     assert task_after["state"] == "in_progress"
+
+
+def test_coverage_hours_for_unscheduled_task_is_zero(client):
+    task = create_leaf(client)
+    response = client.get(f"/intervals/coverage/{task['id']}")
+    assert response.status_code == 200
+    assert response.json()["covered_hours"] == 0
+
+
+def test_coverage_hours_sums_a_leaf_tasks_intervals(client):
+    task = create_leaf(client)
+    start = datetime(2026, 7, 13, 9, 0)
+    create_interval(client, task["id"], start, start + timedelta(hours=1, minutes=30))
+    create_interval(
+        client, task["id"], start + timedelta(days=1), start + timedelta(days=1, hours=2)
+    )
+
+    response = client.get(f"/intervals/coverage/{task['id']}")
+    assert response.json()["covered_hours"] == 3.5
+
+
+def test_coverage_hours_aggregates_across_leaf_descendants(client):
+    parent = create_leaf(client, "Parent")
+    child_a = create_leaf(client, "A")
+    child_b = create_leaf(client, "B")
+    client.post(f"/tasks/{child_a['id']}/parents", json={"parent_id": parent["id"]})
+    client.post(f"/tasks/{child_b['id']}/parents", json={"parent_id": parent["id"]})
+
+    start = datetime(2026, 7, 13, 9, 0)
+    create_interval(client, child_a["id"], start, start + timedelta(hours=1))
+    create_interval(client, child_b["id"], start, start + timedelta(hours=2))
+
+    response = client.get(f"/intervals/coverage/{parent['id']}")
+    assert response.json()["covered_hours"] == 3
+
+
+def test_coverage_hours_missing_task_returns_404(client):
+    response = client.get("/intervals/coverage/does-not-exist")
+    assert response.status_code == 404

@@ -39,6 +39,7 @@ class TaskUpdate(BaseModel):
     description: str | None = None
     definition_of_done: str | None = None
     colors: list[str] | None = None
+    estimated_hours: float | None = None
 
 
 class AddParentRequest(BaseModel):
@@ -73,3 +74,6 @@ class TaskOut(BaseModel):
     order: float
     requires_ids: list[str]
     required_by_ids: list[str]
+    # Leaf: its own value if set, else None. Parent: sum of leaf descendants'
+    # values (0 if none of them have anything set).
+    estimated_hours: float | None

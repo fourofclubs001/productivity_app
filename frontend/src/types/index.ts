@@ -15,6 +15,7 @@ export interface Task {
   order: number
   requires_ids: string[]
   required_by_ids: string[]
+  estimated_hours: number | null
 }
 
 export interface Interval {

@@ -60,3 +60,12 @@ async def list_intervals(
 @router.get("/by-task/{task_id}", response_model=list[IntervalOut])
 async def list_intervals_for_task(task_id: str, service: ServiceDep) -> list[IntervalOut]:
     return await service.list_for_task(task_id)
+
+
+@router.get("/coverage/{task_id}")
+async def get_coverage(task_id: str, service: ServiceDep) -> dict[str, float]:
+    try:
+        hours = await service.get_coverage_hours(task_id)
+    except TaskNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"covered_hours": hours}
