@@ -5,13 +5,15 @@ import { makeTask } from '../../test/taskFixtures'
 
 const updateMutate = vi.fn()
 const deleteMutate = vi.fn()
+const deleteReset = vi.fn()
 const addParentMutate = vi.fn()
 const removeParentMutate = vi.fn()
+const deleteTaskState = vi.fn()
 
 vi.mock('../../api/tasks', () => ({
   usePalette: () => ({ data: ['red', 'blue'] }),
   useUpdateTask: () => ({ mutate: updateMutate, isPending: false }),
-  useDeleteTask: () => ({ mutate: deleteMutate, isPending: false }),
+  useDeleteTask: () => deleteTaskState(),
   useAddParent: () => ({ mutate: addParentMutate, isPending: false }),
   useRemoveParent: () => ({ mutate: removeParentMutate, isPending: false }),
 }))
@@ -24,8 +26,16 @@ vi.mock('../../api/intervals', () => ({
 beforeEach(() => {
   updateMutate.mockReset()
   deleteMutate.mockReset()
+  deleteReset.mockReset()
   addParentMutate.mockReset()
   removeParentMutate.mockReset()
+  deleteTaskState.mockReturnValue({
+    mutate: deleteMutate,
+    reset: deleteReset,
+    isPending: false,
+    isError: false,
+    error: null,
+  })
 })
 
 describe('TaskDetailPanel', () => {
@@ -89,5 +99,23 @@ describe('TaskDetailPanel', () => {
 
     fireEvent.click(screen.getByTitle('Remove parent'))
     expect(removeParentMutate).toHaveBeenCalledWith({ id: 't1', parentId: 'p1' })
+  })
+})
+
+describe('TaskDetailPanel delete error', () => {
+  it('shows the backend message when deletion is blocked', () => {
+    deleteTaskState.mockReturnValue({
+      mutate: deleteMutate,
+      reset: deleteReset,
+      isPending: false,
+      isError: true,
+      error: new Error(
+        "This task's timer is currently running — stop it before deleting the task.",
+      ),
+    })
+    const task = makeTask({ id: 't1' })
+    render(<TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} />)
+
+    expect(screen.getByText(/timer is currently running/i)).toBeInTheDocument()
   })
 })

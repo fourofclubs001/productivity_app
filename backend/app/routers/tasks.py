@@ -6,6 +6,7 @@ from redis.asyncio import Redis
 from app.dependencies import apply_rollover, get_task_service
 from app.models.task import PALETTE, AddParentRequest, TaskCreate, TaskOut, TaskUpdate
 from app.redis_client import get_redis
+from app.repositories.entry_repository import EntryRepository
 from app.repositories.interval_repository import IntervalRepository
 from app.services.errors import CycleError, InvalidColorError, SelfParentError, TaskNotFoundError
 from app.services.task_service import TaskService
@@ -55,6 +56,16 @@ async def update_task(task_id: str, payload: TaskUpdate, service: ServiceDep) ->
 async def delete_task(
     task_id: str, service: ServiceDep, redis: Annotated[Redis, Depends(get_redis)]
 ) -> None:
+    entry_repo = EntryRepository(redis)
+    active_id = await entry_repo.get_active_id()
+    if active_id is not None:
+        active_entry = await entry_repo.get(active_id)
+        if active_entry is not None and active_entry["task_id"] == task_id:
+            raise HTTPException(
+                status_code=409,
+                detail="This task's timer is currently running — stop it before deleting the task.",
+            )
+
     try:
         await service.delete_task(task_id)
     except TaskNotFoundError as exc:

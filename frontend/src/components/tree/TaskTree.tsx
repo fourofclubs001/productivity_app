@@ -35,7 +35,7 @@ export default function TaskTree({
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col" data-testid="task-tree">
       <div className="flex items-center justify-between border-b border-neutral-800 px-3 py-2">
         <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
           Tasks

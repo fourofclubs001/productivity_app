@@ -6,7 +6,15 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     ...init,
   })
   if (!response.ok) {
-    throw new Error(`API error ${response.status}: ${await response.text()}`)
+    const text = await response.text()
+    let detail = text
+    try {
+      const parsed = JSON.parse(text)
+      if (typeof parsed.detail === 'string') detail = parsed.detail
+    } catch {
+      // not JSON, fall back to raw text
+    }
+    throw new Error(detail)
   }
   if (response.status === 204) {
     return undefined as T

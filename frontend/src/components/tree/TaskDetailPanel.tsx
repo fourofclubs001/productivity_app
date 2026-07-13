@@ -34,6 +34,7 @@ export default function TaskDetailPanel({
   const { data: palette = [] } = usePalette()
   const updateTask = useUpdateTask()
   const deleteTask = useDeleteTask()
+  const resetDeleteTask = deleteTask.reset
   const addParent = useAddParent()
   const removeParent = useRemoveParent()
   const { data: intervals = [] } = useIntervalsForTask(task.id)
@@ -51,7 +52,8 @@ export default function TaskDetailPanel({
     setDod(task.definition_of_done)
     setConfirmingDelete(false)
     setAddParentId('')
-  }, [task.id, task.name, task.description, task.definition_of_done])
+    resetDeleteTask()
+  }, [task.id, task.name, task.description, task.definition_of_done, resetDeleteTask])
 
   const isDirty =
     name !== task.name || description !== task.description || dod !== task.definition_of_done
@@ -288,6 +290,9 @@ export default function TaskDetailPanel({
               Cancel
             </button>
           </div>
+        )}
+        {deleteTask.isError && (
+          <p className="mt-2 text-xs text-red-400">{(deleteTask.error as Error).message}</p>
         )}
       </div>
     </div>

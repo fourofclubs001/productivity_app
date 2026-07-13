@@ -96,11 +96,43 @@ def test_list_entries_for_week(client):
 
     import datetime
 
-    this_week_start = (
-        datetime.date.today() - datetime.timedelta(days=datetime.date.today().weekday())
-    ).isoformat()
+    # Entries are timestamped in UTC (see TimerService), so "this week" must be
+    # computed from the UTC date, not the local machine date, to avoid flaking
+    # near a UTC day/week boundary.
+    today_utc = datetime.datetime.now(datetime.UTC).date()
+    this_week_start = (today_utc - datetime.timedelta(days=today_utc.weekday())).isoformat()
     response = client.get("/entries", params={"week_start": this_week_start})
     assert response.status_code == 200
     body = response.json()
     assert len(body) == 1
     assert body[0]["task_id"] == task["id"]
+
+
+def test_deleting_a_task_with_a_running_timer_is_blocked(client):
+    task = create_leaf(client)
+    client.post("/timer/start", json={"task_id": task["id"]})
+
+    response = client.delete(f"/tasks/{task['id']}")
+    assert response.status_code == 409
+    assert "timer" in response.json()["detail"].lower()
+
+    # The task must still exist.
+    assert client.get(f"/tasks/{task['id']}").status_code == 200
+
+
+def test_deleting_a_task_after_stopping_its_timer_succeeds(client):
+    task = create_leaf(client)
+    client.post("/timer/start", json={"task_id": task["id"]})
+    client.post("/timer/stop", json={"mark_done": False})
+
+    response = client.delete(f"/tasks/{task['id']}")
+    assert response.status_code == 204
+
+
+def test_deleting_a_task_while_a_different_tasks_timer_runs_is_unaffected(client):
+    tracked = create_leaf(client, "Tracked")
+    other = create_leaf(client, "Other")
+    client.post("/timer/start", json={"task_id": tracked["id"]})
+
+    response = client.delete(f"/tasks/{other['id']}")
+    assert response.status_code == 204
