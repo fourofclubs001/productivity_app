@@ -4,12 +4,23 @@ Working notes for picking this project back up in a future session. Not user-fac
 docs (see `README.md` for that) — this is "what's true right now and how we work
 here."
 
-## Where things stand (as of commit `2eda462`)
+## Where things stand (as of commit `e9ef01d`)
 
 The app is fully built and working: Plan / Execute / Evaluate views, FastAPI +
 Redis backend, React + Tailwind frontend, Google Workspace/Calendar-styled light
-theme. All 8 items in `prompts/app_improvements_v00.md` are implemented. Test suite
-is green: 53 backend pytest cases, 22 frontend Vitest cases, 5 Playwright E2E specs.
+theme. All 8 items in `prompts/app_improvements_v00.md` and all 30 items in
+`prompts/interpreted_app_improvements_v01.md` are implemented (12 milestones,
+M1–M12, each its own commit). Test suite is green: 84 backend pytest cases, 95
+frontend Vitest cases, 27 Playwright E2E specs.
+
+The v01 pass added: dev/prod Docker split, task ordering + drag-and-drop
+reparent/reorder, a prerequisite/dependency graph with cycle detection,
+drag-to-schedule + calendar move/resize/click-to-open, a client-side undo
+stack (ctrl+z), two-color calendar chips, resizable panels, sprint-done/
+parent-removal lifecycle visibility, estimated-hours rollup + coverage, a
+definition-of-done confirmation modal, and Plan-panel-order tree shape
+(with expand/collapse) applied consistently to the Execute task picker and
+both Evaluate lists (Metrics table + task filter).
 
 `docker compose up --build` from the repo root runs the whole stack. Backend
 `/health` should return `{"status":"ok","redis":true}` once up.
@@ -108,6 +119,14 @@ worth reusing rather than reinventing:
   (`typeof x === 'function' ? x : x.default`) rather than assuming either shape. Worth
   remembering if another dual CJS/ESM package added later exhibits the same "works in
   tests/build, blank page in dev" symptom.
+- **Gotcha hit during M12:** don't nest an interactive `<button>` inside a `<label>`
+  that also wraps a `<checkbox>` (e.g. an expand/collapse chevron next to a
+  checkbox row) — browsers' accessible-name computation gets confused by two
+  interactive elements sharing one label, and the checkbox's accessible name
+  comes back empty (Testing Library's `getByRole('checkbox', { name })` then
+  fails to find it, even though the row renders and looks correct). Fix: keep
+  the chevron button as a sibling *outside* the `<label>`, with the `<label>`
+  wrapping only the checkbox + its text (see `TaskFilter.tsx`).
 - Backend venv: `backend/.venv`. Frontend deps: `frontend/node_modules`. Both already
   installed — no fresh `pip install`/`npm install` needed unless dependencies change.
 - Playwright's Chromium binary is installed (`npx playwright install chromium` was
@@ -136,8 +155,10 @@ docker compose -f docker-compose.dev.yml up --build     # dev: isolated data, po
 
 ## Next possible steps
 
-- More improvements: create `prompts/app_improvements_v01.md` and repeat the
-  workflow above.
+- A raw `prompts/app_improvements_v02.md` has already been dropped in the repo
+  (untracked as of this note) — next session should read it and repeat the
+  workflow above: interpret, clarify, commit the interpreted doc, plan, then
+  implement milestone by milestone.
 - Revisit the UTC-vs-local-timezone limitation if week/day boundaries ever look
   wrong to the user in practice.
 - Revisit the tree auto-expand-on-add-child gap if it becomes annoying.
