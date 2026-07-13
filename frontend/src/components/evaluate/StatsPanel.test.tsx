@@ -1,13 +1,14 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import StatsPanel from './StatsPanel'
-import type { EvaluateWeekResult } from '../../api/evaluate'
+import type { EvaluatePeriodResult } from '../../api/evaluate'
 
 describe('StatsPanel', () => {
   it('shows an empty-state message when nothing was planned or executed', () => {
-    const result: EvaluateWeekResult = {
-      week: {
-        week_start: '2026-07-13',
+    const result: EvaluatePeriodResult = {
+      period: {
+        period_start: '2026-07-13',
+        period_end: '2026-07-20',
         planned_hours: 0,
         executed_hours: 0,
         percentage: null,
@@ -22,10 +23,11 @@ describe('StatsPanel', () => {
     expect(screen.getAllByText('—')).toHaveLength(1)
   })
 
-  it('renders week totals and a per-task row, marking non-leaf tasks as goals', () => {
-    const result: EvaluateWeekResult = {
-      week: {
-        week_start: '2026-07-13',
+  it('renders period totals and a per-task row, marking non-leaf tasks as goals', () => {
+    const result: EvaluatePeriodResult = {
+      period: {
+        period_start: '2026-07-13',
+        period_end: '2026-07-20',
         planned_hours: 4,
         executed_hours: 2,
         percentage: 50,

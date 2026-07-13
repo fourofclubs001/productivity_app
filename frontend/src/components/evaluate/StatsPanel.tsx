@@ -1,38 +1,38 @@
-import type { EvaluateWeekResult } from '../../api/evaluate'
+import type { EvaluatePeriodResult } from '../../api/evaluate'
 
 function formatPercentage(percentage: number | null): string {
   return percentage === null ? '—' : `${percentage}%`
 }
 
-export default function StatsPanel({ result }: { result: EvaluateWeekResult }) {
-  const { week, by_task: byTask } = result
+export default function StatsPanel({ result }: { result: EvaluatePeriodResult }) {
+  const { period, by_task: byTask } = result
 
   return (
     <div className="space-y-6 overflow-y-auto p-4">
       <div>
         <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
-          Whole week
+          Totals
         </h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="rounded border border-border p-3">
             <div className="text-xs text-text-secondary">Executed / Planned</div>
             <div className="mt-1 text-lg text-text-primary">
-              {week.executed_hours}h / {week.planned_hours}h
+              {period.executed_hours}h / {period.planned_hours}h
             </div>
           </div>
           <div className="rounded border border-border p-3">
             <div className="text-xs text-text-secondary">Executed %</div>
             <div className="mt-1 text-lg text-text-primary">
-              {formatPercentage(week.percentage)}
+              {formatPercentage(period.percentage)}
             </div>
           </div>
           <div className="rounded border border-border p-3">
             <div className="text-xs text-text-secondary">Finished</div>
-            <div className="mt-1 text-lg text-success">{week.finished_count}</div>
+            <div className="mt-1 text-lg text-success">{period.finished_count}</div>
           </div>
           <div className="rounded border border-border p-3">
             <div className="text-xs text-text-secondary">Not finished</div>
-            <div className="mt-1 text-lg text-text-primary">{week.not_finished_count}</div>
+            <div className="mt-1 text-lg text-text-primary">{period.not_finished_count}</div>
           </div>
         </div>
       </div>
@@ -42,7 +42,7 @@ export default function StatsPanel({ result }: { result: EvaluateWeekResult }) {
           By task
         </h2>
         {byTask.length === 0 ? (
-          <p className="text-xs text-text-secondary">Nothing planned or executed this week.</p>
+          <p className="text-xs text-text-secondary">Nothing planned or executed in this period.</p>
         ) : (
           <table className="w-full text-left text-sm">
             <thead>

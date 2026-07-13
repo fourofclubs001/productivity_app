@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from './client'
+import type { Granularity } from '../lib/period'
 
-export interface TaskWeekStats {
+export interface TaskPeriodStats {
   task_id: string
   name: string
   is_leaf: boolean
@@ -12,8 +13,9 @@ export interface TaskWeekStats {
   not_finished_count: number
 }
 
-export interface WeekStats {
-  week_start: string
+export interface PeriodStats {
+  period_start: string
+  period_end: string
   planned_hours: number
   executed_hours: number
   percentage: number | null
@@ -21,14 +23,18 @@ export interface WeekStats {
   not_finished_count: number
 }
 
-export interface EvaluateWeekResult {
-  week: WeekStats
-  by_task: TaskWeekStats[]
+export interface EvaluatePeriodResult {
+  period: PeriodStats
+  by_task: TaskPeriodStats[]
 }
 
-export function useEvaluateWeek(weekStart: string) {
+export function useEvaluatePeriod(granularity: Granularity, date: string, taskIds: string[]) {
   return useQuery({
-    queryKey: ['evaluate', 'week', weekStart],
-    queryFn: () => apiFetch<EvaluateWeekResult>(`/evaluate/week?week_start=${weekStart}`),
+    queryKey: ['evaluate', 'period', granularity, date, taskIds],
+    queryFn: () => {
+      const params = new URLSearchParams({ granularity, date })
+      taskIds.forEach((id) => params.append('task_ids', id))
+      return apiFetch<EvaluatePeriodResult>(`/evaluate/period?${params.toString()}`)
+    },
   })
 }

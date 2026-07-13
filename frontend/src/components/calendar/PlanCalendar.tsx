@@ -6,6 +6,7 @@ import type { Interval, Task } from '../../types'
 import { useCreateInterval, useDeleteInterval, useIntervalsForWeek } from '../../api/intervals'
 import { formatWeekLabel, mondayOf, shiftWeek, weekStartKey } from '../../lib/week'
 import { localizer } from '../../lib/calendarLocalizer'
+import { utcNow } from '../../lib/time'
 import { COLOR_HEX } from '../tree/colors'
 import CalendarDayHeader from './CalendarDayHeader'
 import CalendarTimezoneLabel from './CalendarTimezoneLabel'
@@ -25,11 +26,11 @@ export default function PlanCalendar({
   selectedTask: Task | undefined
   tasksById: Map<string, Task>
 }) {
-  const [weekAnchor, setWeekAnchor] = useState(() => mondayOf(new Date()))
+  const [weekAnchor, setWeekAnchor] = useState(() => mondayOf(utcNow()))
   const [pendingDelete, setPendingDelete] = useState<Interval | null>(null)
 
   const weekStart = weekStartKey(weekAnchor)
-  const isCurrentWeek = weekStart === weekStartKey(new Date())
+  const isCurrentWeek = weekStart === weekStartKey(utcNow())
 
   const { data: intervals = [] } = useIntervalsForWeek(weekStart)
   const createInterval = useCreateInterval()

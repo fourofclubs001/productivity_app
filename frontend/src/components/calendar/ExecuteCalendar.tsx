@@ -7,6 +7,7 @@ import { useEntriesForWeek } from '../../api/timer'
 import { useIntervalsForWeek } from '../../api/intervals'
 import { formatWeekLabel, mondayOf, shiftWeek, weekStartKey } from '../../lib/week'
 import { localizer } from '../../lib/calendarLocalizer'
+import { utcNow } from '../../lib/time'
 import { COLOR_HEX } from '../tree/colors'
 import CalendarDayHeader from './CalendarDayHeader'
 import CalendarTimezoneLabel from './CalendarTimezoneLabel'
@@ -20,7 +21,7 @@ interface CalendarEvent {
 }
 
 export default function ExecuteCalendar({ tasksById }: { tasksById: Map<string, Task> }) {
-  const [weekAnchor, setWeekAnchor] = useState(() => mondayOf(new Date()))
+  const [weekAnchor, setWeekAnchor] = useState(() => mondayOf(utcNow()))
   const [now, setNow] = useState(() => new Date())
 
   useEffect(() => {
@@ -29,7 +30,7 @@ export default function ExecuteCalendar({ tasksById }: { tasksById: Map<string, 
   }, [])
 
   const weekStart = weekStartKey(weekAnchor)
-  const isCurrentWeek = weekStart === weekStartKey(new Date())
+  const isCurrentWeek = weekStart === weekStartKey(utcNow())
 
   const { data: entries = [] } = useEntriesForWeek(weekStart)
   const { data: intervals = [] } = useIntervalsForWeek(weekStart)
