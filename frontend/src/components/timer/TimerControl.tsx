@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Task } from '../../types'
-import { useActiveTimer, useStartTimer, useStopTimer } from '../../api/timer'
+import { useActiveTimer, useMarkDone, useStartTimer, useStopTimer } from '../../api/timer'
+
+const UNTRACKABLE_STATES = new Set(['sprint_done', 'done'])
 
 function formatElapsed(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000))
@@ -10,18 +12,25 @@ function formatElapsed(ms: number): string {
   return [hours, minutes, seconds].map((n) => String(n).padStart(2, '0')).join(':')
 }
 
+interface JustStopped {
+  taskId: string
+  taskName: string
+  elapsedMs: number
+}
+
 export default function TimerControl({ tasks }: { tasks: Task[] }) {
   const { data: active } = useActiveTimer()
   const startTimer = useStartTimer()
   const stopTimer = useStopTimer()
+  const markDone = useMarkDone()
   const [selectedTaskId, setSelectedTaskId] = useState('')
   const [elapsedMs, setElapsedMs] = useState(0)
-  const [choosingOutcome, setChoosingOutcome] = useState(false)
+  const [justStopped, setJustStopped] = useState<JustStopped | null>(null)
 
   const schedulableTasks = useMemo(
     () =>
       tasks
-        .filter((task) => task.is_leaf && task.state !== 'done')
+        .filter((task) => task.is_leaf && !UNTRACKABLE_STATES.has(task.state))
         .sort((a, b) => a.name.localeCompare(b.name)),
     [tasks],
   )
@@ -40,6 +49,44 @@ export default function TimerControl({ tasks }: { tasks: Task[] }) {
 
   const activeTask = active ? tasks.find((task) => task.id === active.task_id) : undefined
 
+  function handleStop() {
+    if (!active) return
+    const taskId = active.task_id
+    const taskName = activeTask?.name ?? taskId
+    const frozenElapsedMs = elapsedMs
+    stopTimer.mutate(undefined, {
+      onSuccess: () => setJustStopped({ taskId, taskName, elapsedMs: frozenElapsedMs }),
+    })
+  }
+
+  if (justStopped) {
+    return (
+      <div className="flex flex-wrap items-center gap-4 border-b border-neutral-800 p-4">
+        <span className="text-sm text-neutral-300">
+          Stopped <strong>{justStopped.taskName}</strong>
+        </span>
+        <span className="font-mono text-lg text-neutral-100">
+          {formatElapsed(justStopped.elapsedMs)}
+        </span>
+        <span className="text-xs text-neutral-400">Mark as done?</span>
+        <button
+          type="button"
+          onClick={() => markDone.mutate(justStopped.taskId, { onSuccess: () => setJustStopped(null) })}
+          className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500"
+        >
+          Yes, done
+        </button>
+        <button
+          type="button"
+          onClick={() => setJustStopped(null)}
+          className="rounded border border-neutral-700 px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-800"
+        >
+          No, keep in progress
+        </button>
+      </div>
+    )
+  }
+
   if (active) {
     return (
       <div className="flex flex-wrap items-center gap-4 border-b border-neutral-800 p-4">
@@ -47,39 +94,14 @@ export default function TimerControl({ tasks }: { tasks: Task[] }) {
           Tracking <strong>{activeTask?.name ?? active.task_id}</strong>
         </span>
         <span className="font-mono text-lg text-neutral-100">{formatElapsed(elapsedMs)}</span>
-        {!choosingOutcome ? (
-          <button
-            type="button"
-            onClick={() => setChoosingOutcome(true)}
-            className="rounded bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-500"
-          >
-            Stop
-          </button>
-        ) : (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-neutral-400">Mark as done?</span>
-            <button
-              type="button"
-              onClick={() => {
-                stopTimer.mutate(true)
-                setChoosingOutcome(false)
-              }}
-              className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500"
-            >
-              Yes, done
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                stopTimer.mutate(false)
-                setChoosingOutcome(false)
-              }}
-              className="rounded border border-neutral-700 px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-800"
-            >
-              No, keep in progress
-            </button>
-          </div>
-        )}
+        <button
+          type="button"
+          onClick={handleStop}
+          disabled={stopTimer.isPending}
+          className="rounded bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-500 disabled:opacity-50"
+        >
+          Stop
+        </button>
       </div>
     )
   }

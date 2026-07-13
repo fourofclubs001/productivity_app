@@ -60,39 +60,53 @@ def test_starting_a_new_timer_stops_the_previous_one(client):
     assert first_after["state"] == "in_progress"
 
 
-def test_stop_timer_marking_done_sets_sprint_done(client):
+def test_stop_timer_ends_the_entry_without_touching_task_state(client):
     task = create_leaf(client)
     client.post("/timer/start", json={"task_id": task["id"]})
 
-    response = client.post("/timer/stop", json={"mark_done": True})
+    response = client.post("/timer/stop")
     assert response.status_code == 200
     assert response.json()["end"] is not None
 
     task_after = client.get(f"/tasks/{task['id']}").json()
-    assert task_after["state"] == "sprint_done"
+    assert task_after["state"] == "in_progress"
 
     assert client.get("/timer/active").json() is None
 
 
-def test_stop_timer_without_marking_done_stays_in_progress(client):
+def test_stop_timer_without_active_timer_fails(client):
+    response = client.post("/timer/stop")
+    assert response.status_code == 400
+
+
+def test_mark_done_transitions_in_progress_task_to_sprint_done(client):
     task = create_leaf(client)
     client.post("/timer/start", json={"task_id": task["id"]})
+    client.post("/timer/stop")
 
-    client.post("/timer/stop", json={"mark_done": False})
+    response = client.post("/timer/mark-done", json={"task_id": task["id"]})
+    assert response.status_code == 200
+    assert response.json()["state"] == "sprint_done"
 
     task_after = client.get(f"/tasks/{task['id']}").json()
-    assert task_after["state"] == "in_progress"
+    assert task_after["state"] == "sprint_done"
 
 
-def test_stop_timer_without_active_timer_fails(client):
-    response = client.post("/timer/stop", json={"mark_done": True})
+def test_mark_done_rejects_a_task_that_is_not_in_progress(client):
+    task = create_leaf(client)
+    response = client.post("/timer/mark-done", json={"task_id": task["id"]})
     assert response.status_code == 400
+
+
+def test_mark_done_rejects_missing_task(client):
+    response = client.post("/timer/mark-done", json={"task_id": "missing"})
+    assert response.status_code == 404
 
 
 def test_list_entries_for_week(client):
     task = create_leaf(client)
     client.post("/timer/start", json={"task_id": task["id"]})
-    client.post("/timer/stop", json={"mark_done": True})
+    client.post("/timer/stop")
 
     import datetime
 
@@ -123,7 +137,7 @@ def test_deleting_a_task_with_a_running_timer_is_blocked(client):
 def test_deleting_a_task_after_stopping_its_timer_succeeds(client):
     task = create_leaf(client)
     client.post("/timer/start", json={"task_id": task["id"]})
-    client.post("/timer/stop", json={"mark_done": False})
+    client.post("/timer/stop")
 
     response = client.delete(f"/tasks/{task['id']}")
     assert response.status_code == 204

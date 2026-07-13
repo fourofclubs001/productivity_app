@@ -1,15 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from './client'
-import type { Entry } from '../types'
+import type { Entry, Task } from '../types'
 
 const timerApi = {
   active: () => apiFetch<Entry | null>('/timer/active'),
   start: (taskId: string) =>
     apiFetch<Entry>('/timer/start', { method: 'POST', body: JSON.stringify({ task_id: taskId }) }),
-  stop: (markDone: boolean) =>
-    apiFetch<Entry>('/timer/stop', {
+  stop: () => apiFetch<Entry>('/timer/stop', { method: 'POST' }),
+  markDone: (taskId: string) =>
+    apiFetch<Task>('/timer/mark-done', {
       method: 'POST',
-      body: JSON.stringify({ mark_done: markDone }),
+      body: JSON.stringify({ task_id: taskId }),
     }),
   listForWeek: (weekStart: string) => apiFetch<Entry[]>(`/entries?week_start=${weekStart}`),
 }
@@ -43,11 +44,20 @@ export function useStartTimer() {
 export function useStopTimer() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (markDone: boolean) => timerApi.stop(markDone),
+    mutationFn: () => timerApi.stop(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ACTIVE_KEY })
-      queryClient.invalidateQueries({ queryKey: TASKS_KEY })
       queryClient.invalidateQueries({ queryKey: ['entries'] })
+    },
+  })
+}
+
+export function useMarkDone() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (taskId: string) => timerApi.markDone(taskId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: TASKS_KEY })
     },
   })
 }

@@ -5,7 +5,12 @@ from app.models.entry import EntryOut
 from app.models.task import TaskState
 from app.repositories.entry_repository import EntryRepository
 from app.repositories.task_repository import TaskRepository
-from app.services.errors import NoActiveTimerError, TaskNotFoundError, TaskNotLeafError
+from app.services.errors import (
+    NoActiveTimerError,
+    TaskNotFoundError,
+    TaskNotInProgressError,
+    TaskNotLeafError,
+)
 
 
 class TimerService:
@@ -33,7 +38,7 @@ class TimerService:
 
         return EntryOut(id=entry_id, task_id=task_id, start=now, end=None)
 
-    async def stop(self, mark_done: bool) -> EntryOut:
+    async def stop(self) -> EntryOut:
         active_id = await self._entries.get_active_id()
         if active_id is None:
             raise NoActiveTimerError
@@ -42,11 +47,18 @@ class TimerService:
         data = await self._entries.set_end(active_id, now)
         await self._entries.set_active_id(None)
 
-        task_id = data["task_id"]
-        if mark_done:
-            await self._tasks.update_fields(task_id, {"state": TaskState.sprint_done.value})
-
         return self._to_out(active_id, data)
+
+    async def mark_done(self, task_id: str) -> None:
+        task_node = await self._tasks.load_node(task_id)
+        if task_node is None:
+            raise TaskNotFoundError(task_id)
+
+        state = TaskState(task_node.fields.get("state", TaskState.backlog.value))
+        if state != TaskState.in_progress:
+            raise TaskNotInProgressError(task_id)
+
+        await self._tasks.update_fields(task_id, {"state": TaskState.sprint_done.value})
 
     async def get_active(self) -> EntryOut | None:
         active_id = await self._entries.get_active_id()

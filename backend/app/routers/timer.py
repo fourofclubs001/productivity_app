@@ -2,9 +2,16 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.dependencies import apply_rollover, get_timer_service
-from app.models.entry import EntryOut, StartTimerRequest, StopTimerRequest
-from app.services.errors import NoActiveTimerError, TaskNotFoundError, TaskNotLeafError
+from app.dependencies import apply_rollover, get_task_service, get_timer_service
+from app.models.entry import EntryOut, MarkDoneRequest, StartTimerRequest
+from app.models.task import TaskOut
+from app.services.errors import (
+    NoActiveTimerError,
+    TaskNotFoundError,
+    TaskNotInProgressError,
+    TaskNotLeafError,
+)
+from app.services.task_service import TaskService
 from app.services.timer_service import TimerService
 
 router = APIRouter(tags=["timer"], dependencies=[Depends(apply_rollover)])
@@ -23,11 +30,26 @@ async def start_timer(payload: StartTimerRequest, service: ServiceDep) -> EntryO
 
 
 @router.post("/timer/stop", response_model=EntryOut)
-async def stop_timer(payload: StopTimerRequest, service: ServiceDep) -> EntryOut:
+async def stop_timer(service: ServiceDep) -> EntryOut:
     try:
-        return await service.stop(payload.mark_done)
+        return await service.stop()
     except NoActiveTimerError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/timer/mark-done", response_model=TaskOut)
+async def mark_timer_task_done(
+    payload: MarkDoneRequest,
+    timer_service: ServiceDep,
+    task_service: Annotated[TaskService, Depends(get_task_service)],
+) -> TaskOut:
+    try:
+        await timer_service.mark_done(payload.task_id)
+    except TaskNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except TaskNotInProgressError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return await task_service.get_task(payload.task_id)
 
 
 @router.get("/timer/active")

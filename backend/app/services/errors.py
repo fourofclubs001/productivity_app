@@ -43,3 +43,9 @@ class IntervalNotFoundError(Exception):
 class NoActiveTimerError(Exception):
     def __init__(self) -> None:
         super().__init__("No timer is currently running")
+
+
+class TaskNotInProgressError(Exception):
+    def __init__(self, task_id: str) -> None:
+        self.task_id = task_id
+        super().__init__(f"Task {task_id!r} is not in progress and cannot be marked done")

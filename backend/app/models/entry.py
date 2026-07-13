@@ -7,8 +7,8 @@ class StartTimerRequest(BaseModel):
     task_id: str
 
 
-class StopTimerRequest(BaseModel):
-    mark_done: bool
+class MarkDoneRequest(BaseModel):
+    task_id: str
 
 
 class EntryOut(BaseModel):
