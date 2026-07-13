@@ -10,8 +10,14 @@ import {
   useRemoveRequirement,
   useUpdateTask,
 } from '../../api/tasks'
-import { useDeleteInterval, useIntervalsForTask } from '../../api/intervals'
+import { useDeleteInterval, useIntervalsForTask, useUpdateInterval } from '../../api/intervals'
 import { descendantIds } from '../../lib/taskTree'
+import AddToCalendarModal from '../calendar/AddToCalendarModal'
+import IntervalTimeFields, {
+  intervalTimeToDates,
+  intervalToTimeValue,
+  type IntervalTimeValue,
+} from '../calendar/IntervalTimeFields'
 import ColorSwatchPicker from './ColorSwatchPicker'
 import StateBadge from './StateBadge'
 
@@ -34,12 +40,16 @@ export default function TaskDetailPanel({
   const removeRequirement = useRemoveRequirement()
   const { data: intervals = [] } = useIntervalsForTask(task.id)
   const deleteInterval = useDeleteInterval()
+  const updateInterval = useUpdateInterval()
 
   const [name, setName] = useState(task.name)
   const [dod, setDod] = useState(task.definition_of_done)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [addParentId, setAddParentId] = useState('')
   const [addRequiredId, setAddRequiredId] = useState('')
+  const [showAddToCalendar, setShowAddToCalendar] = useState(false)
+  const [editingIntervalId, setEditingIntervalId] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState<IntervalTimeValue | null>(null)
 
   useEffect(() => {
     setName(task.name)
@@ -47,6 +57,9 @@ export default function TaskDetailPanel({
     setConfirmingDelete(false)
     setAddParentId('')
     setAddRequiredId('')
+    setShowAddToCalendar(false)
+    setEditingIntervalId(null)
+    setEditValue(null)
     resetDeleteTask()
   }, [task.id, task.name, task.definition_of_done, resetDeleteTask])
 
@@ -157,38 +170,106 @@ export default function TaskDetailPanel({
 
       {task.is_leaf && (
         <div className="mt-6">
-          <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
-            Sprint schedule
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
+              Sprint schedule
+            </label>
+            <button
+              type="button"
+              title="Add to calendar"
+              onClick={() => setShowAddToCalendar(true)}
+              className="rounded border border-border px-2 py-0.5 text-xs text-text-secondary hover:bg-surface-alt hover:text-text-primary"
+            >
+              + Add to calendar
+            </button>
+          </div>
           {intervals.length === 0 ? (
             <p className="mt-1 text-xs text-text-secondary">
-              Not scheduled. Select this task, then drag on the calendar to reserve time.
+              Not scheduled. Drag this task onto the calendar, or use "Add to calendar" above.
             </p>
           ) : (
             <ul className="mt-2 space-y-1">
               {intervals
                 .slice()
                 .sort((a, b) => a.start.localeCompare(b.start))
-                .map((interval) => (
-                  <li
-                    key={interval.id}
-                    className="flex items-center justify-between rounded bg-surface-alt px-2 py-1 text-xs text-text-secondary"
-                  >
-                    <span>
-                      {format(new Date(interval.start), 'EEE MMM d, HH:mm')} –{' '}
-                      {format(new Date(interval.end), 'HH:mm')}
-                    </span>
-                    <button
-                      type="button"
-                      title="Remove this time slot"
-                      onClick={() => deleteInterval.mutate(interval.id)}
-                      className="text-text-secondary hover:text-danger"
+                .map((interval) =>
+                  editingIntervalId === interval.id && editValue ? (
+                    <li
+                      key={interval.id}
+                      className="rounded bg-surface-alt px-2 py-1.5 text-xs text-text-secondary"
                     >
-                      ×
-                    </button>
-                  </li>
-                ))}
+                      <IntervalTimeFields value={editValue} onChange={setEditValue} />
+                      <div className="mt-1.5 flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingIntervalId(null)
+                            setEditValue(null)
+                          }}
+                          className="text-text-secondary hover:text-text-primary"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const { start, end } = intervalTimeToDates(editValue)
+                            updateInterval.mutate(
+                              {
+                                id: interval.id,
+                                input: { start: start.toISOString(), end: end.toISOString() },
+                              },
+                              {
+                                onSuccess: () => {
+                                  setEditingIntervalId(null)
+                                  setEditValue(null)
+                                },
+                              },
+                            )
+                          }}
+                          disabled={updateInterval.isPending}
+                          className="font-medium text-accent hover:text-accent-hover disabled:opacity-50"
+                        >
+                          Save
+                        </button>
+                      </div>
+                      {updateInterval.isError && (
+                        <p className="mt-1 text-danger">
+                          {(updateInterval.error as Error).message}
+                        </p>
+                      )}
+                    </li>
+                  ) : (
+                    <li
+                      key={interval.id}
+                      className="flex items-center justify-between rounded bg-surface-alt px-2 py-1 text-xs text-text-secondary"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingIntervalId(interval.id)
+                          setEditValue(intervalToTimeValue(interval))
+                        }}
+                        className="text-left hover:text-text-primary"
+                      >
+                        {format(new Date(interval.start), 'EEE MMM d, HH:mm')} –{' '}
+                        {format(new Date(interval.end), 'HH:mm')}
+                      </button>
+                      <button
+                        type="button"
+                        title="Remove this time slot"
+                        onClick={() => deleteInterval.mutate(interval.id)}
+                        className="text-text-secondary hover:text-danger"
+                      >
+                        ×
+                      </button>
+                    </li>
+                  ),
+                )}
             </ul>
+          )}
+          {showAddToCalendar && (
+            <AddToCalendarModal taskId={task.id} onClose={() => setShowAddToCalendar(false)} />
           )}
         </div>
       )}

@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.dependencies import apply_rollover, get_interval_service
-from app.models.interval import IntervalCreate, IntervalOut
+from app.models.interval import IntervalCreate, IntervalOut, IntervalUpdate
 from app.services.errors import (
     IntervalNotFoundError,
     InvalidIntervalError,
@@ -28,6 +28,18 @@ async def create_interval(payload: IntervalCreate, service: ServiceDep) -> Inter
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except UnmetPrerequisiteError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.patch("/{interval_id}", response_model=IntervalOut)
+async def update_interval(
+    interval_id: str, payload: IntervalUpdate, service: ServiceDep
+) -> IntervalOut:
+    try:
+        return await service.update_interval(interval_id, payload)
+    except IntervalNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except InvalidIntervalError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.delete("/{interval_id}", status_code=204)

@@ -9,6 +9,11 @@ class IntervalCreate(BaseModel):
     end: datetime
 
 
+class IntervalUpdate(BaseModel):
+    start: datetime
+    end: datetime
+
+
 class IntervalOut(BaseModel):
     id: str
     task_id: str

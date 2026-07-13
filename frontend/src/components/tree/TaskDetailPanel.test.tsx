@@ -23,9 +23,14 @@ vi.mock('../../api/tasks', () => ({
   useRemoveRequirement: () => ({ mutate: removeRequirementMutate, isPending: false }),
 }))
 
+const updateIntervalMutate = vi.fn()
+const useIntervalsForTask = vi.fn(() => ({ data: [] as unknown[] }))
+
 vi.mock('../../api/intervals', () => ({
-  useIntervalsForTask: () => ({ data: [] }),
+  useIntervalsForTask: () => useIntervalsForTask(),
   useDeleteInterval: () => ({ mutate: vi.fn() }),
+  useUpdateInterval: () => ({ mutate: updateIntervalMutate, isPending: false }),
+  useCreateInterval: () => ({ mutate: vi.fn(), isPending: false }),
 }))
 
 beforeEach(() => {
@@ -36,6 +41,8 @@ beforeEach(() => {
   removeParentMutate.mockReset()
   addRequirementMutate.mockReset()
   removeRequirementMutate.mockReset()
+  updateIntervalMutate.mockReset()
+  useIntervalsForTask.mockReturnValue({ data: [] })
   deleteTaskState.mockReturnValue({
     mutate: deleteMutate,
     reset: deleteReset,
@@ -196,6 +203,50 @@ describe('TaskDetailPanel', () => {
     )
 
     expect(screen.getByText(/would create a cycle/i)).toBeInTheDocument()
+  })
+
+  it('opens the "Add to calendar" modal when the button is clicked', () => {
+    const task = makeTask({ id: 't1', is_leaf: true })
+    render(
+      <TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} onAddChild={() => {}} />,
+    )
+
+    expect(screen.queryByText('Add to calendar')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTitle('Add to calendar'))
+    expect(screen.getByText('Add to calendar')).toBeInTheDocument()
+  })
+
+  it('edits a scheduled interval inline and saves the new time', () => {
+    useIntervalsForTask.mockReturnValue({
+      data: [
+        {
+          id: 'iv1',
+          task_id: 't1',
+          start: '2026-07-13T09:00:00.000Z',
+          end: '2026-07-13T10:00:00.000Z',
+          week_start: '2026-07-13',
+        },
+      ],
+    })
+    const task = makeTask({ id: 't1', is_leaf: true })
+    render(
+      <TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} onAddChild={() => {}} />,
+    )
+
+    // The row's button text is "<day>, HH:mm – HH:mm" -- match the dash
+    // rather than hardcoding digits, since displayed time is in local TZ.
+    fireEvent.click(screen.getByRole('button', { name: /–/ }))
+    const dayInput = screen.getByLabelText('Day') as HTMLInputElement
+    fireEvent.change(screen.getByLabelText('Start hour'), { target: { value: '15:30' } })
+    fireEvent.click(screen.getByText('Save'))
+
+    // Mirror the component's own local-time construction so this assertion
+    // doesn't depend on which timezone the test happens to run in.
+    const expectedStart = new Date(`${dayInput.value}T15:30`).toISOString()
+    expect(updateIntervalMutate).toHaveBeenCalledWith(
+      { id: 'iv1', input: expect.objectContaining({ start: expectedStart }) },
+      expect.any(Object),
+    )
   })
 })
 

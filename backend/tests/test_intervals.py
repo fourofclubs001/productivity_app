@@ -27,6 +27,66 @@ def create_interval(client, task_id: str, start: datetime, end: datetime) -> dic
     return response.json()
 
 
+def test_update_interval_changes_time_within_same_week(client):
+    task = create_leaf(client)
+    start = datetime(2026, 7, 13, 9, 0)
+    interval = create_interval(client, task["id"], start, start + timedelta(hours=1))
+
+    new_start = start + timedelta(hours=3)
+    response = client.patch(
+        f"/intervals/{interval['id']}",
+        json={"start": iso(new_start), "end": iso(new_start + timedelta(hours=1))},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["week_start"] == "2026-07-13"
+
+    week = client.get("/intervals", params={"week_start": "2026-07-13"}).json()
+    assert len(week) == 1
+    assert week[0]["id"] == interval["id"]
+
+
+def test_update_interval_across_week_boundary_rekeys_it(client):
+    task = create_leaf(client)
+    start = datetime(2026, 7, 13, 9, 0)
+    interval = create_interval(client, task["id"], start, start + timedelta(hours=1))
+
+    new_start = start + timedelta(days=7)
+    response = client.patch(
+        f"/intervals/{interval['id']}",
+        json={"start": iso(new_start), "end": iso(new_start + timedelta(hours=1))},
+    )
+    assert response.status_code == 200
+    assert response.json()["week_start"] == "2026-07-20"
+
+    old_week = client.get("/intervals", params={"week_start": "2026-07-13"}).json()
+    assert old_week == []
+    new_week = client.get("/intervals", params={"week_start": "2026-07-20"}).json()
+    assert len(new_week) == 1
+    assert new_week[0]["id"] == interval["id"]
+
+
+def test_update_interval_rejects_end_before_start(client):
+    task = create_leaf(client)
+    start = datetime(2026, 7, 13, 9, 0)
+    interval = create_interval(client, task["id"], start, start + timedelta(hours=1))
+
+    response = client.patch(
+        f"/intervals/{interval['id']}",
+        json={"start": iso(start), "end": iso(start - timedelta(hours=1))},
+    )
+    assert response.status_code == 400
+
+
+def test_update_missing_interval_returns_404(client):
+    start = datetime(2026, 7, 13, 9, 0)
+    response = client.patch(
+        "/intervals/does-not-exist",
+        json={"start": iso(start), "end": iso(start + timedelta(hours=1))},
+    )
+    assert response.status_code == 404
+
+
 def test_create_interval_moves_backlog_task_to_sprint_backlog(client):
     task = create_leaf(client)
     start = datetime(2026, 7, 13, 9, 0)

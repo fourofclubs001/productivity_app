@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
+import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core'
 import type { Task } from '../../types'
 import TaskTreeNode from './TaskTreeNode'
 import { rootIds as computeRootIds, resolveDropAction } from '../../lib/taskTree'
@@ -27,8 +27,6 @@ export default function TaskTree({
   const reorderTask = useReorderTask()
   const { pushUndo } = useUndo()
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
-
   function toggleExpand(id: string) {
     setExpanded((prev) => {
       const next = new Set(prev)
@@ -38,11 +36,16 @@ export default function TaskTree({
     })
   }
 
+  useDndMonitor({ onDragEnd: handleDragEnd })
+
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     if (!over) return
     const activeId = String(active.id)
     const overId = String(over.id)
+    // The DndContext is shared with PlanCalendar (item 5's drag-to-schedule);
+    // ignore drops that aren't onto another row in this tree.
+    if (!tasksById.has(activeId) || !tasksById.has(overId)) return
     const activeRect = active.rect.current.translated
     if (!activeRect) return
     const relativeY = (activeRect.top + activeRect.height / 2 - over.rect.top) / over.rect.height
@@ -111,29 +114,27 @@ export default function TaskTree({
           +
         </button>
       </div>
-      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-        <div className="flex-1 overflow-y-auto p-1">
-          {rootIds.length === 0 && (
-            <p className="px-2 py-4 text-center text-xs text-text-secondary">
-              No tasks yet. Click + to create one.
-            </p>
-          )}
-          {rootIds.map((id) => (
-            <TaskTreeNode
-              key={id}
-              taskId={id}
-              tasksById={tasksById}
-              depth={0}
-              selectedId={selectedId}
-              expanded={expanded}
-              ancestorPath={new Set()}
-              onSelect={onSelect}
-              onToggleExpand={toggleExpand}
-              onAddChild={onOpenNewTask}
-            />
-          ))}
-        </div>
-      </DndContext>
+      <div className="flex-1 overflow-y-auto p-1">
+        {rootIds.length === 0 && (
+          <p className="px-2 py-4 text-center text-xs text-text-secondary">
+            No tasks yet. Click + to create one.
+          </p>
+        )}
+        {rootIds.map((id) => (
+          <TaskTreeNode
+            key={id}
+            taskId={id}
+            tasksById={tasksById}
+            depth={0}
+            selectedId={selectedId}
+            expanded={expanded}
+            ancestorPath={new Set()}
+            onSelect={onSelect}
+            onToggleExpand={toggleExpand}
+            onAddChild={onOpenNewTask}
+          />
+        ))}
+      </div>
     </div>
   )
 }

@@ -43,6 +43,26 @@ class IntervalRepository:
         data = await self._redis.hgetall(interval_key(interval_id))
         return data or None
 
+    async def update(self, interval_id: str, start: datetime, end: datetime) -> str | None:
+        data = await self.get(interval_id)
+        if data is None:
+            return None
+
+        old_week_start = data["week_start"]
+        new_week_start = monday_of(start.date()).isoformat()
+        await self._redis.hset(
+            interval_key(interval_id),
+            mapping={
+                "start": start.isoformat(),
+                "end": end.isoformat(),
+                "week_start": new_week_start,
+            },
+        )
+        if new_week_start != old_week_start:
+            await self._redis.zrem(week_intervals_key(old_week_start), interval_id)
+        await self._redis.zadd(week_intervals_key(new_week_start), {interval_id: start.timestamp()})
+        return new_week_start
+
     async def delete(self, interval_id: str) -> dict[str, Any] | None:
         data = await self.get(interval_id)
         if data is None:

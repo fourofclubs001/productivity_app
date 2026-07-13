@@ -8,12 +8,19 @@ export interface CreateIntervalInput {
   end: string
 }
 
+export interface UpdateIntervalInput {
+  start: string
+  end: string
+}
+
 const intervalsApi = {
   listForWeek: (weekStart: string) =>
     apiFetch<Interval[]>(`/intervals?week_start=${weekStart}`),
   listForTask: (taskId: string) => apiFetch<Interval[]>(`/intervals/by-task/${taskId}`),
   create: (input: CreateIntervalInput) =>
     apiFetch<Interval>('/intervals', { method: 'POST', body: JSON.stringify(input) }),
+  update: (id: string, input: UpdateIntervalInput) =>
+    apiFetch<Interval>(`/intervals/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
   remove: (id: string) => apiFetch<void>(`/intervals/${id}`, { method: 'DELETE' }),
 }
 
@@ -37,6 +44,18 @@ export function useCreateInterval() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: intervalsApi.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['intervals'] })
+      queryClient.invalidateQueries({ queryKey: TASKS_KEY })
+    },
+  })
+}
+
+export function useUpdateInterval() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdateIntervalInput }) =>
+      intervalsApi.update(id, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['intervals'] })
       queryClient.invalidateQueries({ queryKey: TASKS_KEY })

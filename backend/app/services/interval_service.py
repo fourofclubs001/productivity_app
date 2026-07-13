@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import uuid4
 
-from app.models.interval import IntervalCreate, IntervalOut
+from app.models.interval import IntervalCreate, IntervalOut, IntervalUpdate
 from app.models.task import TaskState
 from app.repositories.interval_repository import IntervalRepository
 from app.repositories.task_repository import TaskRepository
@@ -62,6 +62,23 @@ class IntervalService:
         return IntervalOut(
             id=interval_id,
             task_id=payload.task_id,
+            start=payload.start,
+            end=payload.end,
+            week_start=week_start,
+        )
+
+    async def update_interval(self, interval_id: str, payload: IntervalUpdate) -> IntervalOut:
+        if payload.end <= payload.start:
+            raise InvalidIntervalError
+
+        data = await self._intervals.get(interval_id)
+        if data is None:
+            raise IntervalNotFoundError(interval_id)
+
+        week_start = await self._intervals.update(interval_id, payload.start, payload.end)
+        return IntervalOut(
+            id=interval_id,
+            task_id=data["task_id"],
             start=payload.start,
             end=payload.end,
             week_start=week_start,

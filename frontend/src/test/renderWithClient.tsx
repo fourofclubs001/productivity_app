@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { DndContext } from '@dnd-kit/core'
 import { render } from '@testing-library/react'
 import { UndoProvider } from '../undo/UndoProvider'
 
@@ -9,7 +10,9 @@ export function renderWithClient(ui: ReactElement) {
   })
   return render(
     <QueryClientProvider client={queryClient}>
-      <UndoProvider>{ui}</UndoProvider>
+      <UndoProvider>
+        <DndContext>{ui}</DndContext>
+      </UndoProvider>
     </QueryClientProvider>,
   )
 }
