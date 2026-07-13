@@ -2,8 +2,19 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from app.models.task import PALETTE, TaskCreate, TaskOut, TaskState, TaskUpdate
-from app.repositories.task_repository import TaskNode, TaskRepository
+from app.repositories.task_repository import ORDER_STEP, TaskNode, TaskRepository
 from app.services.errors import CycleError, InvalidColorError, SelfParentError, TaskNotFoundError
+
+
+def _order_of(node: TaskNode) -> float:
+    try:
+        return float(node.fields.get("order", 0))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _sorted_by_order(ids: set[str] | list[str], graph: dict[str, TaskNode]) -> list[str]:
+    return sorted(ids, key=lambda task_id: (_order_of(graph[task_id]), task_id))
 
 
 def _is_reachable(start_id: str, target_id: str, graph: dict[str, TaskNode]) -> bool:
@@ -85,7 +96,8 @@ class TaskService:
             effective_colors=sorted(_compute_effective_colors(task_id, graph, color_memo)),
             is_leaf=not node.children,
             parent_ids=sorted(node.parents),
-            children_ids=sorted(node.children),
+            children_ids=_sorted_by_order(node.children, graph),
+            order=_order_of(node),
         )
 
     async def create_task(self, payload: TaskCreate) -> TaskOut:
@@ -100,6 +112,7 @@ class TaskService:
         if invalid:
             raise InvalidColorError(invalid)
 
+        order = await self._repo.next_order()
         await self._repo.create(
             task_id,
             {
@@ -108,6 +121,7 @@ class TaskService:
                 "definition_of_done": payload.definition_of_done,
                 "state": TaskState.backlog.value,
                 "created_at": now.isoformat(),
+                "order": str(order),
             },
         )
         for parent_id in parent_ids:
@@ -179,3 +193,58 @@ class TaskService:
             raise TaskNotFoundError(task_id)
         await self._repo.remove_child_edge(parent_id, task_id)
         return await self.get_task(task_id)
+
+    async def reorder_task(
+        self, task_id: str, after_id: str | None, before_id: str | None
+    ) -> TaskOut:
+        """Place task_id's global order value between after_id and before_id.
+
+        Ordering is a single value shared across the whole DAG (not scoped
+        per-parent), so "between" here means immediately adjacent in that one
+        global order, regardless of which list (root list, some parent's
+        children) the caller is actually reordering within.
+        """
+        graph = await self._repo.load_graph()
+        if task_id not in graph:
+            raise TaskNotFoundError(task_id)
+        if after_id is not None and after_id not in graph:
+            raise TaskNotFoundError(after_id)
+        if before_id is not None and before_id not in graph:
+            raise TaskNotFoundError(before_id)
+
+        after_order = _order_of(graph[after_id]) if after_id is not None else None
+        before_order = _order_of(graph[before_id]) if before_id is not None else None
+
+        if after_order is not None and before_order is not None:
+            candidate = (after_order + before_order) / 2
+            exhausted = candidate <= after_order or candidate >= before_order
+        elif after_order is not None:
+            candidate = after_order + ORDER_STEP
+            exhausted = False
+        elif before_order is not None:
+            candidate = before_order - ORDER_STEP
+            exhausted = False
+        else:
+            candidate = 0.0
+            exhausted = False
+
+        if exhausted:
+            await self._rebalance_order(graph, task_id, after_id)
+        else:
+            await self._repo.update_fields(task_id, {"order": str(candidate)})
+
+        return await self.get_task(task_id)
+
+    async def _rebalance_order(
+        self, graph: dict[str, TaskNode], task_id: str, after_id: str | None
+    ) -> None:
+        """Evenly re-space every task's order, inserting task_id right after after_id.
+
+        Triggered when two neighbors' order values are float-adjacent, so no
+        midpoint can be represented between them anymore.
+        """
+        ordered_ids = [tid for tid in _sorted_by_order(list(graph.keys()), graph) if tid != task_id]
+        insert_at = 0 if after_id is None else ordered_ids.index(after_id) + 1
+        ordered_ids.insert(insert_at, task_id)
+        for index, tid in enumerate(ordered_ids):
+            await self._repo.update_fields(tid, {"order": str(index * ORDER_STEP)})

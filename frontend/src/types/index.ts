@@ -12,6 +12,7 @@ export interface Task {
   is_leaf: boolean
   parent_ids: string[]
   children_ids: string[]
+  order: number
 }
 
 export interface Interval {

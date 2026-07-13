@@ -190,3 +190,79 @@ def test_create_task_with_invalid_color_rejected(client):
         json={"name": "Task", "definition_of_done": "d", "colors": ["not-a-color"]},
     )
     assert response.status_code == 400
+
+
+def test_new_tasks_get_increasing_default_order(client):
+    a = create_task(client, name="A")
+    b = create_task(client, name="B")
+    c = create_task(client, name="C")
+    assert a["order"] < b["order"] < c["order"]
+
+
+def test_children_ids_are_order_sorted(client):
+    parent = create_task(client, name="Parent")
+    third = create_task(client, name="Third", parent_ids=[parent["id"]])
+    first = create_task(client, name="First", parent_ids=[parent["id"]])
+    second = create_task(client, name="Second", parent_ids=[parent["id"]])
+    client.patch(f"/tasks/{first['id']}/order", json={"before_id": third["id"]})
+    client.patch(
+        f"/tasks/{second['id']}/order",
+        json={"after_id": first["id"], "before_id": third["id"]},
+    )
+
+    body = client.get(f"/tasks/{parent['id']}").json()
+    assert body["children_ids"] == [first["id"], second["id"], third["id"]]
+
+
+def test_reorder_task_moves_it_between_two_others(client):
+    a = create_task(client, name="A")
+    b = create_task(client, name="B")
+    c = create_task(client, name="C")
+    # Move C between A and B.
+    response = client.patch(
+        f"/tasks/{c['id']}/order", json={"after_id": a["id"], "before_id": b["id"]}
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert a["order"] < body["order"] < b["order"]
+
+
+def test_reorder_to_start_and_end(client):
+    a = create_task(client, name="A")
+    b = create_task(client, name="B")
+
+    moved_to_start = client.patch(f"/tasks/{b['id']}/order", json={"before_id": a["id"]}).json()
+    assert moved_to_start["order"] < a["order"]
+
+    moved_to_end = client.patch(f"/tasks/{b['id']}/order", json={"after_id": a["id"]}).json()
+    assert moved_to_end["order"] > a["order"]
+
+
+def test_reorder_rebalances_when_precision_is_exhausted(client):
+    a = create_task(client, name="A")
+    b = create_task(client, name="B")
+
+    # Repeatedly insert a fresh task into the shrinking (lo, B) gap, each time
+    # narrowing lo to the newly-inserted task, until float precision can no
+    # longer represent a midpoint distinct from both neighbors -- forcing a
+    # full rebalance of the whole order sequence.
+    lo = a
+    inserted_ids = []
+    for i in range(100):
+        candidate = create_task(client, name=f"Between {i}")
+        response = client.patch(
+            f"/tasks/{candidate['id']}/order", json={"after_id": lo["id"], "before_id": b["id"]}
+        )
+        assert response.status_code == 200
+        moved = response.json()
+        inserted_ids.append(moved["id"])
+        lo = moved
+
+    tasks_by_id = {t["id"]: t for t in client.get("/tasks").json()}
+    ordered = sorted(tasks_by_id.values(), key=lambda t: t["order"])
+    ordered_ids = [t["id"] for t in ordered]
+    # Rebalance must preserve relative order (A first, then every inserted
+    # task in insertion order, then B last) even though every order value
+    # got renumbered, and all resulting values must be distinct.
+    assert ordered_ids == [a["id"], *inserted_ids, b["id"]]
+    assert len({t["order"] for t in ordered}) == len(ordered)

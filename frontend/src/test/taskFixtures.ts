@@ -13,6 +13,7 @@ export function makeTask(overrides: Partial<Task> = {}): Task {
     is_leaf: true,
     parent_ids: [],
     children_ids: [],
+    order: 0,
     ...overrides,
   }
 }

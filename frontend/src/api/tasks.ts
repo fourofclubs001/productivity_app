@@ -32,6 +32,11 @@ const tasksApi = {
     }),
   removeParent: (id: string, parentId: string) =>
     apiFetch<Task>(`/tasks/${id}/parents/${parentId}`, { method: 'DELETE' }),
+  reorder: (id: string, afterId: string | null, beforeId: string | null) =>
+    apiFetch<Task>(`/tasks/${id}/order`, {
+      method: 'PATCH',
+      body: JSON.stringify({ after_id: afterId, before_id: beforeId }),
+    }),
 }
 
 const TASKS_KEY = ['tasks']
@@ -84,6 +89,22 @@ export function useRemoveParent() {
   return useMutation({
     mutationFn: ({ id, parentId }: { id: string; parentId: string }) =>
       tasksApi.removeParent(id, parentId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: TASKS_KEY }),
+  })
+}
+
+export function useReorderTask() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      afterId,
+      beforeId,
+    }: {
+      id: string
+      afterId: string | null
+      beforeId: string | null
+    }) => tasksApi.reorder(id, afterId, beforeId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: TASKS_KEY }),
   })
 }

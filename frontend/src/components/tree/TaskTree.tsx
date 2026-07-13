@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { Task } from '../../types'
 import TaskTreeNode from './TaskTreeNode'
+import { rootIds as computeRootIds } from '../../lib/taskTree'
 
 export default function TaskTree({
   tasks,
@@ -16,14 +17,7 @@ export default function TaskTree({
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   const tasksById = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks])
-  const rootIds = useMemo(
-    () =>
-      tasks
-        .filter((task) => task.parent_ids.length === 0)
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map((task) => task.id),
-    [tasks],
-  )
+  const rootIds = useMemo(() => computeRootIds(tasks), [tasks])
 
   function toggleExpand(id: string) {
     setExpanded((prev) => {

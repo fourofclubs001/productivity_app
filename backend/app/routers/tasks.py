@@ -4,7 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from redis.asyncio import Redis
 
 from app.dependencies import apply_rollover, get_task_service
-from app.models.task import PALETTE, AddParentRequest, TaskCreate, TaskOut, TaskUpdate
+from app.models.task import (
+    PALETTE,
+    AddParentRequest,
+    ReorderRequest,
+    TaskCreate,
+    TaskOut,
+    TaskUpdate,
+)
 from app.redis_client import get_redis
 from app.repositories.entry_repository import EntryRepository
 from app.repositories.interval_repository import IntervalRepository
@@ -96,5 +103,13 @@ async def add_parent(task_id: str, payload: AddParentRequest, service: ServiceDe
 async def remove_parent(task_id: str, parent_id: str, service: ServiceDep) -> TaskOut:
     try:
         return await service.remove_parent(task_id, parent_id)
+    except TaskNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.patch("/{task_id}/order", response_model=TaskOut)
+async def reorder_task(task_id: str, payload: ReorderRequest, service: ServiceDep) -> TaskOut:
+    try:
+        return await service.reorder_task(task_id, payload.after_id, payload.before_id)
     except TaskNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

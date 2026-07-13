@@ -5,6 +5,8 @@ from redis.asyncio import Redis
 
 ALL_TASKS_KEY = "tasks:all"
 ROOTS_KEY = "tasks:roots"
+ORDER_SEQ_KEY = "tasks:order_seq"
+ORDER_STEP = 1000
 
 
 def task_key(task_id: str) -> str:
@@ -43,6 +45,15 @@ class TaskRepository:
         await self._redis.hset(task_key(task_id), mapping=fields)
         await self._redis.sadd(ALL_TASKS_KEY, task_id)
         await self._redis.sadd(ROOTS_KEY, task_id)
+
+    async def next_order(self) -> float:
+        """Monotonically increasing order value for a newly created task.
+
+        Existing tasks predating this field default to order 0 when read (see
+        TaskNode/_to_task_out), so starting this sequence above zero keeps new
+        tasks sorting after all legacy ones without a backfill migration.
+        """
+        return float(await self._redis.incrby(ORDER_SEQ_KEY, ORDER_STEP))
 
     async def update_fields(self, task_id: str, fields: dict[str, Any]) -> None:
         if fields:

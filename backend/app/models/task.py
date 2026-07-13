@@ -45,6 +45,11 @@ class AddParentRequest(BaseModel):
     parent_id: str
 
 
+class ReorderRequest(BaseModel):
+    after_id: str | None = None
+    before_id: str | None = None
+
+
 class TaskOut(BaseModel):
     id: str
     name: str
@@ -57,3 +62,4 @@ class TaskOut(BaseModel):
     is_leaf: bool
     parent_ids: list[str]
     children_ids: list[str]
+    order: float
