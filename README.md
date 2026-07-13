@@ -44,7 +44,12 @@ calendars specifically modeled on Google Calendar's look
 
 ## Running locally
 
-Requires Docker Desktop.
+Requires Docker Desktop. There are two separate stacks, kept fully isolated from each
+other (separate ports, separate Redis volumes) so day-to-day feature development never
+touches real data:
+
+**Production** (`docker-compose.yml`) — the real stack, real data, no hot reload. This
+is what you actually use day to day.
 
 ```
 docker compose up --build
@@ -54,7 +59,23 @@ docker compose up --build
 - Backend: http://localhost:8000 (health check at `/health`, interactive docs at `/docs`)
 - Redis: localhost:6379 (persisted in the `redis-data` Docker volume)
 
-Source is bind-mounted into both containers with hot reload enabled, so edits to
+To ship newly-developed features to prod, just rebuild and restart: `docker compose up
+--build` again picks up the latest code (there's no separate deploy step — prod is a
+one-shot image build from whatever's on disk, not a bind mount).
+
+**Development** (`docker-compose.dev.yml`) — isolated data, hot reload, for building
+new features without ever touching production data. Can run at the same time as the
+prod stack.
+
+```
+docker compose -f docker-compose.dev.yml up --build
+```
+
+- Frontend: http://localhost:5174
+- Backend: http://localhost:8001 (health check at `/health`)
+- Redis: localhost:6380 (persisted in the separate `redis-data-dev` Docker volume)
+
+Source is bind-mounted into both dev containers with hot reload enabled, so edits to
 `backend/` or `frontend/` take effect without rebuilding the image.
 
 ## Development
@@ -80,7 +101,8 @@ npm run build   # type-check + production build
 npm run lint
 ```
 
-End-to-end tests (Playwright, requires `docker compose up` already running):
+End-to-end tests (Playwright, requires the **dev** stack already running —
+`docker compose -f docker-compose.dev.yml up`):
 
 ```
 cd frontend
@@ -88,10 +110,11 @@ npx playwright install chromium   # first time only
 npm run test:e2e
 ```
 
-Specs live in `frontend/e2e/`. They run against the real stack (real FastAPI, real
+Specs live in `frontend/e2e/`. They run against the real dev stack (real FastAPI, real
 Redis) rather than mocks, single-worker (the backend's active-timer is a single
 global key, so timer specs can't run concurrently), and flush Redis once at the start
-of the run via a Playwright global setup.
+of the run via a Playwright global setup — **always against the dev stack's Redis
+(`docker-compose.dev.yml`), never prod**, since the flush is destructive.
 
 ## API notes
 

@@ -61,14 +61,31 @@ worth reusing rather than reinventing:
 
 ## Environment notes
 
-- `docker compose` stack was left running at the end of this session (ports
-  8000/5173/6379); Redis was flushed clean (no leftover test data).
+- **Dev/prod Docker split (added in the v01 pass, milestone M1):** there are now two
+  fully isolated compose stacks, never sharing ports or Redis volumes.
+  - **Prod** — `docker-compose.yml`, ports 8000/5173/6379, volume `redis-data`. Real
+    data. No bind mounts — code is baked into the image at build time, so "shipping" a
+    feature is just `docker compose up --build` again.
+  - **Dev** — `docker-compose.dev.yml`, ports 8001/5174/6380, volume `redis-data-dev`.
+    Isolated data, bind-mounted source + hot reload, safe to flush/break. Started with
+    `docker compose -f docker-compose.dev.yml up --build`.
+  - **All Playwright E2E specs and all day-to-day development from here on must target
+    the dev stack, never prod** — Playwright's global setup (`frontend/e2e/global-setup.ts`)
+    runs `redis-cli FLUSHALL` at the start of every run, and it's now hardwired to
+    `docker-compose.dev.yml` specifically so this can't accidentally hit prod data.
+  - Both Dockerfiles (`backend/Dockerfile`, `frontend/Dockerfile`) are multi-stage with
+    `dev`/`prod` build targets rather than being separate files, so they can't drift
+    apart. The frontend's prod target runs `vite build` + `vite preview`; note Vite
+    inlines `VITE_*` env vars at **build time**, so `VITE_API_BASE_URL` is passed as a
+    Docker build `arg` in `docker-compose.yml`, not as a runtime `environment:` entry
+    (that would be too late for a build that already happened).
 - Backend venv: `backend/.venv`. Frontend deps: `frontend/node_modules`. Both already
   installed — no fresh `pip install`/`npm install` needed unless dependencies change.
 - Playwright's Chromium binary is installed (`npx playwright install chromium` was
-  already run). E2E specs require `docker compose up` running first (global setup
-  health-checks `/health` and flushes Redis) and run single-worker — the backend's
-  active-timer is one global Redis key, so parallel timer specs would interfere.
+  already run). E2E specs require the **dev** compose stack running first (global
+  setup health-checks `/health` on port 8001 and flushes the dev Redis) and run
+  single-worker — the backend's active-timer is one global Redis key, so parallel
+  timer specs would interfere.
 
 ## Quick command reference
 
@@ -81,7 +98,11 @@ cd backend && .venv/Scripts/python.exe -m ruff check .
 cd frontend && npm test
 cd frontend && npm run build
 cd frontend && npm run lint
-cd frontend && npx playwright test        # requires docker compose up already running
+cd frontend && npx playwright test        # requires docker-compose.dev.yml stack already running
+
+# Docker
+docker compose up --build                              # prod: real data, ports 8000/5173/6379
+docker compose -f docker-compose.dev.yml up --build     # dev: isolated data, ports 8001/5174/6380
 ```
 
 ## Next possible steps

@@ -8,7 +8,7 @@ export default defineConfig({
   retries: 0,
   reporter: [['html', { open: 'never' }]],
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:5174',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },

@@ -8,9 +8,9 @@ services:
       - "6379:6379"
 
   backend:
-    build: ./backend
-    volumes:
-      - ./backend:/app
+    build:
+      context: ./backend
+      target: prod
     environment:
       - REDIS_URL=redis://redis:6379/0
       - CORS_ORIGINS=["http://localhost:5173"]
@@ -20,12 +20,11 @@ services:
       - redis
 
   frontend:
-    build: ./frontend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    environment:
-      - VITE_API_BASE_URL=http://localhost:8000
+    build:
+      context: ./frontend
+      target: prod
+      args:
+        VITE_API_BASE_URL: http://localhost:8000
     ports:
       - "5173:5173"
     depends_on:

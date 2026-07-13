@@ -24,7 +24,7 @@ test('Evaluate Metrics subtab: granularity switch and task filter', async ({ pag
   await page.getByRole('button', { name: 'No, keep in progress' }).click()
 
   await page.getByRole('button', { name: 'Evaluate' }).click()
-  await page.getByRole('button', { name: 'Metrics' }).click()
+  await page.getByRole('button', { name: 'Metrics', exact: true }).click()
 
   // Both subtab controls are present.
   await expect(page.getByRole('button', { name: 'Day' })).toBeVisible()

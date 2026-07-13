@@ -1,0 +1,41 @@
+name: productivity_app_dev
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data-dev:/data
+    ports:
+      - "6380:6379"
+
+  backend:
+    build:
+      context: ./backend
+      target: dev
+    volumes:
+      - ./backend:/app
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CORS_ORIGINS=["http://localhost:5174"]
+    ports:
+      - "8001:8000"
+    depends_on:
+      - redis
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8001
+    ports:
+      - "5174:5173"
+    depends_on:
+      - backend
+
+volumes:
+  redis-data-dev:
