@@ -7,6 +7,7 @@ from app.dependencies import apply_rollover, get_task_service
 from app.models.task import (
     PALETTE,
     AddParentRequest,
+    AddRequirementRequest,
     ReorderRequest,
     TaskCreate,
     TaskOut,
@@ -15,7 +16,14 @@ from app.models.task import (
 from app.redis_client import get_redis
 from app.repositories.entry_repository import EntryRepository
 from app.repositories.interval_repository import IntervalRepository
-from app.services.errors import CycleError, InvalidColorError, SelfParentError, TaskNotFoundError
+from app.services.errors import (
+    CycleError,
+    InvalidColorError,
+    RequirementCycleError,
+    SelfParentError,
+    SelfRequirementError,
+    TaskNotFoundError,
+)
 from app.services.task_service import TaskService
 
 router = APIRouter(prefix="/tasks", tags=["tasks"], dependencies=[Depends(apply_rollover)])
@@ -113,5 +121,27 @@ async def reorder_task(task_id: str, payload: ReorderRequest, service: ServiceDe
         return await service.reorder_task(
             task_id, payload.after_id, payload.before_id, payload.order
         )
+    except TaskNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/{task_id}/requires", response_model=TaskOut)
+async def add_requirement(
+    task_id: str, payload: AddRequirementRequest, service: ServiceDep
+) -> TaskOut:
+    try:
+        return await service.add_requirement(task_id, payload.required_id)
+    except TaskNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except SelfRequirementError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RequirementCycleError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.delete("/{task_id}/requires/{required_id}", response_model=TaskOut)
+async def remove_requirement(task_id: str, required_id: str, service: ServiceDep) -> TaskOut:
+    try:
+        return await service.remove_requirement(task_id, required_id)
     except TaskNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

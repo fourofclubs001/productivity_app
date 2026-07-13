@@ -277,3 +277,65 @@ def test_reorder_rebalances_when_precision_is_exhausted(client):
     # got renumbered, and all resulting values must be distinct.
     assert ordered_ids == [a["id"], *inserted_ids, b["id"]]
     assert len({t["order"] for t in ordered}) == len(ordered)
+
+
+def test_add_and_remove_requirement(client):
+    task = create_task(client, name="Task")
+    required = create_task(client, name="Required")
+
+    response = client.post(f"/tasks/{task['id']}/requires", json={"required_id": required["id"]})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["requires_ids"] == [required["id"]]
+
+    required_body = client.get(f"/tasks/{required['id']}").json()
+    assert required_body["required_by_ids"] == [task["id"]]
+
+    response = client.delete(f"/tasks/{task['id']}/requires/{required['id']}")
+    assert response.status_code == 200
+    assert response.json()["requires_ids"] == []
+
+
+def test_self_requirement_rejected(client):
+    task = create_task(client, name="Task")
+    response = client.post(f"/tasks/{task['id']}/requires", json={"required_id": task["id"]})
+    assert response.status_code == 400
+
+
+def test_requirement_cycle_rejected(client):
+    a = create_task(client, name="A")
+    b = create_task(client, name="B")
+
+    response = client.post(f"/tasks/{a['id']}/requires", json={"required_id": b["id"]})
+    assert response.status_code == 200
+
+    # B already (transitively) requires... wait, A requires B, so B cannot
+    # also require A -- that would close a cycle A -> B -> A.
+    response = client.post(f"/tasks/{b['id']}/requires", json={"required_id": a["id"]})
+    assert response.status_code == 400
+
+
+def test_transitive_requirement_cycle_rejected(client):
+    a = create_task(client, name="A")
+    b = create_task(client, name="B")
+    c = create_task(client, name="C")
+
+    a_requires_b = client.post(f"/tasks/{a['id']}/requires", json={"required_id": b["id"]})
+    assert a_requires_b.status_code == 200
+    b_requires_c = client.post(f"/tasks/{b['id']}/requires", json={"required_id": c["id"]})
+    assert b_requires_c.status_code == 200
+
+    # C -> A would close the cycle A -> B -> C -> A.
+    response = client.post(f"/tasks/{c['id']}/requires", json={"required_id": a["id"]})
+    assert response.status_code == 400
+
+
+def test_deleting_a_task_cleans_up_requirement_edges(client):
+    task = create_task(client, name="Task")
+    required = create_task(client, name="Required")
+    client.post(f"/tasks/{task['id']}/requires", json={"required_id": required["id"]})
+
+    assert client.delete(f"/tasks/{required['id']}").status_code == 204
+
+    body = client.get(f"/tasks/{task['id']}").json()
+    assert body["requires_ids"] == []

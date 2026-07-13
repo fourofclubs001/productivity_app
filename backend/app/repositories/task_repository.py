@@ -25,6 +25,14 @@ def colors_key(task_id: str) -> str:
     return f"task:{task_id}:colors"
 
 
+def requires_key(task_id: str) -> str:
+    return f"task:{task_id}:requires"
+
+
+def required_by_key(task_id: str) -> str:
+    return f"task:{task_id}:required_by"
+
+
 @dataclass
 class TaskNode:
     id: str
@@ -32,6 +40,8 @@ class TaskNode:
     children: set[str] = field(default_factory=set)
     parents: set[str] = field(default_factory=set)
     colors: set[str] = field(default_factory=set)
+    requires: set[str] = field(default_factory=set)
+    required_by: set[str] = field(default_factory=set)
 
 
 class TaskRepository:
@@ -76,9 +86,27 @@ class TaskRepository:
         if not await self._redis.smembers(parents_key(child_id)):
             await self._redis.sadd(ROOTS_KEY, child_id)
 
+    async def add_requirement_edge(self, task_id: str, required_id: str) -> None:
+        await self._redis.sadd(requires_key(task_id), required_id)
+        await self._redis.sadd(required_by_key(required_id), task_id)
+
+    async def remove_requirement_edge(self, task_id: str, required_id: str) -> None:
+        await self._redis.srem(requires_key(task_id), required_id)
+        await self._redis.srem(required_by_key(required_id), task_id)
+
+    async def load_requirement_graph(self) -> dict[str, set[str]]:
+        """task_id -> set of task_ids it requires, for every task."""
+        task_ids = await self._redis.smembers(ALL_TASKS_KEY)
+        graph: dict[str, set[str]] = {}
+        for task_id in task_ids:
+            graph[task_id] = await self._redis.smembers(requires_key(task_id))
+        return graph
+
     async def delete(self, task_id: str) -> None:
         children = await self._redis.smembers(children_key(task_id))
         parents = await self._redis.smembers(parents_key(task_id))
+        requires = await self._redis.smembers(requires_key(task_id))
+        required_by = await self._redis.smembers(required_by_key(task_id))
 
         for child_id in children:
             await self._redis.srem(parents_key(child_id), task_id)
@@ -86,9 +114,18 @@ class TaskRepository:
                 await self._redis.sadd(ROOTS_KEY, child_id)
         for parent_id in parents:
             await self._redis.srem(children_key(parent_id), task_id)
+        for required_id in requires:
+            await self._redis.srem(required_by_key(required_id), task_id)
+        for dependent_id in required_by:
+            await self._redis.srem(requires_key(dependent_id), task_id)
 
         await self._redis.delete(
-            task_key(task_id), children_key(task_id), parents_key(task_id), colors_key(task_id)
+            task_key(task_id),
+            children_key(task_id),
+            parents_key(task_id),
+            colors_key(task_id),
+            requires_key(task_id),
+            required_by_key(task_id),
         )
         await self._redis.srem(ALL_TASKS_KEY, task_id)
         await self._redis.srem(ROOTS_KEY, task_id)
@@ -101,8 +138,16 @@ class TaskRepository:
             children = await self._redis.smembers(children_key(task_id))
             parents = await self._redis.smembers(parents_key(task_id))
             colors = await self._redis.smembers(colors_key(task_id))
+            requires = await self._redis.smembers(requires_key(task_id))
+            required_by = await self._redis.smembers(required_by_key(task_id))
             graph[task_id] = TaskNode(
-                id=task_id, fields=task_fields, children=children, parents=parents, colors=colors
+                id=task_id,
+                fields=task_fields,
+                children=children,
+                parents=parents,
+                colors=colors,
+                requires=requires,
+                required_by=required_by,
             )
         return graph
 
@@ -113,6 +158,14 @@ class TaskRepository:
         children = await self._redis.smembers(children_key(task_id))
         parents = await self._redis.smembers(parents_key(task_id))
         colors = await self._redis.smembers(colors_key(task_id))
+        requires = await self._redis.smembers(requires_key(task_id))
+        required_by = await self._redis.smembers(required_by_key(task_id))
         return TaskNode(
-            id=task_id, fields=task_fields, children=children, parents=parents, colors=colors
+            id=task_id,
+            fields=task_fields,
+            children=children,
+            parents=parents,
+            colors=colors,
+            requires=requires,
+            required_by=required_by,
         )

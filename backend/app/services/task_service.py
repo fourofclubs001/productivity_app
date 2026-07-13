@@ -3,7 +3,15 @@ from uuid import uuid4
 
 from app.models.task import PALETTE, TaskCreate, TaskOut, TaskState, TaskUpdate
 from app.repositories.task_repository import ORDER_STEP, TaskNode, TaskRepository
-from app.services.errors import CycleError, InvalidColorError, SelfParentError, TaskNotFoundError
+from app.services.errors import (
+    CycleError,
+    InvalidColorError,
+    RequirementCycleError,
+    SelfParentError,
+    SelfRequirementError,
+    TaskNotFoundError,
+)
+from app.services.graph_utils import is_reachable
 
 
 def _order_of(node: TaskNode) -> float:
@@ -15,21 +23,6 @@ def _order_of(node: TaskNode) -> float:
 
 def _sorted_by_order(ids: set[str] | list[str], graph: dict[str, TaskNode]) -> list[str]:
     return sorted(ids, key=lambda task_id: (_order_of(graph[task_id]), task_id))
-
-
-def _is_reachable(start_id: str, target_id: str, graph: dict[str, TaskNode]) -> bool:
-    """Whether target_id can be reached from start_id by following children edges."""
-    visited: set[str] = set()
-    stack = [start_id]
-    while stack:
-        current = stack.pop()
-        if current == target_id:
-            return True
-        if current in visited:
-            continue
-        visited.add(current)
-        stack.extend(graph[current].children)
-    return False
 
 
 def _compute_state(task_id: str, graph: dict[str, TaskNode]) -> TaskState:
@@ -98,6 +91,8 @@ class TaskService:
             parent_ids=sorted(node.parents),
             children_ids=_sorted_by_order(node.children, graph),
             order=_order_of(node),
+            requires_ids=sorted(node.requires),
+            required_by_ids=sorted(node.required_by),
         )
 
     async def create_task(self, payload: TaskCreate) -> TaskOut:
@@ -180,9 +175,9 @@ class TaskService:
             raise TaskNotFoundError(parent_id)
 
         if parent_id in graph[task_id].parents:
-            return self._to_task_out(task_id, graph, {})
+            return await self.get_task(task_id)
 
-        if _is_reachable(task_id, parent_id, graph):
+        if is_reachable(task_id, parent_id, lambda tid: graph[tid].children):
             raise CycleError(task_id, parent_id)
 
         await self._repo.add_child_edge(parent_id, task_id)
@@ -261,3 +256,32 @@ class TaskService:
         ordered_ids.insert(insert_at, task_id)
         for index, tid in enumerate(ordered_ids):
             await self._repo.update_fields(tid, {"order": str(index * ORDER_STEP)})
+
+    async def add_requirement(self, task_id: str, required_id: str) -> TaskOut:
+        """Mark required_id as a prerequisite of task_id (task_id can't be
+        scheduled until required_id reaches `done` -- enforced in
+        IntervalService, not here). A separate edge-set from the parent/child
+        DAG, with its own cycle guard.
+        """
+        if task_id == required_id:
+            raise SelfRequirementError(task_id)
+        if not await self._repo.exists(task_id):
+            raise TaskNotFoundError(task_id)
+        if not await self._repo.exists(required_id):
+            raise TaskNotFoundError(required_id)
+
+        requires_graph = await self._repo.load_requirement_graph()
+        # Adding task_id -> required_id would cycle if required_id can
+        # already (transitively) reach task_id, i.e. task_id is already one
+        # of required_id's own prerequisites.
+        if is_reachable(required_id, task_id, lambda tid: requires_graph.get(tid, set())):
+            raise RequirementCycleError(task_id, required_id)
+
+        await self._repo.add_requirement_edge(task_id, required_id)
+        return await self.get_task(task_id)
+
+    async def remove_requirement(self, task_id: str, required_id: str) -> TaskOut:
+        if not await self._repo.exists(task_id):
+            raise TaskNotFoundError(task_id)
+        await self._repo.remove_requirement_edge(task_id, required_id)
+        return await self.get_task(task_id)

@@ -14,6 +14,8 @@ export function makeTask(overrides: Partial<Task> = {}): Task {
     parent_ids: [],
     children_ids: [],
     order: 0,
+    requires_ids: [],
+    required_by_ids: [],
     ...overrides,
   }
 }

@@ -17,6 +17,30 @@ class SelfParentError(Exception):
         super().__init__(f"Task {task_id!r} cannot be its own parent")
 
 
+class RequirementCycleError(Exception):
+    def __init__(self, task_id: str, required_id: str) -> None:
+        self.task_id = task_id
+        self.required_id = required_id
+        super().__init__(
+            f"Requiring {required_id!r} for {task_id!r} would create a cycle of prerequisites"
+        )
+
+
+class SelfRequirementError(Exception):
+    def __init__(self, task_id: str) -> None:
+        self.task_id = task_id
+        super().__init__(f"Task {task_id!r} cannot require itself")
+
+
+class UnmetPrerequisiteError(Exception):
+    def __init__(self, task_id: str, unmet_ids: list[str]) -> None:
+        self.task_id = task_id
+        self.unmet_ids = unmet_ids
+        super().__init__(
+            f"Task {task_id!r} cannot be scheduled until its prerequisites are done: {unmet_ids}"
+        )
+
+
 class InvalidColorError(Exception):
     def __init__(self, colors: list[str]) -> None:
         self.colors = colors

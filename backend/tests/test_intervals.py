@@ -167,6 +167,41 @@ def test_deleting_a_task_removes_its_scheduled_intervals(client):
     assert response.json() == []
 
 
+def test_create_interval_blocked_by_unmet_prerequisite(client):
+    task = create_leaf(client, "Task")
+    required = create_leaf(client, "Required")
+    client.post(f"/tasks/{task['id']}/requires", json={"required_id": required["id"]})
+
+    start = datetime(2026, 7, 13, 9, 0)
+    response = client.post(
+        "/intervals",
+        json={
+            "task_id": task["id"],
+            "start": iso(start),
+            "end": iso(start + timedelta(hours=1)),
+        },
+    )
+    assert response.status_code == 409
+
+
+async def test_create_interval_allowed_once_prerequisite_is_done(client, redis_client):
+    task = create_leaf(client, "Task")
+    required = create_leaf(client, "Required")
+    client.post(f"/tasks/{task['id']}/requires", json={"required_id": required["id"]})
+    await redis_client.hset(f"task:{required['id']}", "state", "done")
+
+    start = datetime(2026, 7, 13, 9, 0)
+    response = client.post(
+        "/intervals",
+        json={
+            "task_id": task["id"],
+            "start": iso(start),
+            "end": iso(start + timedelta(hours=1)),
+        },
+    )
+    assert response.status_code == 201
+
+
 async def test_delete_interval_does_not_revert_in_progress_task(client, redis_client):
     task = create_leaf(client)
     start = datetime(2026, 7, 13, 9, 0)

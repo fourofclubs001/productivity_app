@@ -19,7 +19,8 @@ def get_task_service(redis: Annotated[Redis, Depends(get_redis)]) -> TaskService
 
 
 def get_interval_service(redis: Annotated[Redis, Depends(get_redis)]) -> IntervalService:
-    return IntervalService(IntervalRepository(redis), TaskRepository(redis))
+    task_repo = TaskRepository(redis)
+    return IntervalService(IntervalRepository(redis), task_repo, TaskService(task_repo))
 
 
 def get_timer_service(redis: Annotated[Redis, Depends(get_redis)]) -> TimerService:

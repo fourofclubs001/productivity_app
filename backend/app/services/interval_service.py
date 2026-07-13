@@ -10,13 +10,24 @@ from app.services.errors import (
     InvalidIntervalError,
     TaskNotFoundError,
     TaskNotLeafError,
+    UnmetPrerequisiteError,
 )
+from app.services.task_service import TaskService
 
 
 class IntervalService:
-    def __init__(self, interval_repo: IntervalRepository, task_repo: TaskRepository) -> None:
+    def __init__(
+        self,
+        interval_repo: IntervalRepository,
+        task_repo: TaskRepository,
+        task_service: TaskService | None = None,
+    ) -> None:
         self._intervals = interval_repo
         self._tasks = task_repo
+        # Optional so existing call sites/tests that don't care about
+        # prerequisites don't need to wire it up; defaults to a fresh
+        # TaskService over the same repo.
+        self._task_service = task_service or TaskService(task_repo)
 
     async def create_interval(self, payload: IntervalCreate) -> IntervalOut:
         if payload.end <= payload.start:
@@ -27,6 +38,15 @@ class IntervalService:
             raise TaskNotFoundError(payload.task_id)
         if task_node.children:
             raise TaskNotLeafError(payload.task_id)
+
+        if task_node.requires:
+            unmet = []
+            for required_id in task_node.requires:
+                required_task = await self._task_service.get_task(required_id)
+                if required_task.state != TaskState.done:
+                    unmet.append(required_id)
+            if unmet:
+                raise UnmetPrerequisiteError(payload.task_id, unmet)
 
         interval_id = str(uuid4())
         week_start = await self._intervals.create(

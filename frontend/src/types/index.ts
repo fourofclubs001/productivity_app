@@ -13,6 +13,8 @@ export interface Task {
   parent_ids: string[]
   children_ids: string[]
   order: number
+  requires_ids: string[]
+  required_by_ids: string[]
 }
 
 export interface Interval {

@@ -32,6 +32,13 @@ const tasksApi = {
     }),
   removeParent: (id: string, parentId: string) =>
     apiFetch<Task>(`/tasks/${id}/parents/${parentId}`, { method: 'DELETE' }),
+  addRequirement: (id: string, requiredId: string) =>
+    apiFetch<Task>(`/tasks/${id}/requires`, {
+      method: 'POST',
+      body: JSON.stringify({ required_id: requiredId }),
+    }),
+  removeRequirement: (id: string, requiredId: string) =>
+    apiFetch<Task>(`/tasks/${id}/requires/${requiredId}`, { method: 'DELETE' }),
   reorder: (
     id: string,
     afterId: string | null,
@@ -94,6 +101,24 @@ export function useRemoveParent() {
   return useMutation({
     mutationFn: ({ id, parentId }: { id: string; parentId: string }) =>
       tasksApi.removeParent(id, parentId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: TASKS_KEY }),
+  })
+}
+
+export function useAddRequirement() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, requiredId }: { id: string; requiredId: string }) =>
+      tasksApi.addRequirement(id, requiredId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: TASKS_KEY }),
+  })
+}
+
+export function useRemoveRequirement() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, requiredId }: { id: string; requiredId: string }) =>
+      tasksApi.removeRequirement(id, requiredId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: TASKS_KEY }),
   })
 }

@@ -3,9 +3,11 @@ import { format } from 'date-fns'
 import type { Task } from '../../types'
 import {
   useAddParent,
+  useAddRequirement,
   useDeleteTask,
   usePalette,
   useRemoveParent,
+  useRemoveRequirement,
   useUpdateTask,
 } from '../../api/tasks'
 import { useDeleteInterval, useIntervalsForTask } from '../../api/intervals'
@@ -28,6 +30,8 @@ export default function TaskDetailPanel({
   const resetDeleteTask = deleteTask.reset
   const addParent = useAddParent()
   const removeParent = useRemoveParent()
+  const addRequirement = useAddRequirement()
+  const removeRequirement = useRemoveRequirement()
   const { data: intervals = [] } = useIntervalsForTask(task.id)
   const deleteInterval = useDeleteInterval()
 
@@ -35,12 +39,14 @@ export default function TaskDetailPanel({
   const [dod, setDod] = useState(task.definition_of_done)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [addParentId, setAddParentId] = useState('')
+  const [addRequiredId, setAddRequiredId] = useState('')
 
   useEffect(() => {
     setName(task.name)
     setDod(task.definition_of_done)
     setConfirmingDelete(false)
     setAddParentId('')
+    setAddRequiredId('')
     resetDeleteTask()
   }, [task.id, task.name, task.definition_of_done, resetDeleteTask])
 
@@ -61,6 +67,14 @@ export default function TaskDetailPanel({
     [tasksById, excludedFromParentPicker],
   )
 
+  const requirementCandidates = useMemo(() => {
+    const excluded = new Set(task.requires_ids)
+    excluded.add(task.id)
+    return Array.from(tasksById.values())
+      .filter((candidate) => !excluded.has(candidate.id))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [task, tasksById])
+
   function handleSave() {
     updateTask.mutate({
       id: task.id,
@@ -76,7 +90,7 @@ export default function TaskDetailPanel({
   }
 
   return (
-    <div className="h-full overflow-y-auto p-6">
+    <div className="h-full overflow-y-auto p-6" data-testid="task-detail-panel">
       <div className="mb-4 flex items-center gap-2">
         <StateBadge state={task.state} />
         {!task.is_leaf && (
@@ -210,6 +224,7 @@ export default function TaskDetailPanel({
         {parentCandidates.length > 0 && (
           <div className="mt-2 flex gap-2">
             <select
+              aria-label="Add parent"
               value={addParentId}
               onChange={(event) => setAddParentId(event.target.value)}
               className="flex-1 rounded border border-border bg-surface px-2 py-1 text-xs text-text-primary"
@@ -223,6 +238,7 @@ export default function TaskDetailPanel({
             </select>
             <button
               type="button"
+              title="Add parent"
               disabled={!addParentId || addParent.isPending}
               onClick={() => {
                 addParent.mutate({ id: task.id, parentId: addParentId })
@@ -233,6 +249,73 @@ export default function TaskDetailPanel({
               Add
             </button>
           </div>
+        )}
+      </div>
+
+      <div className="mt-6">
+        <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
+          Requires
+        </label>
+        <p className="mt-1 text-xs text-text-secondary">
+          Prerequisite tasks — this task can't be scheduled until they're done.
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {task.requires_ids.length === 0 && (
+            <span className="text-xs text-text-secondary">No prerequisites</span>
+          )}
+          {task.requires_ids.map((requiredId) => {
+            const required = tasksById.get(requiredId)
+            return (
+              <span
+                key={requiredId}
+                className="flex items-center gap-1 rounded-full bg-surface-alt px-2 py-0.5 text-xs text-text-secondary"
+              >
+                {required?.name ?? requiredId}
+                <button
+                  type="button"
+                  onClick={() => removeRequirement.mutate({ id: task.id, requiredId })}
+                  className="text-text-secondary hover:text-danger"
+                  title="Remove requirement"
+                >
+                  ×
+                </button>
+              </span>
+            )
+          })}
+        </div>
+        {requirementCandidates.length > 0 && (
+          <div className="mt-2 flex gap-2">
+            <select
+              aria-label="Add requirement"
+              value={addRequiredId}
+              onChange={(event) => setAddRequiredId(event.target.value)}
+              className="flex-1 rounded border border-border bg-surface px-2 py-1 text-xs text-text-primary"
+            >
+              <option value="">Add requirement…</option>
+              {requirementCandidates.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              title="Add requirement"
+              disabled={!addRequiredId || addRequirement.isPending}
+              onClick={() => {
+                addRequirement.mutate(
+                  { id: task.id, requiredId: addRequiredId },
+                  { onSuccess: () => setAddRequiredId('') },
+                )
+              }}
+              className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-alt disabled:opacity-50"
+            >
+              Add
+            </button>
+          </div>
+        )}
+        {addRequirement.isError && (
+          <p className="mt-2 text-xs text-danger">{(addRequirement.error as Error).message}</p>
         )}
       </div>
 

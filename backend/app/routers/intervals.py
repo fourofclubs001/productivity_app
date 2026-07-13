@@ -9,6 +9,7 @@ from app.services.errors import (
     InvalidIntervalError,
     TaskNotFoundError,
     TaskNotLeafError,
+    UnmetPrerequisiteError,
 )
 from app.services.interval_service import IntervalService
 
@@ -25,6 +26,8 @@ async def create_interval(payload: IntervalCreate, service: ServiceDep) -> Inter
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except (InvalidIntervalError, TaskNotLeafError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except UnmetPrerequisiteError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.delete("/{interval_id}", status_code=204)

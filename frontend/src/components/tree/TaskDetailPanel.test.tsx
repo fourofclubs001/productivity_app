@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import TaskDetailPanel from './TaskDetailPanel'
 import { makeTask } from '../../test/taskFixtures'
@@ -8,7 +8,10 @@ const deleteMutate = vi.fn()
 const deleteReset = vi.fn()
 const addParentMutate = vi.fn()
 const removeParentMutate = vi.fn()
+const addRequirementMutate = vi.fn()
+const removeRequirementMutate = vi.fn()
 const deleteTaskState = vi.fn()
+const addRequirementState = vi.fn()
 
 vi.mock('../../api/tasks', () => ({
   usePalette: () => ({ data: ['red', 'blue'] }),
@@ -16,6 +19,8 @@ vi.mock('../../api/tasks', () => ({
   useDeleteTask: () => deleteTaskState(),
   useAddParent: () => ({ mutate: addParentMutate, isPending: false }),
   useRemoveParent: () => ({ mutate: removeParentMutate, isPending: false }),
+  useAddRequirement: () => addRequirementState(),
+  useRemoveRequirement: () => ({ mutate: removeRequirementMutate, isPending: false }),
 }))
 
 vi.mock('../../api/intervals', () => ({
@@ -29,9 +34,17 @@ beforeEach(() => {
   deleteReset.mockReset()
   addParentMutate.mockReset()
   removeParentMutate.mockReset()
+  addRequirementMutate.mockReset()
+  removeRequirementMutate.mockReset()
   deleteTaskState.mockReturnValue({
     mutate: deleteMutate,
     reset: deleteReset,
+    isPending: false,
+    isError: false,
+    error: null,
+  })
+  addRequirementState.mockReturnValue({
+    mutate: addRequirementMutate,
     isPending: false,
     isError: false,
     error: null,
@@ -123,6 +136,66 @@ describe('TaskDetailPanel', () => {
 
     fireEvent.click(screen.getByTitle('Remove parent'))
     expect(removeParentMutate).toHaveBeenCalledWith({ id: 't1', parentId: 'p1' })
+  })
+
+  it('adds a requirement when a candidate is selected and Add is clicked', () => {
+    const other = makeTask({ id: 'r1', name: 'Required task' })
+    const task = makeTask({ id: 't1' })
+    render(
+      <TaskDetailPanel
+        task={task}
+        tasksById={
+          new Map([
+            [task.id, task],
+            [other.id, other],
+          ])
+        }
+        onAddChild={() => {}}
+      />,
+    )
+
+    const select = screen.getByDisplayValue('Add requirement…')
+    fireEvent.change(select, { target: { value: 'r1' } })
+    fireEvent.click(within(select.closest('div')!).getByText('Add'))
+    expect(addRequirementMutate).toHaveBeenCalledWith(
+      { id: 't1', requiredId: 'r1' },
+      expect.any(Object),
+    )
+  })
+
+  it('removes a requirement when its chip is clicked', () => {
+    const required = makeTask({ id: 'r1', name: 'Required task' })
+    const task = makeTask({ id: 't1', requires_ids: ['r1'] })
+    render(
+      <TaskDetailPanel
+        task={task}
+        tasksById={
+          new Map([
+            [task.id, task],
+            [required.id, required],
+          ])
+        }
+        onAddChild={() => {}}
+      />,
+    )
+
+    fireEvent.click(screen.getByTitle('Remove requirement'))
+    expect(removeRequirementMutate).toHaveBeenCalledWith({ id: 't1', requiredId: 'r1' })
+  })
+
+  it('shows the backend message when adding a requirement is rejected (e.g. a cycle)', () => {
+    addRequirementState.mockReturnValue({
+      mutate: addRequirementMutate,
+      isPending: false,
+      isError: true,
+      error: new Error('Requiring this task would create a cycle of prerequisites'),
+    })
+    const task = makeTask({ id: 't1' })
+    render(
+      <TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} onAddChild={() => {}} />,
+    )
+
+    expect(screen.getByText(/would create a cycle/i)).toBeInTheDocument()
   })
 })
 

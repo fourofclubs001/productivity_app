@@ -45,6 +45,10 @@ class AddParentRequest(BaseModel):
     parent_id: str
 
 
+class AddRequirementRequest(BaseModel):
+    required_id: str
+
+
 class ReorderRequest(BaseModel):
     after_id: str | None = None
     before_id: str | None = None
@@ -67,3 +71,5 @@ class TaskOut(BaseModel):
     parent_ids: list[str]
     children_ids: list[str]
     order: float
+    requires_ids: list[str]
+    required_by_ids: list[str]
