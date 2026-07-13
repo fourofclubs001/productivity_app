@@ -1,0 +1,101 @@
+.rbc-calendar {
+  color: var(--color-text-primary);
+  background-color: var(--color-surface);
+}
+
+.rbc-time-view,
+.rbc-time-header,
+.rbc-time-content,
+.rbc-time-header.rbc-overflowing,
+.rbc-header,
+.rbc-time-header-content,
+.rbc-day-bg + .rbc-day-bg,
+.rbc-timeslot-group,
+.rbc-time-content > * + * > * {
+  border-color: var(--color-border) !important;
+}
+
+.rbc-header {
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+  padding: 8px 0 12px;
+  font-weight: 500;
+}
+
+.rbc-label {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.rbc-time-gutter .rbc-timeslot-group {
+  color: var(--color-text-secondary);
+}
+
+.rbc-today {
+  background-color: var(--color-accent-soft);
+}
+
+.rbc-off-range-bg {
+  background-color: var(--color-surface-alt);
+}
+
+.rbc-current-time-indicator {
+  background-color: var(--color-danger);
+  height: 2px;
+}
+
+.rbc-event {
+  border-radius: 6px;
+  font-size: 12px;
+  padding: 2px 6px;
+  box-shadow: none;
+}
+
+.rbc-event.rbc-selected {
+  outline: 2px solid var(--color-text-primary);
+}
+
+.rbc-slot-selection {
+  background-color: var(--color-accent-soft);
+}
+
+.rbc-time-slot {
+  color: var(--color-text-secondary);
+}
+
+.rbc-allday-cell {
+  display: none;
+}
+
+/* Stacked day header: "MON" (small, gray) above the date number (bold, dark),
+   matching prompts/references/google_calendar.png. */
+.calendar-day-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.calendar-day-header .day-name {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+}
+
+.calendar-day-header .day-number {
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.calendar-timezone-label {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 100%;
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  padding: 4px;
+}

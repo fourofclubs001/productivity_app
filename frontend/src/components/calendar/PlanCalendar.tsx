@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react'
 import { Calendar, type SlotInfo } from 'react-big-calendar'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
-import './calendar-dark.css'
+import './calendar.css'
 import type { Interval, Task } from '../../types'
 import { useCreateInterval, useDeleteInterval, useIntervalsForWeek } from '../../api/intervals'
 import { formatWeekLabel, mondayOf, shiftWeek, weekStartKey } from '../../lib/week'
 import { localizer } from '../../lib/calendarLocalizer'
 import { COLOR_HEX } from '../tree/colors'
+import CalendarDayHeader from './CalendarDayHeader'
+import CalendarTimezoneLabel from './CalendarTimezoneLabel'
 
 interface CalendarEvent {
   id: string
@@ -43,7 +45,7 @@ export default function PlanCalendar({
           title: task?.name ?? 'Unknown task',
           start: new Date(interval.start),
           end: new Date(interval.end),
-          color: color ? COLOR_HEX[color] : '#525252',
+          color: color ? COLOR_HEX[color] : '#616161',
         }
       }),
     [intervals, tasksById],
@@ -68,29 +70,29 @@ export default function PlanCalendar({
             type="button"
             disabled={isCurrentWeek}
             onClick={() => setWeekAnchor((prev) => shiftWeek(prev, -1))}
-            className="rounded border border-neutral-700 px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-800 disabled:opacity-30"
+            className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-hover disabled:opacity-30"
           >
             ← Prev
           </button>
           <button
             type="button"
             onClick={() => setWeekAnchor((prev) => shiftWeek(prev, 1))}
-            className="rounded border border-neutral-700 px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-800"
+            className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-hover"
           >
             Next →
           </button>
-          <span className="text-sm text-neutral-300">
+          <span className="text-sm text-text-secondary">
             Week of {formatWeekLabel(weekAnchor)}
-            {isCurrentWeek && <span className="ml-1 text-neutral-500">(current)</span>}
+            {isCurrentWeek && <span className="ml-1 text-text-secondary">(current)</span>}
           </span>
         </div>
         {!canSchedule && (
-          <span className="text-xs text-neutral-500">
+          <span className="text-xs text-text-secondary">
             Select a leaf task to reserve time for it
           </span>
         )}
         {canSchedule && (
-          <span className="text-xs text-neutral-500">
+          <span className="text-xs text-text-secondary">
             Drag on the calendar to schedule <strong>{selectedTask?.name}</strong>
           </span>
         )}
@@ -114,14 +116,15 @@ export default function PlanCalendar({
           eventPropGetter={(event: CalendarEvent) => ({
             style: { backgroundColor: event.color, border: 'none' },
           })}
+          components={{ header: CalendarDayHeader, timeGutterHeader: CalendarTimezoneLabel }}
           style={{ height: '100%' }}
         />
       </div>
 
       {pendingDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-80 rounded-md border border-neutral-700 bg-neutral-900 p-4 shadow-xl">
-            <p className="mb-3 text-sm text-neutral-200">
+          <div className="w-80 rounded-lg border border-border bg-surface p-4 shadow-xl">
+            <p className="mb-3 text-sm text-text-primary">
               Remove this reserved time slot for{' '}
               <strong>{tasksById.get(pendingDelete.task_id)?.name}</strong>?
             </p>
@@ -129,7 +132,7 @@ export default function PlanCalendar({
               <button
                 type="button"
                 onClick={() => setPendingDelete(null)}
-                className="rounded px-3 py-1.5 text-xs text-neutral-400 hover:text-neutral-200"
+                className="rounded px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary"
               >
                 Cancel
               </button>
@@ -139,7 +142,7 @@ export default function PlanCalendar({
                   deleteInterval.mutate(pendingDelete.id)
                   setPendingDelete(null)
                 }}
-                className="rounded bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-500"
+                className="rounded bg-danger px-3 py-1.5 text-xs font-medium text-white hover:bg-danger-hover"
               >
                 Remove
               </button>

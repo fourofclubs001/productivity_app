@@ -1,10 +1,12 @@
 import { useMemo } from 'react'
 import { Calendar } from 'react-big-calendar'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
-import './calendar-dark.css'
+import './calendar.css'
 import type { Entry, Interval, Task } from '../../types'
 import { localizer } from '../../lib/calendarLocalizer'
 import { COLOR_HEX } from '../tree/colors'
+import CalendarDayHeader from './CalendarDayHeader'
+import CalendarTimezoneLabel from './CalendarTimezoneLabel'
 
 export type EvaluateMode = 'planned' | 'real' | 'diff'
 
@@ -39,7 +41,7 @@ export default function EvaluateCalendar({
         title: task?.name ?? 'Unknown task',
         start: new Date(interval.start),
         end: new Date(interval.end),
-        color: color ? COLOR_HEX[color] : '#525252',
+        color: color ? COLOR_HEX[color] : '#616161',
         kind: 'planned',
       }
     })
@@ -52,7 +54,7 @@ export default function EvaluateCalendar({
         title: task?.name ?? 'Unknown task',
         start: new Date(entry.start),
         end: entry.end ? new Date(entry.end) : new Date(),
-        color: color ? COLOR_HEX[color] : '#525252',
+        color: color ? COLOR_HEX[color] : '#616161',
         kind: 'real',
       }
     })
@@ -82,6 +84,7 @@ export default function EvaluateCalendar({
                 color: event.color,
               },
       })}
+      components={{ header: CalendarDayHeader, timeGutterHeader: CalendarTimezoneLabel }}
       style={{ height: '100%' }}
     />
   )
