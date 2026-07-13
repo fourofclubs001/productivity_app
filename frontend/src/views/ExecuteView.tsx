@@ -8,12 +8,12 @@ export default function ExecuteView() {
   const tasksById = useMemo(() => new Map((tasks ?? []).map((task) => [task.id, task])), [tasks])
 
   if (isLoading) {
-    return <div className="p-6 text-sm text-neutral-500">Loading tasks…</div>
+    return <div className="p-6 text-sm text-text-secondary">Loading tasks…</div>
   }
 
   if (isError) {
     return (
-      <div className="p-6 text-sm text-red-400">
+      <div className="p-6 text-sm text-danger">
         Failed to load tasks: {(error as Error).message}
       </div>
     )

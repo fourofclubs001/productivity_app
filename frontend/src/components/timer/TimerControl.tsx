@@ -61,25 +61,25 @@ export default function TimerControl({ tasks }: { tasks: Task[] }) {
 
   if (justStopped) {
     return (
-      <div className="flex flex-wrap items-center gap-4 border-b border-neutral-800 p-4">
-        <span className="text-sm text-neutral-300">
-          Stopped <strong>{justStopped.taskName}</strong>
+      <div className="flex flex-wrap items-center gap-4 border-b border-border p-4">
+        <span className="text-sm text-text-secondary">
+          Stopped <strong className="text-text-primary">{justStopped.taskName}</strong>
         </span>
-        <span className="font-mono text-lg text-neutral-100">
+        <span className="font-mono text-lg text-text-primary">
           {formatElapsed(justStopped.elapsedMs)}
         </span>
-        <span className="text-xs text-neutral-400">Mark as done?</span>
+        <span className="text-xs text-text-secondary">Mark as done?</span>
         <button
           type="button"
           onClick={() => markDone.mutate(justStopped.taskId, { onSuccess: () => setJustStopped(null) })}
-          className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500"
+          className="rounded bg-success px-3 py-1.5 text-xs font-medium text-white hover:bg-success-hover"
         >
           Yes, done
         </button>
         <button
           type="button"
           onClick={() => setJustStopped(null)}
-          className="rounded border border-neutral-700 px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-800"
+          className="rounded border border-border px-3 py-1.5 text-xs text-text-secondary hover:bg-surface-hover"
         >
           No, keep in progress
         </button>
@@ -89,16 +89,16 @@ export default function TimerControl({ tasks }: { tasks: Task[] }) {
 
   if (active) {
     return (
-      <div className="flex flex-wrap items-center gap-4 border-b border-neutral-800 p-4">
-        <span className="text-sm text-neutral-300">
-          Tracking <strong>{activeTask?.name ?? active.task_id}</strong>
+      <div className="flex flex-wrap items-center gap-4 border-b border-border p-4">
+        <span className="text-sm text-text-secondary">
+          Tracking <strong className="text-text-primary">{activeTask?.name ?? active.task_id}</strong>
         </span>
-        <span className="font-mono text-lg text-neutral-100">{formatElapsed(elapsedMs)}</span>
+        <span className="font-mono text-lg text-text-primary">{formatElapsed(elapsedMs)}</span>
         <button
           type="button"
           onClick={handleStop}
           disabled={stopTimer.isPending}
-          className="rounded bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-500 disabled:opacity-50"
+          className="rounded bg-danger px-3 py-1.5 text-xs font-medium text-white hover:bg-danger-hover disabled:opacity-50"
         >
           Stop
         </button>
@@ -107,11 +107,11 @@ export default function TimerControl({ tasks }: { tasks: Task[] }) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-neutral-800 p-4">
+    <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
       <select
         value={selectedTaskId}
         onChange={(event) => setSelectedTaskId(event.target.value)}
-        className="rounded border border-neutral-800 bg-neutral-900 px-2 py-1.5 text-sm text-neutral-200"
+        className="rounded border border-border bg-surface px-2 py-1.5 text-sm text-text-primary"
       >
         <option value="">Select a task…</option>
         {schedulableTasks.map((task) => (
@@ -124,12 +124,12 @@ export default function TimerControl({ tasks }: { tasks: Task[] }) {
         type="button"
         disabled={!selectedTaskId || startTimer.isPending}
         onClick={() => startTimer.mutate(selectedTaskId)}
-        className="rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-50"
+        className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
       >
         Start
       </button>
       {schedulableTasks.length === 0 && (
-        <span className="text-xs text-neutral-600">No tasks available to track</span>
+        <span className="text-xs text-text-secondary">No tasks available to track</span>
       )}
     </div>
   )

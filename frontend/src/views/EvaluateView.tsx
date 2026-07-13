@@ -31,12 +31,12 @@ export default function EvaluateView() {
 
   return (
     <div className="flex h-[calc(100vh-49px)] flex-col overflow-y-auto">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-800 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setWeekAnchor((prev) => shiftWeek(prev, -1))}
-            className="rounded border border-neutral-700 px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-800"
+            className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-hover"
           >
             ← Prev
           </button>
@@ -44,13 +44,13 @@ export default function EvaluateView() {
             type="button"
             disabled={isCurrentWeek}
             onClick={() => setWeekAnchor((prev) => shiftWeek(prev, 1))}
-            className="rounded border border-neutral-700 px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-800 disabled:opacity-30"
+            className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-hover disabled:opacity-30"
           >
             Next →
           </button>
-          <span className="text-sm text-neutral-300">
+          <span className="text-sm text-text-secondary">
             Week of {formatWeekLabel(weekAnchor)}
-            {isCurrentWeek && <span className="ml-1 text-neutral-500">(current)</span>}
+            {isCurrentWeek && <span className="ml-1 text-text-secondary">(current)</span>}
           </span>
         </div>
         <div className="flex gap-1">
@@ -61,8 +61,8 @@ export default function EvaluateView() {
               onClick={() => setMode(key)}
               className={`rounded px-3 py-1 text-xs font-medium ${
                 mode === key
-                  ? 'bg-blue-600 text-white'
-                  : 'text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200'
+                  ? 'bg-accent text-white'
+                  : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'
               }`}
             >
               {label}
@@ -81,9 +81,9 @@ export default function EvaluateView() {
         />
       </div>
 
-      {isLoading && <div className="p-4 text-sm text-neutral-500">Loading stats…</div>}
+      {isLoading && <div className="p-4 text-sm text-text-secondary">Loading stats…</div>}
       {isError && (
-        <div className="p-4 text-sm text-red-400">
+        <div className="p-4 text-sm text-danger">
           Failed to load stats: {(error as Error).message}
         </div>
       )}

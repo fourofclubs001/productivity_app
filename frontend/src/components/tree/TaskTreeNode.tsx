@@ -30,7 +30,7 @@ export default function TaskTreeNode({
 
   if (ancestorPath.has(taskId)) {
     return (
-      <div className="px-2 py-1 text-xs text-red-400" style={{ paddingLeft: depth * 16 + 8 }}>
+      <div className="px-2 py-1 text-xs text-danger" style={{ paddingLeft: depth * 16 + 8 }}>
         cycle detected ({task.name})
       </div>
     )
@@ -44,7 +44,7 @@ export default function TaskTreeNode({
     <div>
       <div
         className={`group flex cursor-pointer items-center gap-1.5 rounded px-1 py-1 text-sm ${
-          isSelected ? 'bg-blue-600/30 text-neutral-100' : 'text-neutral-300 hover:bg-neutral-800'
+          isSelected ? 'bg-accent-soft text-accent' : 'text-text-primary hover:bg-surface-hover'
         }`}
         style={{ paddingLeft: depth * 16 + 4 }}
         onClick={() => onSelect(taskId)}
@@ -55,7 +55,7 @@ export default function TaskTreeNode({
             event.stopPropagation()
             onToggleExpand(taskId)
           }}
-          className={`flex h-4 w-4 shrink-0 items-center justify-center text-neutral-500 ${
+          className={`flex h-4 w-4 shrink-0 items-center justify-center text-text-secondary ${
             task.is_leaf ? 'invisible' : ''
           }`}
         >
@@ -71,7 +71,7 @@ export default function TaskTreeNode({
             event.stopPropagation()
             onAddChild(taskId)
           }}
-          className="invisible h-4 w-4 shrink-0 text-center leading-none text-neutral-500 hover:text-neutral-200 group-hover:visible"
+          className="invisible h-4 w-4 shrink-0 text-center leading-none text-text-secondary hover:text-text-primary group-hover:visible"
         >
           +
         </button>

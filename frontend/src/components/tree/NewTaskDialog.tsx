@@ -31,47 +31,47 @@ export default function NewTaskDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <form
         onSubmit={handleSubmit}
-        className="w-96 rounded-md border border-neutral-700 bg-neutral-900 p-4 shadow-xl"
+        className="w-96 rounded-lg border border-border bg-surface p-4 shadow-xl"
       >
-        <h2 className="mb-3 text-sm font-semibold text-neutral-200">
+        <h2 className="mb-3 text-sm font-semibold text-text-primary">
           {parentId ? 'New sub-task' : 'New task'}
         </h2>
-        <label className="mb-2 block text-xs text-neutral-400">
+        <label className="mb-2 block text-xs text-text-secondary">
           Name
           <input
             autoFocus
             value={name}
             onChange={(event) => setName(event.target.value)}
-            className="mt-1 w-full rounded border border-neutral-700 bg-neutral-800 px-2 py-1 text-sm text-neutral-100 focus:border-blue-500 focus:outline-none"
+            className="mt-1 w-full rounded border border-border bg-surface px-2 py-1 text-sm text-text-primary focus:border-accent focus:outline-none"
           />
         </label>
-        <label className="mb-3 block text-xs text-neutral-400">
+        <label className="mb-3 block text-xs text-text-secondary">
           Definition of done
           <textarea
             value={definitionOfDone}
             onChange={(event) => setDefinitionOfDone(event.target.value)}
             rows={3}
-            className="mt-1 w-full rounded border border-neutral-700 bg-neutral-800 px-2 py-1 text-sm text-neutral-100 focus:border-blue-500 focus:outline-none"
+            className="mt-1 w-full rounded border border-border bg-surface px-2 py-1 text-sm text-text-primary focus:border-accent focus:outline-none"
           />
         </label>
         <div className="flex justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="rounded px-3 py-1.5 text-xs text-neutral-400 hover:text-neutral-200"
+            className="rounded px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={!canSubmit || createTask.isPending}
-            className="rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-50"
+            className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
           >
             Create
           </button>
         </div>
         {createTask.isError && (
-          <p className="mt-2 text-xs text-red-400">{(createTask.error as Error).message}</p>
+          <p className="mt-2 text-xs text-danger">{(createTask.error as Error).message}</p>
         )}
       </form>
     </div>

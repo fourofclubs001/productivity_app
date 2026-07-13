@@ -12,12 +12,12 @@ export default function PlanView() {
   const selectedTask = selectedId ? tasksById.get(selectedId) : undefined
 
   if (isLoading) {
-    return <div className="p-6 text-sm text-neutral-500">Loading tasks…</div>
+    return <div className="p-6 text-sm text-text-secondary">Loading tasks…</div>
   }
 
   if (isError) {
     return (
-      <div className="p-6 text-sm text-red-400">
+      <div className="p-6 text-sm text-danger">
         Failed to load tasks: {(error as Error).message}
       </div>
     )
@@ -25,14 +25,14 @@ export default function PlanView() {
 
   return (
     <div className="flex h-[calc(100vh-49px)]">
-      <div className="w-56 shrink-0 border-r border-neutral-800">
+      <div className="w-56 shrink-0 border-r border-border">
         <TaskTree tasks={tasks ?? []} selectedId={selectedId} onSelect={setSelectedId} />
       </div>
-      <div className="w-72 shrink-0 border-r border-neutral-800">
+      <div className="w-72 shrink-0 border-r border-border">
         {selectedTask ? (
           <TaskDetailPanel task={selectedTask} tasksById={tasksById} />
         ) : (
-          <div className="flex h-full items-center justify-center text-sm text-neutral-600">
+          <div className="flex h-full items-center justify-center text-sm text-text-secondary">
             Select a task to see its details
           </div>
         )}

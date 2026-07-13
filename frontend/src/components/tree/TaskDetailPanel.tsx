@@ -92,7 +92,7 @@ export default function TaskDetailPanel({
       <div className="mb-4 flex items-center gap-2">
         <StateBadge state={task.state} />
         {!task.is_leaf && (
-          <span className="text-xs text-neutral-500">
+          <span className="text-xs text-text-secondary">
             derived from {task.children_ids.length} sub-task
             {task.children_ids.length === 1 ? '' : 's'}
           </span>
@@ -102,30 +102,30 @@ export default function TaskDetailPanel({
       <input
         value={name}
         onChange={(event) => setName(event.target.value)}
-        className="w-full border-none bg-transparent text-xl font-semibold text-neutral-100 focus:outline-none"
+        className="w-full border-none bg-transparent text-xl font-semibold text-text-primary focus:outline-none"
       />
 
       <div className="mt-4">
-        <label className="block text-xs font-medium uppercase tracking-wide text-neutral-500">
+        <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
           Description
         </label>
         <textarea
           value={description}
           onChange={(event) => setDescription(event.target.value)}
           rows={4}
-          className="mt-1 w-full rounded border border-neutral-800 bg-neutral-900 px-2 py-1.5 text-sm text-neutral-200 focus:border-blue-500 focus:outline-none"
+          className="mt-1 w-full rounded border border-border bg-surface px-2 py-1.5 text-sm text-text-primary focus:border-accent focus:outline-none"
         />
       </div>
 
       <div className="mt-4">
-        <label className="block text-xs font-medium uppercase tracking-wide text-neutral-500">
+        <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
           Definition of done
         </label>
         <textarea
           value={dod}
           onChange={(event) => setDod(event.target.value)}
           rows={3}
-          className="mt-1 w-full rounded border border-neutral-800 bg-neutral-900 px-2 py-1.5 text-sm text-neutral-200 focus:border-blue-500 focus:outline-none"
+          className="mt-1 w-full rounded border border-border bg-surface px-2 py-1.5 text-sm text-text-primary focus:border-accent focus:outline-none"
         />
       </div>
 
@@ -134,14 +134,14 @@ export default function TaskDetailPanel({
           type="button"
           onClick={handleSave}
           disabled={updateTask.isPending || name.trim().length === 0}
-          className="mt-3 rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-50"
+          className="mt-3 rounded bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
         >
           Save changes
         </button>
       )}
 
       <div className="mt-6">
-        <label className="block text-xs font-medium uppercase tracking-wide text-neutral-500">
+        <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
           Colors
         </label>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -154,7 +154,7 @@ export default function TaskDetailPanel({
                 title={color}
                 onClick={() => toggleColor(color)}
                 className={`h-6 w-6 rounded-full border-2 ${
-                  active ? 'border-neutral-100' : 'border-transparent opacity-60'
+                  active ? 'border-text-primary' : 'border-transparent opacity-60'
                 }`}
                 style={{ backgroundColor: COLOR_HEX[color] }}
               />
@@ -162,7 +162,7 @@ export default function TaskDetailPanel({
           })}
         </div>
         {task.colors.length === 0 && task.effective_colors.length > 0 && (
-          <p className="mt-1 text-xs text-neutral-500">
+          <p className="mt-1 text-xs text-text-secondary">
             Inherited from parent{task.parent_ids.length === 1 ? '' : 's'}
           </p>
         )}
@@ -170,11 +170,11 @@ export default function TaskDetailPanel({
 
       {task.is_leaf && (
         <div className="mt-6">
-          <label className="block text-xs font-medium uppercase tracking-wide text-neutral-500">
+          <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
             Sprint schedule
           </label>
           {intervals.length === 0 ? (
-            <p className="mt-1 text-xs text-neutral-600">
+            <p className="mt-1 text-xs text-text-secondary">
               Not scheduled. Select this task, then drag on the calendar to reserve time.
             </p>
           ) : (
@@ -185,7 +185,7 @@ export default function TaskDetailPanel({
                 .map((interval) => (
                   <li
                     key={interval.id}
-                    className="flex items-center justify-between rounded bg-neutral-800 px-2 py-1 text-xs text-neutral-300"
+                    className="flex items-center justify-between rounded bg-surface-alt px-2 py-1 text-xs text-text-secondary"
                   >
                     <span>
                       {format(new Date(interval.start), 'EEE MMM d, HH:mm')} –{' '}
@@ -195,7 +195,7 @@ export default function TaskDetailPanel({
                       type="button"
                       title="Remove this time slot"
                       onClick={() => deleteInterval.mutate(interval.id)}
-                      className="text-neutral-500 hover:text-red-400"
+                      className="text-text-secondary hover:text-danger"
                     >
                       ×
                     </button>
@@ -207,25 +207,25 @@ export default function TaskDetailPanel({
       )}
 
       <div className="mt-6">
-        <label className="block text-xs font-medium uppercase tracking-wide text-neutral-500">
+        <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
           Parents
         </label>
         <div className="mt-2 flex flex-wrap gap-2">
           {task.parent_ids.length === 0 && (
-            <span className="text-xs text-neutral-600">Top-level task</span>
+            <span className="text-xs text-text-secondary">Top-level task</span>
           )}
           {task.parent_ids.map((parentId) => {
             const parent = tasksById.get(parentId)
             return (
               <span
                 key={parentId}
-                className="flex items-center gap-1 rounded-full bg-neutral-800 px-2 py-0.5 text-xs text-neutral-300"
+                className="flex items-center gap-1 rounded-full bg-surface-alt px-2 py-0.5 text-xs text-text-secondary"
               >
                 {parent?.name ?? parentId}
                 <button
                   type="button"
                   onClick={() => removeParent.mutate({ id: task.id, parentId })}
-                  className="text-neutral-500 hover:text-red-400"
+                  className="text-text-secondary hover:text-danger"
                   title="Remove parent"
                 >
                   ×
@@ -239,7 +239,7 @@ export default function TaskDetailPanel({
             <select
               value={addParentId}
               onChange={(event) => setAddParentId(event.target.value)}
-              className="flex-1 rounded border border-neutral-800 bg-neutral-900 px-2 py-1 text-xs text-neutral-200"
+              className="flex-1 rounded border border-border bg-surface px-2 py-1 text-xs text-text-primary"
             >
               <option value="">Add parent…</option>
               {parentCandidates.map((candidate) => (
@@ -255,7 +255,7 @@ export default function TaskDetailPanel({
                 addParent.mutate({ id: task.id, parentId: addParentId })
                 setAddParentId('')
               }}
-              className="rounded border border-neutral-700 px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-800 disabled:opacity-50"
+              className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-alt disabled:opacity-50"
             >
               Add
             </button>
@@ -263,36 +263,36 @@ export default function TaskDetailPanel({
         )}
       </div>
 
-      <div className="mt-8 border-t border-neutral-800 pt-4">
+      <div className="mt-8 border-t border-border pt-4">
         {!confirmingDelete ? (
           <button
             type="button"
             onClick={() => setConfirmingDelete(true)}
-            className="text-xs text-red-400 hover:text-red-300"
+            className="text-xs text-danger hover:text-danger-hover"
           >
             Delete task
           </button>
         ) : (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-neutral-400">Delete this task permanently?</span>
+            <span className="text-xs text-text-secondary">Delete this task permanently?</span>
             <button
               type="button"
               onClick={() => deleteTask.mutate(task.id)}
-              className="rounded bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-500"
+              className="rounded bg-danger px-2 py-1 text-xs font-medium text-white hover:bg-danger-hover"
             >
               Confirm
             </button>
             <button
               type="button"
               onClick={() => setConfirmingDelete(false)}
-              className="text-xs text-neutral-500 hover:text-neutral-300"
+              className="text-xs text-text-secondary hover:text-text-primary"
             >
               Cancel
             </button>
           </div>
         )}
         {deleteTask.isError && (
-          <p className="mt-2 text-xs text-red-400">{(deleteTask.error as Error).message}</p>
+          <p className="mt-2 text-xs text-danger">{(deleteTask.error as Error).message}</p>
         )}
       </div>
     </div>

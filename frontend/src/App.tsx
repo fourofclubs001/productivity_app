@@ -16,8 +16,8 @@ function App() {
   const ActiveComponent = VIEWS[activeView].Component
 
   return (
-    <div className="flex h-full min-h-screen flex-col bg-neutral-900">
-      <nav className="flex gap-1 border-b border-neutral-800 bg-neutral-950 px-4">
+    <div className="flex h-full min-h-screen flex-col bg-surface">
+      <nav className="flex gap-1 border-b border-border bg-surface px-4">
         {(Object.keys(VIEWS) as ViewKey[]).map((key) => (
           <button
             key={key}
@@ -25,8 +25,8 @@ function App() {
             onClick={() => setActiveView(key)}
             className={`px-4 py-3 text-sm font-medium transition-colors ${
               activeView === key
-                ? 'border-b-2 border-blue-500 text-neutral-100'
-                : 'text-neutral-500 hover:text-neutral-300'
+                ? 'border-b-2 border-accent text-accent'
+                : 'text-text-secondary hover:text-text-primary'
             }`}
           >
             {VIEWS[key].label}
