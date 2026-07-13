@@ -11,6 +11,22 @@ A personal web app for planning, executing, and evaluating daily/weekly tasks.
 
 The app has three top-level views: **Plan**, **Execute**, **Evaluate**.
 
+### 1.1 Interaction model: direct manipulation
+
+The app is built around **direct manipulation** as a core UI principle: acting
+on the visual representation of a task or event directly (dragging, dropping,
+resizing) rather than through intermediate forms/menus wherever a direct
+gesture is natural. This shows up across all three views — the DAG tree, the
+calendars, and the panel layout — rather than being a one-off feature of any
+single view. See `prompts/glossary.md` for the full vocabulary.
+
+The flagship instance of this is **drag-and-drop reparenting**: dragging one
+task node in the Plan view's left panel and dropping it onto another task node
+attaches it as a child of that target, the same mechanism VS Code's file
+Explorer uses to move a file into a folder. This is the primary way of
+restructuring the task DAG (see §2.5's **Reparent** operation) — form-based
+reparenting is a fallback, not the main path.
+
 ---
 
 ## 2. Task Model (shared across all views)
@@ -66,7 +82,7 @@ Beyond creating a task, the following operations are in scope for v1:
 
 - **Rename / edit** — change a task's name, description, and definition of done after creation.
 - **Delete** — remove a task from the DAG.
-- **Reparent** — add or remove parent links for a task (attach/detach it from additional parent nodes), since the structure is a DAG.
+- **Reparent** — add or remove parent links for a task (attach/detach it from additional parent nodes), since the structure is a DAG. Primary mechanism is drag-and-drop in the left panel (see §1.1); a form-based "add parent" path also exists as a fallback.
 - **Un-schedule** — manually pull a task back from `sprint backlog` to `backlog`, removing its reserved calendar interval(s).
 
 ---
@@ -168,3 +184,6 @@ Google Calendar–style views for:
 - Confirmed: task colors come from a fixed preset palette.
 - Confirmed: v1 includes rename/edit, delete, reparent, and un-schedule operations on tasks.
 - Confirmed: app runs locally only for this stage; Google Calendar sync is deferred to a later phase.
+- Confirmed (added in the v01 pass): direct manipulation, and drag-and-drop
+  reparenting specifically, is a main interaction paradigm of the app, not a
+  minor convenience — see §1.1.
