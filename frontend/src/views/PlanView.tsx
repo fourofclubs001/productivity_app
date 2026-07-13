@@ -53,7 +53,7 @@ export default function PlanView() {
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <PlanCalendar tasksById={tasksById} />
+          <PlanCalendar tasksById={tasksById} onOpenTask={setSelectedId} />
         </div>
         {dialogParentId !== undefined && (
           <NewTaskDialog

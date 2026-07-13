@@ -12,6 +12,7 @@ vi.mock('./api/tasks', () => ({
 vi.mock('./api/intervals', () => ({
   useIntervalsForWeek: () => ({ data: [] }),
   useCreateInterval: () => ({ mutate: vi.fn() }),
+  useUpdateInterval: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
   useDeleteInterval: () => ({ mutate: vi.fn() }),
 }))
 

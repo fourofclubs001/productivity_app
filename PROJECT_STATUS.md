@@ -93,6 +93,21 @@ worth reusing rather than reinventing:
     drops the stale anonymous volume). Same applies to the backend if a Python
     dependency is ever added, though it has no anonymous volume today since
     `backend/requirements.txt` installs happen in a layer that isn't bind-mount-shadowed.
+- **Gotcha hit during M8:** `react-big-calendar/lib/addons/dragAndDrop`'s default export
+  comes through **double-wrapped** (`mod.default.default`, an object rather than the
+  `withDragAndDrop` function itself) specifically under Vite's **dev-server** esbuild
+  dependency pre-bundling — a CJS/ESM interop quirk of that package's export shape. It
+  resolves correctly as a plain function under both vitest and the production `vite
+  build` (Rollup), so this only surfaces as a runtime `TypeError: withDragAndDrop is not
+  a function` in the browser against the dev stack, with **no build-time or type error
+  anywhere** (`tsc`, `vitest`, and `vite build` all pass clean) — the first sign is a
+  blank white page with all network requests returning 200 and nothing in the console.
+  Diagnosed by executing `import('/src/main.tsx')` directly in the browser console via
+  claude-in-chrome to surface the swallowed exception. Fixed in
+  `frontend/src/components/calendar/PlanCalendar.tsx` with a defensive unwrap
+  (`typeof x === 'function' ? x : x.default`) rather than assuming either shape. Worth
+  remembering if another dual CJS/ESM package added later exhibits the same "works in
+  tests/build, blank page in dev" symptom.
 - Backend venv: `backend/.venv`. Frontend deps: `frontend/node_modules`. Both already
   installed — no fresh `pip install`/`npm install` needed unless dependencies change.
 - Playwright's Chromium binary is installed (`npx playwright install chromium` was

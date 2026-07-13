@@ -7,22 +7,27 @@ import type { Task } from '../../types'
 
 const deleteMutate = vi.fn((_id: string, opts?: { onSuccess?: () => void }) => opts?.onSuccess?.())
 const createMutateAsync = vi.fn().mockResolvedValue(undefined)
+const updateMutate = vi.fn()
+const updateMutateAsync = vi.fn().mockResolvedValue(undefined)
 const useIntervalsForWeek = vi.fn(() => ({ data: [] as unknown[] }))
 
 vi.mock('../../api/intervals', () => ({
   useIntervalsForWeek: () => useIntervalsForWeek(),
   useCreateInterval: () => ({ mutate: vi.fn(), mutateAsync: createMutateAsync }),
+  useUpdateInterval: () => ({ mutate: updateMutate, mutateAsync: updateMutateAsync }),
   useDeleteInterval: () => ({ mutate: deleteMutate }),
 }))
 
-function renderCalendar(tasksById: Map<string, Task>) {
-  return renderWithClient(<PlanCalendar tasksById={tasksById} />)
+function renderCalendar(tasksById: Map<string, Task>, onOpenTask: (taskId: string) => void = vi.fn()) {
+  return renderWithClient(<PlanCalendar tasksById={tasksById} onOpenTask={onOpenTask} />)
 }
 
 beforeEach(() => {
   vi.setSystemTime(new Date('2026-07-15T12:00:00Z'))
   deleteMutate.mockClear()
   createMutateAsync.mockClear()
+  updateMutate.mockClear()
+  updateMutateAsync.mockClear()
   useIntervalsForWeek.mockReturnValue({ data: [] })
 })
 
@@ -69,5 +74,26 @@ describe('PlanCalendar', () => {
       start: '2026-07-15T10:00:00.000Z',
       end: '2026-07-15T11:00:00.000Z',
     })
+  })
+
+  it('opens the task detail view when a scheduled event is left-clicked', () => {
+    const task = makeTask({ id: 't1', name: 'Scheduled task', is_leaf: true })
+    useIntervalsForWeek.mockReturnValue({
+      data: [
+        {
+          id: 'iv1',
+          task_id: 't1',
+          start: '2026-07-15T10:00:00.000Z',
+          end: '2026-07-15T11:00:00.000Z',
+          week_start: '2026-07-13',
+        },
+      ],
+    })
+    const onOpenTask = vi.fn()
+
+    renderCalendar(new Map([[task.id, task]]), onOpenTask)
+
+    fireEvent.click(screen.getByText('Scheduled task'))
+    expect(onOpenTask).toHaveBeenCalledWith('t1')
   })
 })

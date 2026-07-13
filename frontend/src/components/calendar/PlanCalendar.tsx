@@ -1,10 +1,19 @@
 import { useMemo, useRef, useState } from 'react'
 import { Calendar } from 'react-big-calendar'
+import dragAndDropImport, {
+  type EventInteractionArgs,
+} from 'react-big-calendar/lib/addons/dragAndDrop'
 import { useDndMonitor, useDroppable } from '@dnd-kit/core'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
+import 'react-big-calendar/lib/addons/dragAndDrop/styles.css'
 import './calendar.css'
 import type { Interval, Task } from '../../types'
-import { useCreateInterval, useDeleteInterval, useIntervalsForWeek } from '../../api/intervals'
+import {
+  useCreateInterval,
+  useDeleteInterval,
+  useIntervalsForWeek,
+  useUpdateInterval,
+} from '../../api/intervals'
 import { formatWeekLabel, mondayOf, shiftWeek, weekStartKey } from '../../lib/week'
 import { localizer } from '../../lib/calendarLocalizer'
 import { utcNow } from '../../lib/time'
@@ -23,9 +32,25 @@ interface CalendarEvent {
   color: string
 }
 
-export default function PlanCalendar({ tasksById }: { tasksById: Map<string, Task> }) {
+// Vite's dev-server esbuild pre-bundling double-wraps this addon's default
+// export (mod.default.default) for reasons specific to its CJS/ESM interop
+// shape; vitest and the production Rollup build both resolve it correctly as
+// a plain function. Unwrap defensively so both environments work.
+const withDragAndDrop =
+  typeof dragAndDropImport === 'function'
+    ? dragAndDropImport
+    : (dragAndDropImport as unknown as { default: typeof dragAndDropImport }).default
+
+const DnDCalendar = withDragAndDrop<CalendarEvent>(Calendar)
+
+export default function PlanCalendar({
+  tasksById,
+  onOpenTask,
+}: {
+  tasksById: Map<string, Task>
+  onOpenTask: (taskId: string) => void
+}) {
   const [weekAnchor, setWeekAnchor] = useState(() => mondayOf(utcNow()))
-  const [pendingDelete, setPendingDelete] = useState<Interval | null>(null)
   const [scheduleError, setScheduleError] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<{
     x: number
@@ -39,6 +64,7 @@ export default function PlanCalendar({ tasksById }: { tasksById: Map<string, Tas
 
   const { data: intervals = [] } = useIntervalsForWeek(weekStart)
   const createInterval = useCreateInterval()
+  const updateInterval = useUpdateInterval()
   const deleteInterval = useDeleteInterval()
   const { pushUndo } = useUndo()
 
@@ -102,6 +128,30 @@ export default function PlanCalendar({ tasksById }: { tasksById: Map<string, Tas
     })
   }
 
+  function handleEventChange({ event, start, end }: EventInteractionArgs<CalendarEvent>) {
+    const interval = intervals.find((i) => i.id === event.id)
+    if (!interval) return
+    const previousStart = interval.start
+    const previousEnd = interval.end
+    const input = { start: new Date(start).toISOString(), end: new Date(end).toISOString() }
+    setScheduleError(null)
+    updateInterval.mutate(
+      { id: interval.id, input },
+      {
+        onSuccess: () =>
+          pushUndo({
+            label: 'Move/resize scheduled task',
+            undo: () =>
+              updateInterval.mutateAsync({
+                id: interval.id,
+                input: { start: previousStart, end: previousEnd },
+              }),
+          }),
+        onError: (error) => setScheduleError((error as Error).message),
+      },
+    )
+  }
+
   const events = useMemo<CalendarEvent[]>(
     () =>
       intervals.map((interval) => {
@@ -158,7 +208,7 @@ export default function PlanCalendar({ tasksById }: { tasksById: Map<string, Tas
         ref={setCalendarRef}
         className={`min-h-0 flex-1 ${isOver ? 'ring-2 ring-accent' : ''}`}
       >
-        <Calendar
+        <DnDCalendar
           localizer={localizer}
           events={events}
           defaultView="week"
@@ -167,9 +217,12 @@ export default function PlanCalendar({ tasksById }: { tasksById: Map<string, Tas
           onNavigate={() => {}}
           toolbar={false}
           selectable={false}
-          onSelectEvent={(event) => {
+          resizable
+          onEventDrop={handleEventChange}
+          onEventResize={handleEventChange}
+          onSelectEvent={(event: CalendarEvent) => {
             const interval = intervals.find((i) => i.id === event.id)
-            if (interval) setPendingDelete(interval)
+            if (interval) onOpenTask(interval.task_id)
           }}
           eventPropGetter={(event: CalendarEvent) => ({
             style: { backgroundColor: event.color, border: 'none' },
@@ -208,36 +261,6 @@ export default function PlanCalendar({ tasksById }: { tasksById: Map<string, Tas
             },
           ]}
         />
-      )}
-
-      {pendingDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-80 rounded-lg border border-border bg-surface p-4 shadow-xl">
-            <p className="mb-3 text-sm text-text-primary">
-              Remove this reserved time slot for{' '}
-              <strong>{tasksById.get(pendingDelete.task_id)?.name}</strong>?
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setPendingDelete(null)}
-                className="rounded px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  deleteIntervalWithUndo(pendingDelete)
-                  setPendingDelete(null)
-                }}
-                className="rounded bg-danger px-3 py-1.5 text-xs font-medium text-white hover:bg-danger-hover"
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   )
