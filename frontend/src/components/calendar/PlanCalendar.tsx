@@ -7,9 +7,11 @@ import { useCreateInterval, useDeleteInterval, useIntervalsForWeek } from '../..
 import { formatWeekLabel, mondayOf, shiftWeek, weekStartKey } from '../../lib/week'
 import { localizer } from '../../lib/calendarLocalizer'
 import { utcNow } from '../../lib/time'
+import { useUndo } from '../../undo/UndoProvider'
 import { COLOR_HEX } from '../tree/colors'
 import CalendarDayHeader from './CalendarDayHeader'
 import CalendarTimezoneLabel from './CalendarTimezoneLabel'
+import ContextMenu from './ContextMenu'
 
 interface CalendarEvent {
   id: string
@@ -28,6 +30,11 @@ export default function PlanCalendar({
 }) {
   const [weekAnchor, setWeekAnchor] = useState(() => mondayOf(utcNow()))
   const [pendingDelete, setPendingDelete] = useState<Interval | null>(null)
+  const [contextMenu, setContextMenu] = useState<{
+    x: number
+    y: number
+    interval: Interval
+  } | null>(null)
 
   const weekStart = weekStartKey(weekAnchor)
   const isCurrentWeek = weekStart === weekStartKey(utcNow())
@@ -35,6 +42,22 @@ export default function PlanCalendar({
   const { data: intervals = [] } = useIntervalsForWeek(weekStart)
   const createInterval = useCreateInterval()
   const deleteInterval = useDeleteInterval()
+  const { pushUndo } = useUndo()
+
+  function deleteIntervalWithUndo(interval: Interval) {
+    deleteInterval.mutate(interval.id, {
+      onSuccess: () =>
+        pushUndo({
+          label: 'Delete reserved time slot',
+          undo: () =>
+            createInterval.mutateAsync({
+              task_id: interval.task_id,
+              start: interval.start,
+              end: interval.end,
+            }),
+        }),
+    })
+  }
 
   const events = useMemo<CalendarEvent[]>(
     () =>
@@ -117,10 +140,41 @@ export default function PlanCalendar({
           eventPropGetter={(event: CalendarEvent) => ({
             style: { backgroundColor: event.color, border: 'none' },
           })}
-          components={{ header: CalendarDayHeader, timeGutterHeader: CalendarTimezoneLabel }}
+          components={{
+            header: CalendarDayHeader,
+            timeGutterHeader: CalendarTimezoneLabel,
+            event: ({ event, title }: { event: CalendarEvent; title: string }) => (
+              <div
+                className="h-full w-full truncate"
+                onContextMenu={(domEvent) => {
+                  domEvent.preventDefault()
+                  const interval = intervals.find((i) => i.id === event.id)
+                  if (!interval) return
+                  setContextMenu({ x: domEvent.clientX, y: domEvent.clientY, interval })
+                }}
+              >
+                {title}
+              </div>
+            ),
+          }}
           style={{ height: '100%' }}
         />
       </div>
+
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          items={[
+            {
+              label: 'Delete',
+              danger: true,
+              onSelect: () => deleteIntervalWithUndo(contextMenu.interval),
+            },
+          ]}
+        />
+      )}
 
       {pendingDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -140,7 +194,7 @@ export default function PlanCalendar({
               <button
                 type="button"
                 onClick={() => {
-                  deleteInterval.mutate(pendingDelete.id)
+                  deleteIntervalWithUndo(pendingDelete)
                   setPendingDelete(null)
                 }}
                 className="rounded bg-danger px-3 py-1.5 text-xs font-medium text-white hover:bg-danger-hover"
