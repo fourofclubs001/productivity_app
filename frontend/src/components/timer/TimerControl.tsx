@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Task } from '../../types'
-import { useActiveTimer, useMarkDone, useStartTimer, useStopTimer } from '../../api/timer'
+import {
+  useActiveTimer,
+  useMarkDone,
+  useRevertDone,
+  useStartTimer,
+  useStopTimer,
+} from '../../api/timer'
+import { useUndo } from '../../undo/UndoProvider'
+import DoneConfirmModal from './DoneConfirmModal'
 
 const UNTRACKABLE_STATES = new Set(['sprint_done', 'done'])
 
@@ -15,6 +23,7 @@ function formatElapsed(ms: number): string {
 interface JustStopped {
   taskId: string
   taskName: string
+  definitionOfDone: string
   elapsedMs: number
 }
 
@@ -23,6 +32,8 @@ export default function TimerControl({ tasks }: { tasks: Task[] }) {
   const startTimer = useStartTimer()
   const stopTimer = useStopTimer()
   const markDone = useMarkDone()
+  const revertDone = useRevertDone()
+  const { pushUndo } = useUndo()
   const [selectedTaskId, setSelectedTaskId] = useState('')
   const [elapsedMs, setElapsedMs] = useState(0)
   const [justStopped, setJustStopped] = useState<JustStopped | null>(null)
@@ -53,9 +64,11 @@ export default function TimerControl({ tasks }: { tasks: Task[] }) {
     if (!active) return
     const taskId = active.task_id
     const taskName = activeTask?.name ?? taskId
+    const definitionOfDone = activeTask?.definition_of_done ?? ''
     const frozenElapsedMs = elapsedMs
     stopTimer.mutate(undefined, {
-      onSuccess: () => setJustStopped({ taskId, taskName, elapsedMs: frozenElapsedMs }),
+      onSuccess: () =>
+        setJustStopped({ taskId, taskName, definitionOfDone, elapsedMs: frozenElapsedMs }),
     })
   }
 
@@ -68,21 +81,24 @@ export default function TimerControl({ tasks }: { tasks: Task[] }) {
         <span className="font-mono text-lg text-text-primary">
           {formatElapsed(justStopped.elapsedMs)}
         </span>
-        <span className="text-xs text-text-secondary">Mark as done?</span>
-        <button
-          type="button"
-          onClick={() => markDone.mutate(justStopped.taskId, { onSuccess: () => setJustStopped(null) })}
-          className="rounded bg-success px-3 py-1.5 text-xs font-medium text-white hover:bg-success-hover"
-        >
-          Yes, done
-        </button>
-        <button
-          type="button"
-          onClick={() => setJustStopped(null)}
-          className="rounded border border-border px-3 py-1.5 text-xs text-text-secondary hover:bg-surface-hover"
-        >
-          No, keep in progress
-        </button>
+        <DoneConfirmModal
+          taskName={justStopped.taskName}
+          definitionOfDone={justStopped.definitionOfDone}
+          isPending={markDone.isPending}
+          onDismiss={() => setJustStopped(null)}
+          onConfirm={() => {
+            const { taskId } = justStopped
+            markDone.mutate(taskId, {
+              onSuccess: () => {
+                pushUndo({
+                  label: 'Mark sprint done',
+                  undo: () => revertDone.mutateAsync(taskId),
+                })
+                setJustStopped(null)
+              },
+            })
+          }}
+        />
       </div>
     )
   }

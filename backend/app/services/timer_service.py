@@ -10,6 +10,7 @@ from app.services.errors import (
     TaskNotFoundError,
     TaskNotInProgressError,
     TaskNotLeafError,
+    TaskNotSprintDoneError,
 )
 
 
@@ -59,6 +60,20 @@ class TimerService:
             raise TaskNotInProgressError(task_id)
 
         await self._tasks.update_fields(task_id, {"state": TaskState.sprint_done.value})
+
+    async def revert_done(self, task_id: str) -> None:
+        """Undo the sprint_done transition made via mark_done, back to
+        in_progress -- does not resurrect the timer entry, which was already
+        stopped/recorded independently of this decision (see item 16c)."""
+        task_node = await self._tasks.load_node(task_id)
+        if task_node is None:
+            raise TaskNotFoundError(task_id)
+
+        state = TaskState(task_node.fields.get("state", TaskState.backlog.value))
+        if state != TaskState.sprint_done:
+            raise TaskNotSprintDoneError(task_id)
+
+        await self._tasks.update_fields(task_id, {"state": TaskState.in_progress.value})
 
     async def get_active(self) -> EntryOut | None:
         active_id = await self._entries.get_active_id()

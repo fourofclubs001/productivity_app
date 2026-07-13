@@ -10,6 +10,7 @@ from app.services.errors import (
     TaskNotFoundError,
     TaskNotInProgressError,
     TaskNotLeafError,
+    TaskNotSprintDoneError,
 )
 from app.services.task_service import TaskService
 from app.services.timer_service import TimerService
@@ -48,6 +49,21 @@ async def mark_timer_task_done(
     except TaskNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except TaskNotInProgressError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return await task_service.get_task(payload.task_id)
+
+
+@router.post("/timer/revert-done", response_model=TaskOut)
+async def revert_done(
+    payload: MarkDoneRequest,
+    timer_service: ServiceDep,
+    task_service: Annotated[TaskService, Depends(get_task_service)],
+) -> TaskOut:
+    try:
+        await timer_service.revert_done(payload.task_id)
+    except TaskNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except TaskNotSprintDoneError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return await task_service.get_task(payload.task_id)
 

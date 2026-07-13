@@ -103,6 +103,33 @@ def test_mark_done_rejects_missing_task(client):
     assert response.status_code == 404
 
 
+def test_revert_done_undoes_a_sprint_done_transition(client):
+    task = create_leaf(client)
+    client.post("/timer/start", json={"task_id": task["id"]})
+    client.post("/timer/stop")
+    client.post("/timer/mark-done", json={"task_id": task["id"]})
+
+    response = client.post("/timer/revert-done", json={"task_id": task["id"]})
+    assert response.status_code == 200
+    assert response.json()["state"] == "in_progress"
+
+    task_after = client.get(f"/tasks/{task['id']}").json()
+    assert task_after["state"] == "in_progress"
+
+
+def test_revert_done_rejects_a_task_that_is_not_sprint_done(client):
+    task = create_leaf(client)
+    client.post("/timer/start", json={"task_id": task["id"]})
+
+    response = client.post("/timer/revert-done", json={"task_id": task["id"]})
+    assert response.status_code == 400
+
+
+def test_revert_done_rejects_missing_task(client):
+    response = client.post("/timer/revert-done", json={"task_id": "missing"})
+    assert response.status_code == 404
+
+
 def test_list_entries_for_week(client):
     task = create_leaf(client)
     client.post("/timer/start", json={"task_id": task["id"]})

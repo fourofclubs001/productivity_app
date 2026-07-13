@@ -12,6 +12,11 @@ const timerApi = {
       method: 'POST',
       body: JSON.stringify({ task_id: taskId }),
     }),
+  revertDone: (taskId: string) =>
+    apiFetch<Task>('/timer/revert-done', {
+      method: 'POST',
+      body: JSON.stringify({ task_id: taskId }),
+    }),
   listForWeek: (weekStart: string) => apiFetch<Entry[]>(`/entries?week_start=${weekStart}`),
 }
 
@@ -56,6 +61,16 @@ export function useMarkDone() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (taskId: string) => timerApi.markDone(taskId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: TASKS_KEY })
+    },
+  })
+}
+
+export function useRevertDone() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (taskId: string) => timerApi.revertDone(taskId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TASKS_KEY })
     },

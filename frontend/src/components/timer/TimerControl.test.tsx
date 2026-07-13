@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import TimerControl from './TimerControl'
 import { makeTask } from '../../test/taskFixtures'
+import { UndoProvider } from '../../undo/UndoProvider'
 
 const activeTimerMock = vi.fn()
 const startMutate = vi.fn()
@@ -11,19 +12,30 @@ const stopMutate = vi.fn((_vars?: unknown, options?: { onSuccess?: () => void })
 const markDoneMutate = vi.fn((_taskId?: unknown, options?: { onSuccess?: () => void }) => {
   options?.onSuccess?.()
 })
+const revertDoneMutateAsync = vi.fn()
 
 vi.mock('../../api/timer', () => ({
   useActiveTimer: () => activeTimerMock(),
   useStartTimer: () => ({ mutate: startMutate, isPending: false }),
   useStopTimer: () => ({ mutate: stopMutate, isPending: false }),
   useMarkDone: () => ({ mutate: markDoneMutate, isPending: false }),
+  useRevertDone: () => ({ mutateAsync: revertDoneMutateAsync, isPending: false }),
 }))
+
+function renderTimerControl(tasks: ReturnType<typeof makeTask>[]) {
+  return render(
+    <UndoProvider>
+      <TimerControl tasks={tasks} />
+    </UndoProvider>,
+  )
+}
 
 beforeEach(() => {
   activeTimerMock.mockReset()
   startMutate.mockReset()
   stopMutate.mockClear()
   markDoneMutate.mockClear()
+  revertDoneMutateAsync.mockReset()
 })
 
 describe('TimerControl (idle)', () => {
@@ -38,7 +50,7 @@ describe('TimerControl (idle)', () => {
       makeTask({ id: 'sprint-done', name: 'Sprint done task', is_leaf: true, state: 'sprint_done' }),
       makeTask({ id: 'done', name: 'Done task', is_leaf: true, state: 'done' }),
     ]
-    render(<TimerControl tasks={tasks} />)
+    renderTimerControl(tasks)
 
     expect(screen.getByText('Leaf task')).toBeInTheDocument()
     expect(screen.queryByText('Node task')).not.toBeInTheDocument()
@@ -48,7 +60,7 @@ describe('TimerControl (idle)', () => {
 
   it('disables Start until a task is chosen, then starts the timer', () => {
     const task = makeTask({ id: 'leaf', name: 'Leaf task', is_leaf: true })
-    render(<TimerControl tasks={[task]} />)
+    renderTimerControl([task])
 
     const startButton = screen.getByText('Start')
     expect(startButton).toBeDisabled()
@@ -70,7 +82,7 @@ describe('TimerControl (active)', () => {
 
   it('stops the timer immediately on click, before any mark-done choice', () => {
     const task = makeTask({ id: 'leaf', name: 'Leaf task', is_leaf: true })
-    render(<TimerControl tasks={[task]} />)
+    renderTimerControl([task])
 
     expect(screen.getByText('Leaf task')).toBeInTheDocument()
     fireEvent.click(screen.getByText('Stop'))
@@ -82,7 +94,7 @@ describe('TimerControl (active)', () => {
 
   it('marking done after stop calls the dedicated mark-done endpoint', () => {
     const task = makeTask({ id: 'leaf', name: 'Leaf task', is_leaf: true })
-    render(<TimerControl tasks={[task]} />)
+    renderTimerControl([task])
 
     fireEvent.click(screen.getByText('Stop'))
     fireEvent.click(screen.getByText('Yes, done'))
@@ -92,11 +104,23 @@ describe('TimerControl (active)', () => {
 
   it('choosing not to mark done makes no API call', () => {
     const task = makeTask({ id: 'leaf', name: 'Leaf task', is_leaf: true })
-    render(<TimerControl tasks={[task]} />)
+    renderTimerControl([task])
 
     fireEvent.click(screen.getByText('Stop'))
     fireEvent.click(screen.getByText('No, keep in progress'))
 
     expect(markDoneMutate).not.toHaveBeenCalled()
+  })
+
+  it('marking done pushes an undo entry that calls revert-done on ctrl+z', () => {
+    const task = makeTask({ id: 'leaf', name: 'Leaf task', is_leaf: true })
+    renderTimerControl([task])
+
+    fireEvent.click(screen.getByText('Stop'))
+    fireEvent.click(screen.getByText('Yes, done'))
+
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true })
+
+    expect(revertDoneMutateAsync).toHaveBeenCalledWith('leaf')
   })
 })

@@ -73,3 +73,9 @@ class TaskNotInProgressError(Exception):
     def __init__(self, task_id: str) -> None:
         self.task_id = task_id
         super().__init__(f"Task {task_id!r} is not in progress and cannot be marked done")
+
+
+class TaskNotSprintDoneError(Exception):
+    def __init__(self, task_id: str) -> None:
+        self.task_id = task_id
+        super().__init__(f"Task {task_id!r} is not sprint-done and cannot be reverted")
