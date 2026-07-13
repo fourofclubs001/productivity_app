@@ -195,7 +195,11 @@ class TaskService:
         return await self.get_task(task_id)
 
     async def reorder_task(
-        self, task_id: str, after_id: str | None, before_id: str | None
+        self,
+        task_id: str,
+        after_id: str | None,
+        before_id: str | None,
+        order: float | None = None,
     ) -> TaskOut:
         """Place task_id's global order value between after_id and before_id.
 
@@ -203,7 +207,16 @@ class TaskService:
         per-parent), so "between" here means immediately adjacent in that one
         global order, regardless of which list (root list, some parent's
         children) the caller is actually reordering within.
+
+        If order is given, it's set directly instead (used to restore an
+        exact prior value on undo).
         """
+        if order is not None:
+            if not await self._repo.exists(task_id):
+                raise TaskNotFoundError(task_id)
+            await self._repo.update_fields(task_id, {"order": str(order)})
+            return await self.get_task(task_id)
+
         graph = await self._repo.load_graph()
         if task_id not in graph:
             raise TaskNotFoundError(task_id)

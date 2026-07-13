@@ -17,7 +17,9 @@ test('creating a task auto-selects it, and a child task can be created from the 
   // Description textarea has been removed from the detail view.
   await expect(page.getByText('Description', { exact: true })).not.toBeVisible()
   // The color chosen at creation is already active (border highlighted).
-  await expect(page.getByRole('button', { name: 'red' })).toHaveClass(/border-text-primary/)
+  await expect(page.getByRole('button', { name: 'red', exact: true })).toHaveClass(
+    /border-text-primary/,
+  )
 
   const childName = `Child ${Date.now()}`
   await page.getByTitle('Create child task').click()

@@ -4,6 +4,9 @@ import App from './App'
 
 vi.mock('./api/tasks', () => ({
   useTasks: () => ({ data: [], isLoading: false, isError: false, error: null }),
+  useAddParent: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
+  useRemoveParent: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
+  useReorderTask: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
 }))
 
 vi.mock('./api/intervals', () => ({

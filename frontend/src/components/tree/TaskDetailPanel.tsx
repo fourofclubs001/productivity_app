@@ -9,20 +9,9 @@ import {
   useUpdateTask,
 } from '../../api/tasks'
 import { useDeleteInterval, useIntervalsForTask } from '../../api/intervals'
+import { descendantIds } from '../../lib/taskTree'
 import ColorSwatchPicker from './ColorSwatchPicker'
 import StateBadge from './StateBadge'
-
-function descendantIds(taskId: string, tasksById: Map<string, Task>): Set<string> {
-  const result = new Set<string>()
-  const stack = [...(tasksById.get(taskId)?.children_ids ?? [])]
-  while (stack.length > 0) {
-    const current = stack.pop()!
-    if (result.has(current)) continue
-    result.add(current)
-    stack.push(...(tasksById.get(current)?.children_ids ?? []))
-  }
-  return result
-}
 
 export default function TaskDetailPanel({
   task,

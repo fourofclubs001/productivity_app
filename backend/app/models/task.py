@@ -48,6 +48,10 @@ class AddParentRequest(BaseModel):
 class ReorderRequest(BaseModel):
     after_id: str | None = None
     before_id: str | None = None
+    # Set an exact order value directly, bypassing the after/before midpoint
+    # logic. Used to restore a task to its precise prior position on undo,
+    # where after/before-relative replay could land on a different value.
+    order: float | None = None
 
 
 class TaskOut(BaseModel):

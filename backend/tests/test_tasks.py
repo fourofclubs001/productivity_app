@@ -214,6 +214,17 @@ def test_children_ids_are_order_sorted(client):
     assert body["children_ids"] == [first["id"], second["id"], third["id"]]
 
 
+def test_reorder_with_explicit_order_bypasses_after_before(client):
+    a = create_task(client, name="A")
+    original_order = a["order"]
+
+    moved = client.patch(f"/tasks/{a['id']}/order", json={"order": 42.5}).json()
+    assert moved["order"] == 42.5
+
+    restored = client.patch(f"/tasks/{a['id']}/order", json={"order": original_order}).json()
+    assert restored["order"] == original_order
+
+
 def test_reorder_task_moves_it_between_two_others(client):
     a = create_task(client, name="A")
     b = create_task(client, name="B")

@@ -1,3 +1,4 @@
+import { useDraggable, useDroppable } from '@dnd-kit/core'
 import type { Task } from '../../types'
 import ColorDots from './ColorDots'
 import StateBadge from './StateBadge'
@@ -25,6 +26,11 @@ export default function TaskTreeNode({
   onToggleExpand,
   onAddChild,
 }: TaskTreeNodeProps) {
+  const { attributes, listeners, setNodeRef: setDraggableRef, isDragging } = useDraggable({
+    id: taskId,
+  })
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id: taskId })
+
   const task = tasksById.get(taskId)
   if (!task) return null
 
@@ -43,8 +49,16 @@ export default function TaskTreeNode({
   return (
     <div>
       <div
+        ref={(node) => {
+          setDraggableRef(node)
+          setDroppableRef(node)
+        }}
+        {...listeners}
+        {...attributes}
         className={`group flex cursor-pointer items-center gap-1.5 rounded px-1 py-1 text-sm ${
           isSelected ? 'bg-accent-soft text-accent' : 'text-text-primary hover:bg-surface-hover'
+        } ${isDragging ? 'opacity-40' : ''} ${
+          isOver ? 'outline outline-2 outline-accent' : ''
         }`}
         style={{ paddingLeft: depth * 16 + 4 }}
         onClick={() => onSelect(taskId)}

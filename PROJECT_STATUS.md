@@ -79,6 +79,20 @@ worth reusing rather than reinventing:
     inlines `VITE_*` env vars at **build time**, so `VITE_API_BASE_URL` is passed as a
     Docker build `arg` in `docker-compose.yml`, not as a runtime `environment:` entry
     (that would be too late for a build that already happened).
+  - **Gotcha hit during M5:** the dev compose file bind-mounts `./frontend:/app` plus an
+    anonymous volume for `/app/node_modules`, so that node_modules survives host bind
+    mounts. That anonymous volume also **survives `docker compose -f
+    docker-compose.dev.yml up --build`** across container recreations — Compose reuses
+    it rather than replacing it with the freshly-`npm install`ed layer from the new
+    image. Net effect: adding a new frontend dependency (e.g. `@dnd-kit/core`) and
+    running `up --build` silently keeps serving the *old* `node_modules`, missing the
+    new package, with no error until something tries to import it. Fix when this
+    happens: `docker compose -f docker-compose.dev.yml stop frontend && docker compose
+    -f docker-compose.dev.yml rm -f -v frontend && docker compose -f
+    docker-compose.dev.yml up -d --build frontend` (the `-v` on `rm` is what actually
+    drops the stale anonymous volume). Same applies to the backend if a Python
+    dependency is ever added, though it has no anonymous volume today since
+    `backend/requirements.txt` installs happen in a layer that isn't bind-mount-shadowed.
 - Backend venv: `backend/.venv`. Frontend deps: `frontend/node_modules`. Both already
   installed — no fresh `pip install`/`npm install` needed unless dependencies change.
 - Playwright's Chromium binary is installed (`npx playwright install chromium` was

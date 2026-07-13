@@ -32,10 +32,15 @@ const tasksApi = {
     }),
   removeParent: (id: string, parentId: string) =>
     apiFetch<Task>(`/tasks/${id}/parents/${parentId}`, { method: 'DELETE' }),
-  reorder: (id: string, afterId: string | null, beforeId: string | null) =>
+  reorder: (
+    id: string,
+    afterId: string | null,
+    beforeId: string | null,
+    order?: number,
+  ) =>
     apiFetch<Task>(`/tasks/${id}/order`, {
       method: 'PATCH',
-      body: JSON.stringify({ after_id: afterId, before_id: beforeId }),
+      body: JSON.stringify({ after_id: afterId, before_id: beforeId, order }),
     }),
 }
 
@@ -100,11 +105,13 @@ export function useReorderTask() {
       id,
       afterId,
       beforeId,
+      order,
     }: {
       id: string
       afterId: string | null
       beforeId: string | null
-    }) => tasksApi.reorder(id, afterId, beforeId),
+      order?: number
+    }) => tasksApi.reorder(id, afterId, beforeId, order),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: TASKS_KEY }),
   })
 }
