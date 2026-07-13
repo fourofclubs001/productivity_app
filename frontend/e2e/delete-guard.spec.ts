@@ -23,7 +23,8 @@ test('blocks deleting a task while its timer is running', async ({ page }) => {
   // Recreate it and start its timer this time.
   await createTask(page, taskName)
   await page.getByRole('button', { name: 'Execute' }).click()
-  await page.getByRole('combobox').selectOption({ label: taskName })
+  await page.getByTestId('task-picker-trigger').click()
+  await page.getByTestId('task-picker-options').getByRole('button', { name: taskName, exact: true }).click()
   await page.getByRole('button', { name: 'Start' }).click()
   await expect(page.getByText('Tracking')).toBeVisible()
 

@@ -52,8 +52,12 @@ describe('TimerControl (idle)', () => {
     ]
     renderTimerControl(tasks)
 
+    fireEvent.click(screen.getByRole('button', { name: 'Select a task…' }))
+
     expect(screen.getByText('Leaf task')).toBeInTheDocument()
-    expect(screen.queryByText('Node task')).not.toBeInTheDocument()
+    // Node task is a parent -- shown for navigation, but not offered as a leaf option.
+    expect(screen.getByText('Node task')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Node task' })).not.toBeInTheDocument()
     expect(screen.queryByText('Sprint done task')).not.toBeInTheDocument()
     expect(screen.queryByText('Done task')).not.toBeInTheDocument()
   })
@@ -65,7 +69,8 @@ describe('TimerControl (idle)', () => {
     const startButton = screen.getByText('Start')
     expect(startButton).toBeDisabled()
 
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'leaf' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Select a task…' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Leaf task' }))
     expect(startButton).not.toBeDisabled()
 
     fireEvent.click(startButton)

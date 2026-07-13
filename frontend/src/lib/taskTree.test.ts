@@ -2,11 +2,15 @@ import { describe, expect, it } from 'vitest'
 import {
   compareByOrder,
   descendantIds,
+  flattenTree,
   isHiddenFromPlan,
   qualifiesForRemovalPrompt,
   resolveDropAction,
   rootIds,
+  sinkCompletedRoots,
   sortByOrder,
+  treeChildIds,
+  treeRootIds,
 } from './taskTree'
 import { makeTask } from '../test/taskFixtures'
 
@@ -133,6 +137,76 @@ describe('resolveDropAction', () => {
       afterId: 'b',
       beforeId: null,
     })
+  })
+})
+
+describe('treeRootIds', () => {
+  it('treats a task as a root when none of its parents are in the visible set', () => {
+    const grandparent = makeTask({ id: 'gp', order: 1000 })
+    const parent = makeTask({ id: 'p', order: 2000, parent_ids: ['gp'] })
+    const leaf = makeTask({ id: 'leaf', order: 3000, parent_ids: ['p'] })
+    const tasksById = new Map([grandparent, parent, leaf].map((t) => [t.id, t]))
+
+    // grandparent is excluded from the visible set, so parent becomes a root.
+    expect(treeRootIds(new Set(['p', 'leaf']), tasksById)).toEqual(['p'])
+  })
+
+  it('order-sorts multiple roots', () => {
+    const root2 = makeTask({ id: 'root2', order: 2000 })
+    const root1 = makeTask({ id: 'root1', order: 1000 })
+    const tasksById = new Map([root2, root1].map((t) => [t.id, t]))
+    expect(treeRootIds(new Set(['root2', 'root1']), tasksById)).toEqual(['root1', 'root2'])
+  })
+})
+
+describe('treeChildIds', () => {
+  it('returns only children that are within the visible set, order-sorted', () => {
+    const parent = makeTask({ id: 'p', children_ids: ['a', 'b', 'c'] })
+    const a = makeTask({ id: 'a', order: 3000, parent_ids: ['p'] })
+    const b = makeTask({ id: 'b', order: 1000, parent_ids: ['p'] })
+    const tasksById = new Map([parent, a, b].map((t) => [t.id, t]))
+
+    // 'c' isn't in the visible set (e.g. not relevant to this Evaluate period).
+    expect(treeChildIds('p', new Set(['p', 'a', 'b']), tasksById)).toEqual(['b', 'a'])
+  })
+
+  it('returns an empty array for an unknown task', () => {
+    expect(treeChildIds('missing', new Set(), new Map())).toEqual([])
+  })
+})
+
+describe('sinkCompletedRoots', () => {
+  it('moves done roots below active roots without reordering within each group', () => {
+    const active1 = makeTask({ id: 'active1', order: 1000, state: 'in_progress' })
+    const done1 = makeTask({ id: 'done1', order: 2000, state: 'done' })
+    const active2 = makeTask({ id: 'active2', order: 3000, state: 'backlog' })
+    const done2 = makeTask({ id: 'done2', order: 4000, state: 'done' })
+    const tasksById = new Map(
+      [active1, done1, active2, done2].map((t) => [t.id, t]),
+    )
+    const rootIdsInPlanOrder = ['active1', 'done1', 'active2', 'done2']
+
+    expect(sinkCompletedRoots(rootIdsInPlanOrder, tasksById)).toEqual([
+      'active1',
+      'active2',
+      'done1',
+      'done2',
+    ])
+  })
+})
+
+describe('flattenTree', () => {
+  it('only descends into children of expanded ids', () => {
+    const parent = makeTask({ id: 'p', order: 1000, children_ids: ['c'] })
+    const child = makeTask({ id: 'c', order: 1000, parent_ids: ['p'] })
+    const tasksById = new Map([parent, child].map((t) => [t.id, t]))
+    const visibleIds = new Set(['p', 'c'])
+
+    expect(flattenTree(['p'], visibleIds, tasksById, new Set())).toEqual([{ id: 'p', depth: 0 }])
+    expect(flattenTree(['p'], visibleIds, tasksById, new Set(['p']))).toEqual([
+      { id: 'p', depth: 0 },
+      { id: 'c', depth: 1 },
+    ])
   })
 })
 

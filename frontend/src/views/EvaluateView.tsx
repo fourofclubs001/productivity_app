@@ -195,7 +195,7 @@ export default function EvaluateView() {
               Failed to load stats: {(error as Error).message}
             </div>
           )}
-          {evaluation && <StatsPanel result={evaluation} />}
+          {evaluation && <StatsPanel result={evaluation} tasks={tasks ?? []} />}
         </>
       )}
     </div>

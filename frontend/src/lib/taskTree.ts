@@ -62,6 +62,70 @@ export function qualifiesForRemovalPrompt(
   })
 }
 
+/**
+ * Generic tree-shaping over an arbitrary subset of tasks (e.g. only the
+ * leaves/ancestors relevant to an Evaluate period, or only the leaves
+ * selectable in the Execute picker) -- rather than the full DAG like
+ * `rootIds`/`descendantIds` above. A task is a "root" of the visible tree if
+ * none of its parents are themselves visible; a task's visible children are
+ * its children_ids intersected with the visible set. Both are order-sorted
+ * to match the Plan left panel (items 25/26/28/29).
+ */
+export function treeRootIds(visibleIds: Set<string>, tasksById: Map<string, Task>): string[] {
+  const roots = [...visibleIds]
+    .map((id) => tasksById.get(id))
+    .filter((task): task is Task => !!task && !task.parent_ids.some((pid) => visibleIds.has(pid)))
+  return sortByOrder(roots).map((task) => task.id)
+}
+
+export function treeChildIds(
+  taskId: string,
+  visibleIds: Set<string>,
+  tasksById: Map<string, Task>,
+): string[] {
+  const task = tasksById.get(taskId)
+  if (!task) return []
+  const children = task.children_ids
+    .map((id) => tasksById.get(id))
+    .filter((child): child is Task => !!child && visibleIds.has(child.id))
+  return sortByOrder(children).map((child) => child.id)
+}
+
+// Item 27: a root task that has reached `done` sinks below the still-active
+// roots, rather than being removed -- it and its subtree stay fully visible.
+export function sinkCompletedRoots(rootIds: string[], tasksById: Map<string, Task>): string[] {
+  const active = rootIds.filter((id) => tasksById.get(id)?.state !== 'done')
+  const completed = rootIds.filter((id) => tasksById.get(id)?.state === 'done')
+  return [...active, ...completed]
+}
+
+export interface TreeRow {
+  id: string
+  depth: number
+}
+
+// Flattens a visible tree into the rows that should actually be rendered
+// given the current expand/collapse state -- shared by every Evaluate/
+// Execute list that mirrors the Plan panel's tree shape (items 25/26/28/29).
+export function flattenTree(
+  rootIds: string[],
+  visibleIds: Set<string>,
+  tasksById: Map<string, Task>,
+  expanded: Set<string>,
+): TreeRow[] {
+  const rows: TreeRow[] = []
+  function walk(ids: string[], depth: number) {
+    for (const id of ids) {
+      rows.push({ id, depth })
+      if (expanded.has(id)) {
+        walk(treeChildIds(id, visibleIds, tasksById), depth + 1)
+      }
+    }
+  }
+  walk(rootIds, 0)
+  return rows
+}
+
 export type DropAction =
   | { kind: 'reparent'; parentId: string }
   | { kind: 'reorder'; afterId: string | null; beforeId: string | null }

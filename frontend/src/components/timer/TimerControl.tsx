@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Task } from '../../types'
 import {
   useActiveTimer,
@@ -9,8 +9,7 @@ import {
 } from '../../api/timer'
 import { useUndo } from '../../undo/UndoProvider'
 import DoneConfirmModal from './DoneConfirmModal'
-
-const UNTRACKABLE_STATES = new Set(['sprint_done', 'done'])
+import TaskPicker from './TaskPicker'
 
 function formatElapsed(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000))
@@ -37,14 +36,6 @@ export default function TimerControl({ tasks }: { tasks: Task[] }) {
   const [selectedTaskId, setSelectedTaskId] = useState('')
   const [elapsedMs, setElapsedMs] = useState(0)
   const [justStopped, setJustStopped] = useState<JustStopped | null>(null)
-
-  const schedulableTasks = useMemo(
-    () =>
-      tasks
-        .filter((task) => task.is_leaf && !UNTRACKABLE_STATES.has(task.state))
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [tasks],
-  )
 
   useEffect(() => {
     if (!active) {
@@ -124,18 +115,7 @@ export default function TimerControl({ tasks }: { tasks: Task[] }) {
 
   return (
     <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
-      <select
-        value={selectedTaskId}
-        onChange={(event) => setSelectedTaskId(event.target.value)}
-        className="rounded border border-border bg-surface px-2 py-1.5 text-sm text-text-primary"
-      >
-        <option value="">Select a task…</option>
-        {schedulableTasks.map((task) => (
-          <option key={task.id} value={task.id}>
-            {task.name}
-          </option>
-        ))}
-      </select>
+      <TaskPicker tasks={tasks} selectedId={selectedTaskId} onSelect={setSelectedTaskId} />
       <button
         type="button"
         disabled={!selectedTaskId || startTimer.isPending}
@@ -144,9 +124,6 @@ export default function TimerControl({ tasks }: { tasks: Task[] }) {
       >
         Start
       </button>
-      {schedulableTasks.length === 0 && (
-        <span className="text-xs text-text-secondary">No tasks available to track</span>
-      )}
     </div>
   )
 }
