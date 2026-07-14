@@ -4,16 +4,16 @@ Working notes for picking this project back up in a future session. Not user-fac
 docs (see `README.md` for that) — this is "what's true right now and how we work
 here."
 
-## Where things stand (as of commit `c1916c8`, mid v02 pass)
+## Where things stand (as of commit `80f515a`, v02 pass complete)
 
 The app is fully built and working: Plan / Execute / Evaluate views, FastAPI +
 Redis backend, React + Tailwind frontend, Google Workspace/Calendar-styled light
-theme. v00 (8 items) and v01 (30 items, M1–M12) are both fully implemented and
-merged. The v02 pass (`prompts/interpreted_app_improvements_v02.md`, 19 items) is
-**in progress**: M13–M20 are done, committed, and pushed. M21–M23 (the Excuses
-feature) are not started — that's the next chunk of work, see below.
+theme. v00 (8 items), v01 (30 items, M1–M12), and now v02 (19 items, M13–M23)
+are all fully implemented, committed, and pushed. **Next up: interpret
+`prompts/app_improvements_v03.md`** (already dropped in the repo, untracked) —
+see the bottom of this file.
 
-### v02 milestones done so far (M13–M19, one commit each, all pushed)
+### v02 milestones (M13–M23, one commit each, all pushed)
 
 - **M13** (`f60e1e4`) — reusable `AlertDialog`, replacing inline error banners/text
   across Plan calendar, task detail panel, add-to-calendar modal.
@@ -91,28 +91,37 @@ feature) are not started — that's the next chunk of work, see below.
     assert the `StateBadge` reads "Backlog" after declining and reverts to the
     live-computed state (`In progress`, in the test's fixture) once a new
     unfinished child is added.
-
-## Next up: M21–M23 (the Excuses feature, not started)
-
-The "Excuses" feature (v02 items 17/18) — the biggest remaining chunk. Full
-design already exists in the approved plan (see `EnterPlanMode`/`ExitPlanMode`
-history in this session's transcript, or re-derive from
-`prompts/interpreted_app_improvements_v02.md`'s items 17/18 if the plan itself
-isn't handy):
-
-- **M21** — backend: new `Excuse` domain (Redis hash+set, mirroring existing repo
-  patterns). `GET /excuses`, `POST /excuses/attach`, `GET /excuses/frequency`
-  (period-scoped, per user's answer — matches the Metrics subtab's Day/Week/
-  Month navigation). New `backend/tests/test_excuses.py`.
-- **M22** — frontend: real gap/overlap computation for the Evaluate diff
-  calendar (`frontend/src/lib/intervalDiff.ts`, new — today's diff mode is a
-  naive `[...planned, ...real]` concat with zero gap logic). Segmented
-  covered/uncovered rendering per planned chip; only the uncovered sub-segment
-  is clickable (per user's resolved answer) and opens a new `ExplainGapDialog.tsx`
-  to pick an existing excuse or type a new one, POSTing to `/excuses/attach`.
-- **M23** — frontend: new "Excuses" third Evaluate subtab, a period-scoped
-  frequency table (by excuse, broken down by task) — matches the Metrics
-  subtab's table convention, not a chart (per user's resolved answer).
+- **M21** (`3c67877`) — backend half of the "Excuses" feature (v02 items 17/18):
+  a new `Excuse` domain lets a specific gap (task + time range) be tagged with
+  a reusable, named reason. New `ExcuseRepository` (Redis hash + by-start
+  sorted set, mirroring `EntryRepository`), `ExcuseService`, `GET /excuses`,
+  `POST /excuses/attach`, `GET /excuses/frequency` (period-scoped, same
+  query shape as `GET /evaluate/period`). Typed excuses are de-duplicated by
+  normalized (trim+lowercase) text; re-explaining the exact same gap updates
+  that attachment in place rather than creating a duplicate (so frequency
+  counts don't double up). Extracted `Granularity`/`period_bounds` out of
+  `evaluate_service.py` into a new shared `period_utils.py` (evaluate_service
+  re-exports `Granularity` so `routers/evaluate.py`'s import is unaffected).
+  11 new pytest cases (102→113 total).
+- **M22** (`e345978`) — real gap/overlap computation for the Evaluate diff
+  calendar. New `frontend/src/lib/intervalDiff.ts` diffs each planned interval
+  against real tracked time for the same task (merging overlapping real
+  ranges, clipping to the planned bounds, subtracting to get uncovered gaps)
+  — replacing the old naive `[...planned, ...real]` concat. `EvaluateCalendar`
+  renders one chip per resulting segment in diff mode; only uncovered segments
+  are clickable (distinct style + cursor), firing a new `onExplainGap`
+  callback prop that `EvaluateView` uses to open a new `ExplainGapDialog.tsx`
+  (pick an existing excuse or type a new one, POSTing via the M21 endpoint).
+  The separate real-entry chips are still rendered as before, so tracked time
+  with no corresponding plan stays visible. 19 new vitest cases.
+- **M23** (`80f515a`) — third Evaluate subtab, "Excuses": a period-scoped
+  frequency table (reusing Metrics' existing Day/Week/Month nav) showing
+  overall totals and a by-task breakdown, via new `ExcusesPanel.tsx` (mirrors
+  `StatsPanel.tsx`'s table conventions, flat rather than tree-based since
+  excuses aren't hierarchical). New `frontend/e2e/excuses.spec.ts` exercises
+  the whole feature end-to-end (schedule an untracked task → click the
+  fully-uncovered gap → save a new excuse → see it in the Excuses subtab).
+  **This completes the v02 pass.**
 
 ## The workflow established for this project
 
@@ -140,9 +149,8 @@ This has repeated three times now (initial build, v00, v01) and is worth reusing
    before committing — don't commit assertion-less or debug-only specs.
 
 **A `prompts/app_improvements_v03.md` was dropped into the repo (untracked) partway
-through the v02 pass** — not yet read or acted on. Per the workflow above, that's
-the next thing after v02 is fully done: interpret it, clarify, commit, plan,
-implement.
+through the v02 pass** — not yet read or acted on. v02 is now fully done, so per the
+workflow above, this is the next thing: interpret it, clarify, commit, plan, implement.
 
 ## Known limitations (deliberately deferred, not bugs)
 
@@ -261,10 +269,9 @@ docker compose -f docker-compose.dev.yml up --build     # dev: isolated data, po
 
 ## Next possible steps
 
-- Implement M21–M23 (the Excuses feature, see "Next up" section above) to
-  complete the v02 pass.
-- Once v02 is fully done, read and interpret `prompts/app_improvements_v03.md`
-  (already dropped in the repo, untracked) per the established workflow.
+- Read and interpret `prompts/app_improvements_v03.md` (already dropped in the
+  repo, untracked) per the established workflow — this is the next thing now
+  that v02 (M13–M23) is fully done.
 - Consider actually fixing the M18 dnd-kit scrolled-container drag bug (currently
   only worked around in tests) if it turns out to bite a real user.
 - Revisit the UTC-vs-local-timezone limitation if week/day boundaries ever look
