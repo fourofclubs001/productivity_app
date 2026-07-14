@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { useCreateInterval } from '../../api/intervals'
+import { useCreateInterval, useDeleteInterval } from '../../api/intervals'
+import { makeDeleteIntervalEntry } from '../../lib/intervalUndoEntries'
+import { useUndo } from '../../undo/UndoProvider'
 import IntervalTimeFields, {
   defaultTimeValue,
   intervalTimeToDates,
@@ -17,6 +19,8 @@ export default function AddToCalendarModal({
   const [value, setValue] = useState<IntervalTimeValue>(defaultTimeValue)
   const [alertMessage, setAlertMessage] = useState<string | null>(null)
   const createInterval = useCreateInterval()
+  const deleteInterval = useDeleteInterval()
+  const { pushUndo } = useUndo()
 
   const { start, end } = intervalTimeToDates(value)
   const canSubmit = end > start
@@ -26,7 +30,18 @@ export default function AddToCalendarModal({
     if (!canSubmit) return
     createInterval.mutate(
       { task_id: taskId, start: start.toISOString(), end: end.toISOString() },
-      { onSuccess: onClose, onError: (error) => setAlertMessage((error as Error).message) },
+      {
+        onSuccess: (created) => {
+          pushUndo(
+            makeDeleteIntervalEntry(created, {
+              createIntervalAsync: createInterval.mutateAsync,
+              deleteIntervalAsync: deleteInterval.mutateAsync,
+            }),
+          )
+          onClose()
+        },
+        onError: (error) => setAlertMessage((error as Error).message),
+      },
     )
   }
 

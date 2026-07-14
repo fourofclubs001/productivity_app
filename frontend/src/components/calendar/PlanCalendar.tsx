@@ -25,6 +25,11 @@ import {
   type PixelRect,
 } from '../../lib/calendarGeometry'
 import { isFullyPast, isInProgress } from '../../lib/intervalTiming'
+import {
+  makeCreateIntervalEntry,
+  makeDeleteIntervalEntry,
+  makeUpdateTimeEntry,
+} from '../../lib/intervalUndoEntries'
 import { useUndo } from '../../undo/UndoProvider'
 import { chipFillStyle } from './eventColor'
 import CalendarDayHeader from './CalendarDayHeader'
@@ -89,6 +94,11 @@ export default function PlanCalendar({
   function setCalendarRef(node: HTMLDivElement | null) {
     wrapperRef.current = node
     setNodeRef(node)
+  }
+
+  const intervalMutators = {
+    createIntervalAsync: createInterval.mutateAsync,
+    deleteIntervalAsync: deleteInterval.mutateAsync,
   }
 
   function resolveGrid(): { grid: GridGeometry; dayCount: number } | null {
@@ -160,7 +170,10 @@ export default function PlanCalendar({
       setScheduleError(null)
       createInterval.mutate(
         { task_id: task.id, start: start.toISOString(), end: end.toISOString() },
-        { onError: (error) => setScheduleError((error as Error).message) },
+        {
+          onSuccess: (created) => pushUndo(makeDeleteIntervalEntry(created, intervalMutators)),
+          onError: (error) => setScheduleError((error as Error).message),
+        },
       )
     },
     onDragCancel: () => setDragPreview(null),
@@ -168,16 +181,7 @@ export default function PlanCalendar({
 
   function deleteIntervalWithUndo(interval: Interval) {
     deleteInterval.mutate(interval.id, {
-      onSuccess: () =>
-        pushUndo({
-          label: 'Delete reserved time slot',
-          undo: () =>
-            createInterval.mutateAsync({
-              task_id: interval.task_id,
-              start: interval.start,
-              end: interval.end,
-            }),
-        }),
+      onSuccess: () => pushUndo(makeCreateIntervalEntry(interval, intervalMutators)),
     })
   }
 
@@ -205,14 +209,14 @@ export default function PlanCalendar({
       { id: interval.id, input },
       {
         onSuccess: () =>
-          pushUndo({
-            label: 'Move/resize scheduled task',
-            undo: () =>
-              updateInterval.mutateAsync({
-                id: interval.id,
-                input: { start: previousStart, end: previousEnd },
-              }),
-          }),
+          pushUndo(
+            makeUpdateTimeEntry(
+              interval.id,
+              { start: previousStart, end: previousEnd },
+              input,
+              updateInterval.mutateAsync,
+            ),
+          ),
         onError: (error) => setScheduleError((error as Error).message),
       },
     )

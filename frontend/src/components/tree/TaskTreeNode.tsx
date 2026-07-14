@@ -2,7 +2,7 @@ import { useDraggable, useDroppable } from '@dnd-kit/core'
 import type { Task } from '../../types'
 import { isHiddenFromPlan, qualifiesForRemovalPrompt } from '../../lib/taskTree'
 import type { ParentDecision } from '../../lib/useParentDismissal'
-import { useUndo } from '../../undo/UndoProvider'
+import { useUndo, type UndoEntry } from '../../undo/UndoProvider'
 import ColorDots from './ColorDots'
 import StateBadge from './StateBadge'
 
@@ -41,6 +41,26 @@ export default function TaskTreeNode({
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id: taskId })
   const { pushUndo } = useUndo()
 
+  function hiddenEntry(): UndoEntry {
+    return {
+      label: 'Hide completed goal',
+      run: () => {
+        onDecide(taskId, 'hidden')
+        return visibleEntry()
+      },
+    }
+  }
+
+  function visibleEntry(): UndoEntry {
+    return {
+      label: 'Restore completed goal',
+      run: () => {
+        onUndecide(taskId)
+        return hiddenEntry()
+      },
+    }
+  }
+
   const task = tasksById.get(taskId)
   if (!task) return null
 
@@ -74,10 +94,7 @@ export default function TaskTreeNode({
             type="button"
             onClick={() => {
               onDecide(taskId, 'hidden')
-              pushUndo({
-                label: 'Hide completed goal',
-                undo: () => onUndecide(taskId),
-              })
+              pushUndo(visibleEntry())
             }}
             className="font-medium text-accent hover:text-accent-hover"
           >

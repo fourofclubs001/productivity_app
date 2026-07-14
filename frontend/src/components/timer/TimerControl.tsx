@@ -7,7 +7,7 @@ import {
   useStartTimer,
   useStopTimer,
 } from '../../api/timer'
-import { useUndo } from '../../undo/UndoProvider'
+import { useUndo, type UndoEntry } from '../../undo/UndoProvider'
 import AlertDialog from '../common/AlertDialog'
 import DoneConfirmModal from './DoneConfirmModal'
 import TaskPicker from './TaskPicker'
@@ -53,6 +53,28 @@ export default function TimerControl({ tasks }: { tasks: Task[] }) {
 
   const activeTask = active ? tasks.find((task) => task.id === active.task_id) : undefined
 
+  // No server-generated id is involved (a task's state is just toggling
+  // between two known values), so a simple symmetric pair suffices.
+  function revertDoneEntry(taskId: string): UndoEntry {
+    return {
+      label: 'Mark sprint done',
+      run: async () => {
+        await revertDone.mutateAsync(taskId)
+        return markDoneEntry(taskId)
+      },
+    }
+  }
+
+  function markDoneEntry(taskId: string): UndoEntry {
+    return {
+      label: 'Revert sprint done',
+      run: async () => {
+        await markDone.mutateAsync(taskId)
+        return revertDoneEntry(taskId)
+      },
+    }
+  }
+
   function handleStop() {
     if (!active) return
     const taskId = active.task_id
@@ -83,10 +105,7 @@ export default function TimerControl({ tasks }: { tasks: Task[] }) {
             const { taskId } = justStopped
             markDone.mutate(taskId, {
               onSuccess: () => {
-                pushUndo({
-                  label: 'Mark sprint done',
-                  undo: () => revertDone.mutateAsync(taskId),
-                })
+                pushUndo(revertDoneEntry(taskId))
                 setJustStopped(null)
               },
             })

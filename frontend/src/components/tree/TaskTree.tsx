@@ -4,7 +4,7 @@ import type { Task } from '../../types'
 import TaskTreeNode from './TaskTreeNode'
 import { isHiddenFromPlan, rootIds as computeRootIds, resolveDropAction } from '../../lib/taskTree'
 import { useAddParent, useRemoveParent, useReorderTask } from '../../api/tasks'
-import { useUndo } from '../../undo/UndoProvider'
+import { useUndo, type UndoEntry } from '../../undo/UndoProvider'
 import { useParentDismissal } from '../../lib/useParentDismissal'
 
 export default function TaskTree({
@@ -45,6 +45,35 @@ export default function TaskTree({
 
   useDndMonitor({ onDragEnd: handleDragEnd })
 
+  // No server-generated id is involved in either transition (order is a
+  // plain float, parent edges are set membership), so a simple symmetric
+  // pair suffices: running an entry applies `target` and returns the entry
+  // that applies `current` again.
+  function reorderEntry(taskId: string, target: number, current: number): UndoEntry {
+    return {
+      label: 'Reorder task',
+      run: async () => {
+        await reorderTask.mutateAsync({ id: taskId, afterId: null, beforeId: null, order: target })
+        return reorderEntry(taskId, current, target)
+      },
+    }
+  }
+
+  function setParentsEntry(taskId: string, target: string[], current: string[]): UndoEntry {
+    return {
+      label: 'Move task',
+      run: async () => {
+        for (const parentId of current) {
+          await removeParent.mutateAsync({ id: taskId, parentId })
+        }
+        for (const parentId of target) {
+          await addParent.mutateAsync({ id: taskId, parentId })
+        }
+        return setParentsEntry(taskId, current, target)
+      },
+    }
+  }
+
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     if (!over) return
@@ -67,17 +96,8 @@ export default function TaskTree({
       reorderTask.mutate(
         { id: activeId, afterId: action.afterId, beforeId: action.beforeId },
         {
-          onSuccess: () =>
-            pushUndo({
-              label: 'Reorder task',
-              undo: () =>
-                reorderTask.mutateAsync({
-                  id: activeId,
-                  afterId: null,
-                  beforeId: null,
-                  order: previousOrder,
-                }),
-            }),
+          onSuccess: (updated) =>
+            pushUndo(reorderEntry(activeId, previousOrder, updated.order)),
         },
       )
       return
@@ -92,15 +112,7 @@ export default function TaskTree({
           for (const parentId of previousParentIds) {
             await removeParent.mutateAsync({ id: activeId, parentId })
           }
-          pushUndo({
-            label: 'Move task',
-            undo: async () => {
-              await removeParent.mutateAsync({ id: activeId, parentId: newParentId })
-              for (const parentId of previousParentIds) {
-                await addParent.mutateAsync({ id: activeId, parentId })
-              }
-            },
-          })
+          pushUndo(setParentsEntry(activeId, previousParentIds, [newParentId]))
         },
       },
     )

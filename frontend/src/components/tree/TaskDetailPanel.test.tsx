@@ -1,7 +1,14 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render as rtlRender, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import TaskDetailPanel from './TaskDetailPanel'
 import { makeTask } from '../../test/taskFixtures'
+import { UndoProvider } from '../../undo/UndoProvider'
+
+// AddToCalendarModal (opened from this panel) pushes an undo entry on
+// create, so every render needs a real UndoProvider ancestor.
+function render(ui: Parameters<typeof rtlRender>[0]) {
+  return rtlRender(<UndoProvider>{ui}</UndoProvider>)
+}
 
 const updateMutate = vi.fn()
 const deleteMutate = vi.fn()
