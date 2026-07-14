@@ -16,16 +16,22 @@ import {
   useTaskCoverage,
   useUpdateInterval,
 } from '../../api/intervals'
+import { useMarkDone, useRevertDone } from '../../api/timer'
 import { descendantIds } from '../../lib/taskTree'
+import { makeRevertDoneEntry } from '../../lib/taskDoneUndoEntries'
+import { useUndo } from '../../undo/UndoProvider'
 import AddToCalendarModal from '../calendar/AddToCalendarModal'
+import ContextMenu from '../calendar/ContextMenu'
 import IntervalTimeFields, {
   intervalTimeToDates,
   intervalToTimeValue,
   type IntervalTimeValue,
 } from '../calendar/IntervalTimeFields'
+import DoneConfirmModal from '../timer/DoneConfirmModal'
 import ColorSwatchPicker from './ColorSwatchPicker'
 import StateBadge from './StateBadge'
 import AlertDialog from '../common/AlertDialog'
+import ConfirmDialog from '../common/ConfirmDialog'
 
 export default function TaskDetailPanel({
   task,
@@ -48,13 +54,17 @@ export default function TaskDetailPanel({
   const deleteInterval = useDeleteInterval()
   const updateInterval = useUpdateInterval()
   const { data: coverage } = useTaskCoverage(task.id)
+  const markDone = useMarkDone()
+  const revertDone = useRevertDone()
+  const { pushUndo } = useUndo()
 
   const [name, setName] = useState(task.name)
   const [dod, setDod] = useState(task.definition_of_done)
-  const [estimatedHours, setEstimatedHours] = useState(
-    task.estimated_hours != null ? String(task.estimated_hours) : '',
-  )
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [optionsMenuAnchor, setOptionsMenuAnchor] = useState<{ x: number; y: number } | null>(
+    null,
+  )
+  const [showDoneConfirm, setShowDoneConfirm] = useState(false)
   const [addParentId, setAddParentId] = useState('')
   const [addRequiredId, setAddRequiredId] = useState('')
   const [showAddToCalendar, setShowAddToCalendar] = useState(false)
@@ -65,8 +75,9 @@ export default function TaskDetailPanel({
   useEffect(() => {
     setName(task.name)
     setDod(task.definition_of_done)
-    setEstimatedHours(task.estimated_hours != null ? String(task.estimated_hours) : '')
     setConfirmingDelete(false)
+    setOptionsMenuAnchor(null)
+    setShowDoneConfirm(false)
     setAddParentId('')
     setAddRequiredId('')
     setShowAddToCalendar(false)
@@ -74,13 +85,9 @@ export default function TaskDetailPanel({
     setEditValue(null)
     setAlertMessage(null)
     resetDeleteTask()
-  }, [task.id, task.name, task.definition_of_done, task.estimated_hours, resetDeleteTask])
+  }, [task.id, task.name, task.definition_of_done, resetDeleteTask])
 
-  const isDirty =
-    name !== task.name ||
-    dod !== task.definition_of_done ||
-    (task.is_leaf &&
-      estimatedHours !== (task.estimated_hours != null ? String(task.estimated_hours) : ''))
+  const isDirty = name !== task.name || dod !== task.definition_of_done
 
   const excludedFromParentPicker = useMemo(() => {
     const excluded = descendantIds(task.id, tasksById)
@@ -106,16 +113,9 @@ export default function TaskDetailPanel({
   }, [task, tasksById])
 
   function handleSave() {
-    const parsedHours = estimatedHours.trim() === '' ? undefined : Number(estimatedHours)
     updateTask.mutate({
       id: task.id,
-      input: {
-        name: name.trim(),
-        definition_of_done: dod,
-        ...(task.is_leaf && parsedHours !== undefined && !Number.isNaN(parsedHours)
-          ? { estimated_hours: parsedHours }
-          : {}),
-      },
+      input: { name: name.trim(), definition_of_done: dod },
     })
   }
 
@@ -128,32 +128,35 @@ export default function TaskDetailPanel({
 
   return (
     <div className="h-full overflow-y-auto p-6" data-testid="task-detail-panel">
-      <div className="mb-4 flex items-center gap-2">
-        <StateBadge state={task.state} />
-        {!task.is_leaf && (
-          <span className="text-xs text-text-secondary">
-            derived from {task.children_ids.length} sub-task
-            {task.children_ids.length === 1 ? '' : 's'}
-          </span>
-        )}
-      </div>
-
-      <div className="flex items-start justify-between gap-2">
-        <input
-          aria-label="Task name"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          className="w-full border-none bg-transparent text-xl font-semibold text-text-primary focus:outline-none"
-        />
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <StateBadge state={task.state} />
+          {!task.is_leaf && (
+            <span className="text-xs text-text-secondary">
+              derived from {task.children_ids.length} sub-task
+              {task.children_ids.length === 1 ? '' : 's'}
+            </span>
+          )}
+        </div>
         <button
           type="button"
-          title="Create child task"
-          onClick={() => onAddChild(task.id)}
-          className="mt-1 shrink-0 rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-alt hover:text-text-primary"
+          title="Options"
+          onClick={(event) => {
+            const rect = event.currentTarget.getBoundingClientRect()
+            setOptionsMenuAnchor({ x: rect.left, y: rect.bottom })
+          }}
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-text-secondary hover:bg-surface-alt hover:text-text-primary"
         >
-          + Child task
+          ⋮
         </button>
       </div>
+
+      <input
+        aria-label="Task name"
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+        className="w-full border-none bg-transparent text-xl font-semibold text-text-primary focus:outline-none"
+      />
 
       <div className="mt-4">
         <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
@@ -171,28 +174,16 @@ export default function TaskDetailPanel({
         <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
           Estimated time
         </label>
-        {task.is_leaf ? (
-          <input
-            aria-label="Estimated hours"
-            type="number"
-            min="0"
-            step="0.5"
-            placeholder="Hours"
-            value={estimatedHours}
-            onChange={(event) => setEstimatedHours(event.target.value)}
-            className="mt-1 w-24 rounded border border-border bg-surface px-2 py-1 text-sm text-text-primary focus:border-accent focus:outline-none"
-          />
-        ) : (
-          <p className="mt-1 text-sm text-text-primary">
-            {task.estimated_hours ?? 0}h (sum of sub-tasks)
-          </p>
-        )}
-        <p className="mt-1 text-xs text-text-secondary">
+        <p className="mt-1 text-sm text-text-primary">
           {coverage
             ? `${coverage.covered_hours.toFixed(1)}h currently on the calendar`
             : 'Loading calendar coverage…'}
-          {task.is_leaf && task.estimated_hours != null && ` of ${task.estimated_hours}h estimated`}
         </p>
+        {!task.is_leaf && (
+          <p className="mt-1 text-xs text-text-secondary">
+            {task.estimated_hours ?? 0}h (sum of sub-tasks)
+          </p>
+        )}
       </div>
 
       {isDirty && (
@@ -219,6 +210,18 @@ export default function TaskDetailPanel({
           </p>
         )}
       </div>
+
+      {task.is_leaf && task.state === 'in_progress' && (
+        <div className="mt-6">
+          <button
+            type="button"
+            onClick={() => setShowDoneConfirm(true)}
+            className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-alt hover:text-text-primary"
+          >
+            Mark sprint done
+          </button>
+        </div>
+      )}
 
       {task.is_leaf && (
         <div className="mt-6">
@@ -383,6 +386,22 @@ export default function TaskDetailPanel({
 
       <div className="mt-6">
         <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
+          Add child task
+        </label>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button
+            type="button"
+            title="Create child task"
+            onClick={() => onAddChild(task.id)}
+            className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-alt hover:text-text-primary"
+          >
+            + Child task
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-6">
+        <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
           Requires
         </label>
         <p className="mt-1 text-xs text-text-secondary">
@@ -448,38 +467,57 @@ export default function TaskDetailPanel({
         )}
       </div>
 
-      <div className="mt-8 border-t border-border pt-4">
-        {!confirmingDelete ? (
-          <button
-            type="button"
-            onClick={() => setConfirmingDelete(true)}
-            className="text-xs text-danger hover:text-danger-hover"
-          >
-            Delete task
-          </button>
-        ) : (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-text-secondary">Delete this task permanently?</span>
-            <button
-              type="button"
-              onClick={() => deleteTask.mutate(task.id)}
-              className="rounded bg-danger px-2 py-1 text-xs font-medium text-white hover:bg-danger-hover"
-            >
-              Confirm
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmingDelete(false)}
-              className="text-xs text-text-secondary hover:text-text-primary"
-            >
-              Cancel
-            </button>
-          </div>
-        )}
-        {deleteTask.isError && (
-          <p className="mt-2 text-xs text-danger">{(deleteTask.error as Error).message}</p>
-        )}
-      </div>
+      {optionsMenuAnchor && (
+        <ContextMenu
+          x={optionsMenuAnchor.x}
+          y={optionsMenuAnchor.y}
+          onClose={() => setOptionsMenuAnchor(null)}
+          items={[
+            {
+              label: 'Delete task',
+              danger: true,
+              onSelect: () => setConfirmingDelete(true),
+            },
+          ]}
+        />
+      )}
+
+      {confirmingDelete && (
+        <ConfirmDialog
+          message="Delete this task permanently?"
+          confirmLabel="Delete"
+          onCancel={() => setConfirmingDelete(false)}
+          onConfirm={() =>
+            deleteTask.mutate(task.id, {
+              onError: (error) => setAlertMessage((error as Error).message),
+              onSettled: () => setConfirmingDelete(false),
+            })
+          }
+        />
+      )}
+
+      {showDoneConfirm && (
+        <DoneConfirmModal
+          taskName={task.name}
+          definitionOfDone={task.definition_of_done}
+          isPending={markDone.isPending}
+          onDismiss={() => setShowDoneConfirm(false)}
+          onConfirm={() => {
+            markDone.mutate(task.id, {
+              onSuccess: () => {
+                pushUndo(
+                  makeRevertDoneEntry(task.id, {
+                    markDoneAsync: markDone.mutateAsync,
+                    revertDoneAsync: revertDone.mutateAsync,
+                  }),
+                )
+                setShowDoneConfirm(false)
+              },
+              onError: (error) => setAlertMessage((error as Error).message),
+            })
+          }}
+        />
+      )}
 
       {alertMessage && (
         <AlertDialog message={alertMessage} onClose={() => setAlertMessage(null)} />

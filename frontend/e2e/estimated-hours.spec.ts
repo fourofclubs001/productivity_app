@@ -10,26 +10,20 @@ async function createTask(request: APIRequestContext, name: string, parentIds: s
   return response.json()
 }
 
-test('setting an estimate on a leaf rolls up to its parent', async ({ page, request }) => {
+test('a leaf estimate (set server-side) rolls up to its parent', async ({ page, request }) => {
+  // Per v02 item 12, the manual "Estimated hours" input was removed from
+  // the detail panel -- the calendar itself is now the only UI-driven
+  // source of a leaf's committed time. Existing stored estimates (e.g. set
+  // before this change, or via the API directly) still roll up to parents,
+  // so seed them the same way the now-removed UI used to.
   const suffix = Date.now()
   const parent = await createTask(request, `Goal ${suffix}`)
   const childA = await createTask(request, `A ${suffix}`, [parent.id])
   const childB = await createTask(request, `B ${suffix}`, [parent.id])
+  await request.patch(`${API_BASE}/tasks/${childA.id}`, { data: { estimated_hours: 2 } })
+  await request.patch(`${API_BASE}/tasks/${childB.id}`, { data: { estimated_hours: 1.5 } })
 
   await page.goto('/')
-
-  const tree = page.getByTestId('task-tree')
-  const parentRow = tree.locator('.group', { hasText: parent.name })
-  await parentRow.getByRole('button').first().click() // expand chevron
-
-  await tree.getByText(childA.name, { exact: true }).click()
-  await page.getByLabel('Estimated hours').fill('2')
-  await page.getByText('Save changes').click()
-  await expect(page.getByLabel('Task name')).toHaveValue(childA.name)
-
-  await page.getByTestId('task-tree').getByText(childB.name, { exact: true }).click()
-  await page.getByLabel('Estimated hours').fill('1.5')
-  await page.getByText('Save changes').click()
 
   await page.getByTestId('task-tree').getByText(parent.name, { exact: true }).click()
   await expect(page.getByText('3.5h (sum of sub-tasks)')).toBeVisible()

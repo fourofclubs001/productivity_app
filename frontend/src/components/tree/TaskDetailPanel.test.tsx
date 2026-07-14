@@ -41,6 +41,15 @@ vi.mock('../../api/intervals', () => ({
   useTaskCoverage: () => ({ data: { covered_hours: 0 } }),
 }))
 
+const markDoneMutate = vi.fn()
+const markDoneMutateAsync = vi.fn()
+const revertDoneMutateAsync = vi.fn()
+
+vi.mock('../../api/timer', () => ({
+  useMarkDone: () => ({ mutate: markDoneMutate, mutateAsync: markDoneMutateAsync, isPending: false }),
+  useRevertDone: () => ({ mutateAsync: revertDoneMutateAsync, isPending: false }),
+}))
+
 beforeEach(() => {
   updateMutate.mockReset()
   deleteMutate.mockReset()
@@ -50,6 +59,9 @@ beforeEach(() => {
   addRequirementMutate.mockReset()
   removeRequirementMutate.mockReset()
   updateIntervalMutate.mockReset()
+  markDoneMutate.mockReset()
+  markDoneMutateAsync.mockReset()
+  revertDoneMutateAsync.mockReset()
   useIntervalsForTask.mockReturnValue({ data: [] })
   deleteTaskState.mockReturnValue({
     mutate: deleteMutate,
@@ -105,17 +117,18 @@ describe('TaskDetailPanel', () => {
     expect(updateMutate).toHaveBeenCalledWith({ id: 't1', input: { colors: ['red'] } })
   })
 
-  it('requires a confirmation click before deleting', () => {
+  it('requires a confirmation click before deleting, via the options (kebab) menu', () => {
     const task = makeTask({ id: 't1' })
     render(
       <TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} onAddChild={() => {}} />,
     )
 
+    fireEvent.click(screen.getByTitle('Options'))
     fireEvent.click(screen.getByText('Delete task'))
     expect(deleteMutate).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByText('Confirm'))
-    expect(deleteMutate).toHaveBeenCalledWith('t1')
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(deleteMutate).toHaveBeenCalledWith('t1', expect.any(Object))
   })
 
   it('calls onAddChild with this task id when "+ Child task" is clicked', () => {
@@ -273,28 +286,21 @@ describe('TaskDetailPanel', () => {
     )
   })
 
-  it('lets a leaf task set an estimate, saved alongside name/DoD', () => {
+  it('has no manual estimate input -- coverage from the calendar is the only estimate display', () => {
     const task = makeTask({ id: 't1', is_leaf: true })
     render(
       <TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} onAddChild={() => {}} />,
     )
 
-    fireEvent.change(screen.getByLabelText('Estimated hours'), { target: { value: '2.5' } })
-    fireEvent.click(screen.getByText('Save changes'))
-
-    expect(updateMutate).toHaveBeenCalledWith({
-      id: 't1',
-      input: { name: task.name, definition_of_done: '', estimated_hours: 2.5 },
-    })
+    expect(screen.queryByLabelText('Estimated hours')).not.toBeInTheDocument()
   })
 
-  it('shows a read-only rollup for a non-leaf task instead of an input', () => {
+  it('shows a read-only rollup for a non-leaf task', () => {
     const task = makeTask({ id: 't1', is_leaf: false, estimated_hours: 4.5 })
     render(
       <TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} onAddChild={() => {}} />,
     )
 
-    expect(screen.queryByLabelText('Estimated hours')).not.toBeInTheDocument()
     expect(screen.getByText(/4\.5h/)).toBeInTheDocument()
   })
 
@@ -306,23 +312,69 @@ describe('TaskDetailPanel', () => {
 
     expect(screen.getByText(/0\.0h currently on the calendar/)).toBeInTheDocument()
   })
+
+  it('shows "Mark sprint done" only for an in-progress leaf task', () => {
+    const inProgress = makeTask({ id: 't1', is_leaf: true, state: 'in_progress' })
+    const { unmount } = render(
+      <TaskDetailPanel
+        task={inProgress}
+        tasksById={new Map([[inProgress.id, inProgress]])}
+        onAddChild={() => {}}
+      />,
+    )
+    expect(screen.getByText('Mark sprint done')).toBeInTheDocument()
+    unmount()
+
+    const backlog = makeTask({ id: 't2', is_leaf: true, state: 'backlog' })
+    render(
+      <TaskDetailPanel
+        task={backlog}
+        tasksById={new Map([[backlog.id, backlog]])}
+        onAddChild={() => {}}
+      />,
+    )
+    expect(screen.queryByText('Mark sprint done')).not.toBeInTheDocument()
+  })
+
+  it('marking sprint done opens the definition-of-done confirmation, and confirming calls markDone', () => {
+    const task = makeTask({
+      id: 't1',
+      is_leaf: true,
+      state: 'in_progress',
+      definition_of_done: 'ship it',
+    })
+    markDoneMutate.mockImplementation(
+      (_id: unknown, options?: { onSuccess?: () => void }) => options?.onSuccess?.(),
+    )
+    render(
+      <TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} onAddChild={() => {}} />,
+    )
+
+    fireEvent.click(screen.getByText('Mark sprint done'))
+    expect(screen.getByText('Is the definition of done fulfilled?')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('Yes, done'))
+    expect(markDoneMutate).toHaveBeenCalledWith('t1', expect.any(Object))
+  })
 })
 
 describe('TaskDetailPanel delete error', () => {
-  it('shows the backend message when deletion is blocked', () => {
-    deleteTaskState.mockReturnValue({
-      mutate: deleteMutate,
-      reset: deleteReset,
-      isPending: false,
-      isError: true,
-      error: new Error(
-        "This task's timer is currently running — stop it before deleting the task.",
-      ),
-    })
+  it('shows the backend message in a dialog when deletion is blocked', () => {
+    deleteMutate.mockImplementation(
+      (_id: unknown, options?: { onError?: (error: unknown) => void }) => {
+        options?.onError?.(
+          new Error("This task's timer is currently running — stop it before deleting the task."),
+        )
+      },
+    )
     const task = makeTask({ id: 't1' })
     render(
       <TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} onAddChild={() => {}} />,
     )
+
+    fireEvent.click(screen.getByTitle('Options'))
+    fireEvent.click(screen.getByText('Delete task'))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
 
     expect(screen.getByText(/timer is currently running/i)).toBeInTheDocument()
   })

@@ -11,6 +11,12 @@ async function createTask(page: import('@playwright/test').Page, name: string) {
   await expect(page.getByTestId('task-tree').getByText(name)).toBeVisible()
 }
 
+async function deleteViaOptionsMenu(page: import('@playwright/test').Page) {
+  await page.getByTitle('Options').click()
+  await page.getByRole('button', { name: 'Delete task' }).click()
+  await page.getByRole('button', { name: 'Delete', exact: true }).click()
+}
+
 test('blocks deleting a task while its timer is running', async ({ page }) => {
   const taskName = `Timer guard ${Date.now()}`
   const tree = () => page.getByTestId('task-tree')
@@ -19,8 +25,7 @@ test('blocks deleting a task while its timer is running', async ({ page }) => {
   await createTask(page, taskName)
 
   await tree().getByText(taskName).click()
-  await page.getByText('Delete task').click()
-  await page.getByRole('button', { name: 'Confirm' }).click()
+  await deleteViaOptionsMenu(page)
   await expect(tree().getByText(taskName)).not.toBeVisible()
 
   // Recreate it and start its timer this time.
@@ -33,10 +38,10 @@ test('blocks deleting a task while its timer is running', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Plan' }).click()
   await tree().getByText(taskName).click()
-  await page.getByText('Delete task').click()
-  await page.getByRole('button', { name: 'Confirm' }).click()
+  await deleteViaOptionsMenu(page)
 
   await expect(page.getByText(/timer is currently running/i)).toBeVisible()
+  await page.getByRole('button', { name: 'OK' }).click()
   await expect(tree().getByText(taskName)).toBeVisible()
 
   // Stop the timer, then deletion should succeed.
@@ -46,8 +51,7 @@ test('blocks deleting a task while its timer is running', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Plan' }).click()
   await tree().getByText(taskName).click()
-  await page.getByText('Delete task').click()
-  await page.getByRole('button', { name: 'Confirm' }).click()
+  await deleteViaOptionsMenu(page)
   await expect(tree().getByText(taskName)).not.toBeVisible()
 })
 
@@ -69,8 +73,7 @@ test('deleting a task removes its future-scheduled chip from the calendar', asyn
   await expect(page.locator('.rbc-event', { hasText: taskName })).toBeVisible()
 
   await page.getByTestId('task-tree').getByText(taskName).click()
-  await page.getByText('Delete task').click()
-  await page.getByRole('button', { name: 'Confirm' }).click()
+  await deleteViaOptionsMenu(page)
 
   await expect(page.locator('.rbc-event', { hasText: taskName })).not.toBeVisible()
 })
