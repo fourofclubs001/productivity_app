@@ -3,10 +3,12 @@ import { useTasks } from '../api/tasks'
 import { useIntervalsForWeek } from '../api/intervals'
 import { useEntriesForWeek } from '../api/timer'
 import { useEvaluatePeriod } from '../api/evaluate'
+import { useExcuseFrequency } from '../api/excuses'
 import EvaluateCalendar, {
   type EvaluateMode,
   type ExplainGapParams,
 } from '../components/calendar/EvaluateCalendar'
+import ExcusesPanel from '../components/evaluate/ExcusesPanel'
 import ExplainGapDialog from '../components/evaluate/ExplainGapDialog'
 import StatsPanel from '../components/evaluate/StatsPanel'
 import TaskFilter from '../components/evaluate/TaskFilter'
@@ -29,6 +31,7 @@ const CALENDAR_MODES: { key: EvaluateMode; label: string }[] = [
 const SUBTABS = [
   { key: 'calendar', label: 'Calendar' },
   { key: 'metrics', label: 'Metrics' },
+  { key: 'excuses', label: 'Excuses' },
 ] as const
 type SubtabKey = (typeof SUBTABS)[number]['key']
 
@@ -62,6 +65,13 @@ export default function EvaluateView() {
     isError,
     error,
   } = useEvaluatePeriod(granularity, periodDate, selectedTaskIds)
+
+  const {
+    data: excuseFrequency,
+    isLoading: isExcusesLoading,
+    isError: isExcusesError,
+    error: excusesError,
+  } = useExcuseFrequency(granularity, periodDate, selectedTaskIds)
 
   const tasksById = useMemo(() => new Map((tasks ?? []).map((task) => [task.id, task])), [tasks])
 
@@ -155,7 +165,7 @@ export default function EvaluateView() {
         />
       )}
 
-      {subtab === 'metrics' && (
+      {(subtab === 'metrics' || subtab === 'excuses') && (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
             <div className="flex items-center gap-2">
@@ -206,13 +216,33 @@ export default function EvaluateView() {
             </div>
           </div>
 
-          {isLoading && <div className="p-4 text-sm text-text-secondary">Loading stats…</div>}
-          {isError && (
-            <div className="p-4 text-sm text-danger">
-              Failed to load stats: {(error as Error).message}
-            </div>
+          {subtab === 'metrics' && (
+            <>
+              {isLoading && (
+                <div className="p-4 text-sm text-text-secondary">Loading stats…</div>
+              )}
+              {isError && (
+                <div className="p-4 text-sm text-danger">
+                  Failed to load stats: {(error as Error).message}
+                </div>
+              )}
+              {evaluation && <StatsPanel result={evaluation} tasks={tasks ?? []} />}
+            </>
           )}
-          {evaluation && <StatsPanel result={evaluation} tasks={tasks ?? []} />}
+
+          {subtab === 'excuses' && (
+            <>
+              {isExcusesLoading && (
+                <div className="p-4 text-sm text-text-secondary">Loading excuses…</div>
+              )}
+              {isExcusesError && (
+                <div className="p-4 text-sm text-danger">
+                  Failed to load excuses: {(excusesError as Error).message}
+                </div>
+              )}
+              {excuseFrequency && <ExcusesPanel result={excuseFrequency} />}
+            </>
+          )}
         </>
       )}
     </div>
