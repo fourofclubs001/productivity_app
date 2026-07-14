@@ -34,7 +34,7 @@ test('a task can be marked as requiring another, then the requirement removed', 
   await expect(panel.getByText('No prerequisites')).toBeVisible()
 })
 
-test('adding a requirement that would create a cycle is rejected with an error message', async ({
+test('adding a requirement that would create a cycle is rejected with a dialog', async ({
   page,
 }) => {
   const suffix = Date.now()
@@ -54,5 +54,7 @@ test('adding a requirement that would create a cycle is rejected with an error m
   await expect(page.getByLabel('Task name')).toHaveValue(bName)
   await addRequirement(page, aName)
 
-  await expect(panel.getByText(/cycle/i)).toBeVisible()
+  await expect(page.getByText(/cycle/i)).toBeVisible()
+  await page.getByRole('button', { name: 'OK' }).click()
+  await expect(page.getByText(/cycle/i)).not.toBeVisible()
 })

@@ -5,6 +5,7 @@ import IntervalTimeFields, {
   intervalTimeToDates,
   type IntervalTimeValue,
 } from './IntervalTimeFields'
+import AlertDialog from '../common/AlertDialog'
 
 export default function AddToCalendarModal({
   taskId,
@@ -14,6 +15,7 @@ export default function AddToCalendarModal({
   onClose: () => void
 }) {
   const [value, setValue] = useState<IntervalTimeValue>(defaultTimeValue)
+  const [alertMessage, setAlertMessage] = useState<string | null>(null)
   const createInterval = useCreateInterval()
 
   const { start, end } = intervalTimeToDates(value)
@@ -24,7 +26,7 @@ export default function AddToCalendarModal({
     if (!canSubmit) return
     createInterval.mutate(
       { task_id: taskId, start: start.toISOString(), end: end.toISOString() },
-      { onSuccess: onClose },
+      { onSuccess: onClose, onError: (error) => setAlertMessage((error as Error).message) },
     )
   }
 
@@ -55,10 +57,10 @@ export default function AddToCalendarModal({
             Add
           </button>
         </div>
-        {createInterval.isError && (
-          <p className="mt-2 text-xs text-danger">{(createInterval.error as Error).message}</p>
-        )}
       </form>
+      {alertMessage && (
+        <AlertDialog message={alertMessage} onClose={() => setAlertMessage(null)} />
+      )}
     </div>
   )
 }

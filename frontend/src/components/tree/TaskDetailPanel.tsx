@@ -25,6 +25,7 @@ import IntervalTimeFields, {
 } from '../calendar/IntervalTimeFields'
 import ColorSwatchPicker from './ColorSwatchPicker'
 import StateBadge from './StateBadge'
+import AlertDialog from '../common/AlertDialog'
 
 export default function TaskDetailPanel({
   task,
@@ -59,6 +60,7 @@ export default function TaskDetailPanel({
   const [showAddToCalendar, setShowAddToCalendar] = useState(false)
   const [editingIntervalId, setEditingIntervalId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState<IntervalTimeValue | null>(null)
+  const [alertMessage, setAlertMessage] = useState<string | null>(null)
 
   useEffect(() => {
     setName(task.name)
@@ -70,6 +72,7 @@ export default function TaskDetailPanel({
     setShowAddToCalendar(false)
     setEditingIntervalId(null)
     setEditValue(null)
+    setAlertMessage(null)
     resetDeleteTask()
   }, [task.id, task.name, task.definition_of_done, task.estimated_hours, resetDeleteTask])
 
@@ -273,6 +276,7 @@ export default function TaskDetailPanel({
                                   setEditingIntervalId(null)
                                   setEditValue(null)
                                 },
+                                onError: (error) => setAlertMessage((error as Error).message),
                               },
                             )
                           }}
@@ -282,11 +286,6 @@ export default function TaskDetailPanel({
                           Save
                         </button>
                       </div>
-                      {updateInterval.isError && (
-                        <p className="mt-1 text-danger">
-                          {(updateInterval.error as Error).message}
-                        </p>
-                      )}
                     </li>
                   ) : (
                     <li
@@ -435,7 +434,10 @@ export default function TaskDetailPanel({
               onClick={() => {
                 addRequirement.mutate(
                   { id: task.id, requiredId: addRequiredId },
-                  { onSuccess: () => setAddRequiredId('') },
+                  {
+                    onSuccess: () => setAddRequiredId(''),
+                    onError: (error) => setAlertMessage((error as Error).message),
+                  },
                 )
               }}
               className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-alt disabled:opacity-50"
@@ -443,9 +445,6 @@ export default function TaskDetailPanel({
               Add
             </button>
           </div>
-        )}
-        {addRequirement.isError && (
-          <p className="mt-2 text-xs text-danger">{(addRequirement.error as Error).message}</p>
         )}
       </div>
 
@@ -481,6 +480,10 @@ export default function TaskDetailPanel({
           <p className="mt-2 text-xs text-danger">{(deleteTask.error as Error).message}</p>
         )}
       </div>
+
+      {alertMessage && (
+        <AlertDialog message={alertMessage} onClose={() => setAlertMessage(null)} />
+      )}
     </div>
   )
 }

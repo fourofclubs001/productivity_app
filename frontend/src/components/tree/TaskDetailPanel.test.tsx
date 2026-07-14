@@ -191,19 +191,35 @@ describe('TaskDetailPanel', () => {
     expect(removeRequirementMutate).toHaveBeenCalledWith({ id: 't1', requiredId: 'r1' })
   })
 
-  it('shows the backend message when adding a requirement is rejected (e.g. a cycle)', () => {
-    addRequirementState.mockReturnValue({
-      mutate: addRequirementMutate,
-      isPending: false,
-      isError: true,
-      error: new Error('Requiring this task would create a cycle of prerequisites'),
-    })
+  it('shows the backend message in a dialog when adding a requirement is rejected (e.g. a cycle)', () => {
+    addRequirementMutate.mockImplementation(
+      (_vars: unknown, options?: { onError?: (error: unknown) => void }) => {
+        options?.onError?.(new Error('Requiring this task would create a cycle of prerequisites'))
+      },
+    )
     const task = makeTask({ id: 't1' })
+    const candidate = makeTask({ id: 'r1', name: 'Candidate task' })
     render(
-      <TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} onAddChild={() => {}} />,
+      <TaskDetailPanel
+        task={task}
+        tasksById={
+          new Map([
+            [task.id, task],
+            [candidate.id, candidate],
+          ])
+        }
+        onAddChild={() => {}}
+      />,
     )
 
+    fireEvent.change(screen.getByLabelText('Add requirement'), {
+      target: { value: candidate.id },
+    })
+    fireEvent.click(screen.getByTitle('Add requirement'))
+
     expect(screen.getByText(/would create a cycle/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+    expect(screen.queryByText(/would create a cycle/i)).not.toBeInTheDocument()
   })
 
   it('opens the "Add to calendar" modal when the button is clicked', () => {

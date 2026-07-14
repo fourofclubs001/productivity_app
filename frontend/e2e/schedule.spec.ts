@@ -52,7 +52,7 @@ test('scheduling a task via the "Add to calendar" modal creates an event', async
   await expect(page.locator('.rbc-event', { hasText: task.name })).toBeVisible()
 })
 
-test('dragging a task with an unmet prerequisite onto the calendar is rejected with an error', async ({
+test('dragging a task with an unmet prerequisite onto the calendar is rejected with a dialog', async ({
   page,
   request,
 }) => {
@@ -67,5 +67,9 @@ test('dragging a task with an unmet prerequisite onto the calendar is rejected w
   await dragTaskOntoCalendar(page, task.name)
 
   await expect(page.getByText(/cannot be scheduled until its prerequisites/i)).toBeVisible()
+  const okButton = page.getByRole('button', { name: 'OK' })
+  await expect(okButton).toBeVisible()
+  await okButton.click()
+  await expect(page.getByText(/cannot be scheduled until its prerequisites/i)).not.toBeVisible()
   await expect(page.locator('.rbc-event', { hasText: task.name })).not.toBeVisible()
 })

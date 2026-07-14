@@ -23,6 +23,7 @@ import { chipFillStyle } from './eventColor'
 import CalendarDayHeader from './CalendarDayHeader'
 import CalendarTimezoneLabel from './CalendarTimezoneLabel'
 import ContextMenu from './ContextMenu'
+import AlertDialog from '../common/AlertDialog'
 
 interface CalendarEvent {
   id: string
@@ -195,12 +196,7 @@ export default function PlanCalendar({
       </div>
 
       {scheduleError && (
-        <div className="mb-2 flex items-center justify-between rounded border border-danger bg-danger/10 px-3 py-2 text-xs text-danger">
-          <span>{scheduleError}</span>
-          <button type="button" onClick={() => setScheduleError(null)} className="ml-2">
-            ×
-          </button>
-        </div>
+        <AlertDialog message={scheduleError} onClose={() => setScheduleError(null)} />
       )}
 
       <div
