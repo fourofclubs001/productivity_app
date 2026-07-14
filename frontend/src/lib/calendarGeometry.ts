@@ -62,3 +62,30 @@ export function slotToInterval(
   const end = new Date(start.getTime() + durationMinutes * 60 * 1000)
   return { start, end }
 }
+
+export interface PixelRect {
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
+/** Inverse of the day/time fraction resolveDropSlot computes -- converts a
+ * resolved slot back into a viewport-relative pixel box the same shape and
+ * position a real dropped event would occupy, for rendering a drag-preview
+ * ghost chip snapped to the grid (Google Calendar-style) as the pointer
+ * moves, before the drop actually happens. */
+export function slotToPixelRect(
+  slot: ResolvedSlot,
+  grid: GridGeometry,
+  dayCount = 7,
+  durationMinutes = 60,
+): PixelRect {
+  const dayWidth = grid.width / dayCount
+  return {
+    left: grid.left + slot.dayIndex * dayWidth,
+    top: grid.top + (slot.minutesFromMidnight / MINUTES_PER_DAY) * grid.height - grid.scrollTop,
+    width: dayWidth,
+    height: (durationMinutes / MINUTES_PER_DAY) * grid.height,
+  }
+}

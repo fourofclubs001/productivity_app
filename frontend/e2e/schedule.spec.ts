@@ -42,6 +42,35 @@ test('dragging a leaf task from the panel onto the calendar schedules it', async
   await expect(page.locator('.rbc-event', { hasText: task.name })).toBeVisible()
 })
 
+test('a drop-preview ghost chip appears while dragging, before the drop', async ({
+  page,
+  request,
+}) => {
+  const task = await createTask(request, `Ghost ${Date.now()}`)
+
+  await page.goto('/')
+
+  const row = page.getByTestId('task-tree').locator('.group', { hasText: task.name })
+  await row.scrollIntoViewIfNeeded()
+  const rowBox = await row.boundingBox()
+  const daySlot = page.locator('.rbc-day-slot').last()
+  const slotBox = await daySlot.boundingBox()
+  if (!rowBox || !slotBox) throw new Error('row or day-slot bounding box not found')
+
+  await page.mouse.move(rowBox.x + rowBox.width / 2, rowBox.y + rowBox.height / 2)
+  await page.mouse.down()
+  await expect(page.getByTestId('drag-preview-chip')).not.toBeVisible()
+
+  await page.mouse.move(slotBox.x + slotBox.width / 2, slotBox.y + 300, { steps: 10 })
+  const ghost = page.getByTestId('drag-preview-chip')
+  await expect(ghost).toBeVisible()
+  await expect(ghost).toContainText(task.name)
+
+  await page.mouse.up()
+  await expect(ghost).not.toBeVisible()
+  await expect(page.locator('.rbc-event', { hasText: task.name })).toBeVisible()
+})
+
 test('scheduling a task via the "Add to calendar" modal creates an event', async ({
   page,
   request,

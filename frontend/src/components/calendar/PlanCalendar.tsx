@@ -17,7 +17,13 @@ import {
 import { formatWeekLabel, mondayOf, shiftWeek, weekStartKey } from '../../lib/week'
 import { localizer } from '../../lib/calendarLocalizer'
 import { utcNow } from '../../lib/time'
-import { resolveDropSlot, slotToInterval } from '../../lib/calendarGeometry'
+import {
+  resolveDropSlot,
+  slotToInterval,
+  slotToPixelRect,
+  type GridGeometry,
+  type PixelRect,
+} from '../../lib/calendarGeometry'
 import { isFullyPast, isInProgress } from '../../lib/intervalTiming'
 import { useUndo } from '../../undo/UndoProvider'
 import { chipFillStyle } from './eventColor'
@@ -62,6 +68,7 @@ export default function PlanCalendar({
   } | null>(null)
   const [editingInterval, setEditingInterval] = useState<Interval | null>(null)
   const [now, setNow] = useState(() => new Date())
+  const [dragPreview, setDragPreview] = useState<{ rect: PixelRect; task: Task } | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -84,34 +91,69 @@ export default function PlanCalendar({
     setNodeRef(node)
   }
 
+  function resolveGrid(): { grid: GridGeometry; dayCount: number } | null {
+    const daySlots = wrapperRef.current?.querySelectorAll<HTMLElement>('.rbc-day-slot')
+    if (!daySlots || daySlots.length === 0) return null
+    const first = daySlots[0].getBoundingClientRect()
+    const last = daySlots[daySlots.length - 1].getBoundingClientRect()
+    return {
+      grid: {
+        left: first.left,
+        top: first.top,
+        width: last.right - first.left,
+        height: first.height,
+        scrollTop: 0,
+      },
+      dayCount: daySlots.length,
+    }
+  }
+
   useDndMonitor({
+    onDragMove: (event) => {
+      const { active, over } = event
+      if (over?.id !== 'plan-calendar') {
+        setDragPreview(null)
+        return
+      }
+      const task = tasksById.get(String(active.id))
+      if (!task || !task.is_leaf) {
+        setDragPreview(null)
+        return
+      }
+
+      const resolved = resolveGrid()
+      if (!resolved) return
+      const activatorEvent = event.activatorEvent as PointerEvent
+      const point = {
+        clientX: activatorEvent.clientX + event.delta.x,
+        clientY: activatorEvent.clientY + event.delta.y,
+      }
+      const slot = resolveDropSlot(point, resolved.grid, resolved.dayCount)
+      if (!slot) {
+        setDragPreview(null)
+        return
+      }
+      setDragPreview({
+        rect: slotToPixelRect(slot, resolved.grid, resolved.dayCount),
+        task,
+      })
+    },
     onDragEnd: (event) => {
+      setDragPreview(null)
       const { active, over } = event
       if (over?.id !== 'plan-calendar') return
       const task = tasksById.get(String(active.id))
       if (!task || !task.is_leaf) return
 
-      const daySlots = wrapperRef.current?.querySelectorAll<HTMLElement>('.rbc-day-slot')
-      if (!daySlots || daySlots.length === 0) return
-      const first = daySlots[0].getBoundingClientRect()
-      const last = daySlots[daySlots.length - 1].getBoundingClientRect()
+      const resolved = resolveGrid()
+      if (!resolved) return
 
       const activatorEvent = event.activatorEvent as PointerEvent
       const dropPoint = {
         clientX: activatorEvent.clientX + event.delta.x,
         clientY: activatorEvent.clientY + event.delta.y,
       }
-      const slot = resolveDropSlot(
-        dropPoint,
-        {
-          left: first.left,
-          top: first.top,
-          width: last.right - first.left,
-          height: first.height,
-          scrollTop: 0,
-        },
-        daySlots.length,
-      )
+      const slot = resolveDropSlot(dropPoint, resolved.grid, resolved.dayCount)
       if (!slot) return
 
       const { start, end } = slotToInterval(slot, weekAnchor)
@@ -121,6 +163,7 @@ export default function PlanCalendar({
         { onError: (error) => setScheduleError((error as Error).message) },
       )
     },
+    onDragCancel: () => setDragPreview(null),
   })
 
   function deleteIntervalWithUndo(interval: Interval) {
@@ -270,6 +313,23 @@ export default function PlanCalendar({
           style={{ height: '100%' }}
         />
       </div>
+
+      {dragPreview && (
+        <div
+          data-testid="drag-preview-chip"
+          className="pointer-events-none fixed z-40 truncate rounded px-1 text-xs text-white"
+          style={{
+            left: dragPreview.rect.left,
+            top: dragPreview.rect.top,
+            width: dragPreview.rect.width,
+            height: dragPreview.rect.height,
+            ...chipFillStyle(dragPreview.task.effective_colors),
+            opacity: 0.7,
+          }}
+        >
+          {dragPreview.task.name}
+        </div>
+      )}
 
       {contextMenu && (
         <ContextMenu
