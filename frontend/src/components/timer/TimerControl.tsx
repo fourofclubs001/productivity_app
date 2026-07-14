@@ -8,6 +8,7 @@ import {
   useStopTimer,
 } from '../../api/timer'
 import { useUndo } from '../../undo/UndoProvider'
+import AlertDialog from '../common/AlertDialog'
 import DoneConfirmModal from './DoneConfirmModal'
 import TaskPicker from './TaskPicker'
 
@@ -36,6 +37,7 @@ export default function TimerControl({ tasks }: { tasks: Task[] }) {
   const [selectedTaskId, setSelectedTaskId] = useState('')
   const [elapsedMs, setElapsedMs] = useState(0)
   const [justStopped, setJustStopped] = useState<JustStopped | null>(null)
+  const [alertMessage, setAlertMessage] = useState<string | null>(null)
 
   useEffect(() => {
     if (!active) {
@@ -119,11 +121,18 @@ export default function TimerControl({ tasks }: { tasks: Task[] }) {
       <button
         type="button"
         disabled={!selectedTaskId || startTimer.isPending}
-        onClick={() => startTimer.mutate(selectedTaskId)}
+        onClick={() =>
+          startTimer.mutate(selectedTaskId, {
+            onError: (error) => setAlertMessage((error as Error).message),
+          })
+        }
         className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
       >
         Start
       </button>
+      {alertMessage && (
+        <AlertDialog message={alertMessage} onClose={() => setAlertMessage(null)} />
+      )}
     </div>
   )
 }

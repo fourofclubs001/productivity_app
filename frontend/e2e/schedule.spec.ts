@@ -73,3 +73,37 @@ test('dragging a task with an unmet prerequisite onto the calendar is rejected w
   await expect(page.getByText(/cannot be scheduled until its prerequisites/i)).not.toBeVisible()
   await expect(page.locator('.rbc-event', { hasText: task.name })).not.toBeVisible()
 })
+
+test('a task can be scheduled via the modal once its prerequisite is scheduled before it', async ({
+  page,
+  request,
+}) => {
+  const suffix = Date.now()
+  const required = await createTask(request, `Blocker2 ${suffix}`)
+  const task = await createTask(request, `Blocked2 ${suffix}`)
+  await request.post(`${API_BASE}/tasks/${task.id}/requires`, {
+    data: { required_id: required.id },
+  })
+
+  await page.goto('/')
+
+  // Schedule the prerequisite first: 01:00-02:00 (today, the modal's
+  // default day) -- an arbitrary early hour unlikely to collide with the
+  // modal's own "now, rounded up" default time.
+  await page.getByTestId('task-tree').getByText(required.name).click()
+  await expect(page.getByLabel('Task name')).toHaveValue(required.name)
+  await page.getByTitle('Add to calendar').click()
+  await page.getByLabel('Start hour').fill('01:00')
+  await page.getByLabel('End hour').fill('02:00')
+  await page.locator('form').getByRole('button', { name: 'Add' }).click()
+  await expect(page.locator('.rbc-event', { hasText: required.name })).toBeVisible()
+
+  // The dependent task can now be scheduled starting right when it ends.
+  await page.getByTestId('task-tree').getByText(task.name).click()
+  await expect(page.getByLabel('Task name')).toHaveValue(task.name)
+  await page.getByTitle('Add to calendar').click()
+  await page.getByLabel('Start hour').fill('02:00')
+  await page.getByLabel('End hour').fill('03:00')
+  await page.locator('form').getByRole('button', { name: 'Add' }).click()
+  await expect(page.locator('.rbc-event', { hasText: task.name })).toBeVisible()
+})

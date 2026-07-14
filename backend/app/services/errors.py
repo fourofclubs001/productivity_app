@@ -37,7 +37,27 @@ class UnmetPrerequisiteError(Exception):
         self.task_id = task_id
         self.unmet_ids = unmet_ids
         super().__init__(
-            f"Task {task_id!r} cannot be scheduled until its prerequisites are done: {unmet_ids}"
+            f"Task {task_id!r} cannot be scheduled until its prerequisites are "
+            f"scheduled before it: {unmet_ids}"
+        )
+
+
+class PrerequisiteNotSprintDoneError(Exception):
+    def __init__(self, task_id: str, unmet_ids: list[str]) -> None:
+        self.task_id = task_id
+        self.unmet_ids = unmet_ids
+        super().__init__(
+            f"Task {task_id!r} cannot be time-tracked until its prerequisites are "
+            f"sprint-done: {unmet_ids}"
+        )
+
+
+class RequirementAncestorError(Exception):
+    def __init__(self, task_id: str, required_id: str) -> None:
+        self.task_id = task_id
+        self.required_id = required_id
+        super().__init__(
+            f"Task {task_id!r} cannot require {required_id!r} because it is one of its ancestors"
         )
 
 

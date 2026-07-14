@@ -7,6 +7,7 @@ from app.models.entry import EntryOut, MarkDoneRequest, StartTimerRequest
 from app.models.task import TaskOut
 from app.services.errors import (
     NoActiveTimerError,
+    PrerequisiteNotSprintDoneError,
     TaskNotFoundError,
     TaskNotInProgressError,
     TaskNotLeafError,
@@ -28,6 +29,8 @@ async def start_timer(payload: StartTimerRequest, service: ServiceDep) -> EntryO
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except TaskNotLeafError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except PrerequisiteNotSprintDoneError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.post("/timer/stop", response_model=EntryOut)

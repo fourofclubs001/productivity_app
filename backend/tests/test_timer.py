@@ -43,6 +43,31 @@ def test_start_timer_rejects_missing_task(client):
     assert response.status_code == 404
 
 
+def test_start_timer_blocked_while_a_prerequisite_is_not_sprint_done(client):
+    task = create_leaf(client, "Task")
+    required = create_leaf(client, "Required")
+    client.post(f"/tasks/{task['id']}/requires", json={"required_id": required["id"]})
+
+    response = client.post("/timer/start", json={"task_id": task["id"]})
+    assert response.status_code == 409
+
+    task_after = client.get(f"/tasks/{task['id']}").json()
+    assert task_after["state"] == "backlog"
+
+
+def test_start_timer_allowed_once_prerequisite_is_sprint_done(client):
+    task = create_leaf(client, "Task")
+    required = create_leaf(client, "Required")
+    client.post(f"/tasks/{task['id']}/requires", json={"required_id": required["id"]})
+
+    client.post("/timer/start", json={"task_id": required["id"]})
+    client.post("/timer/stop")
+    client.post("/timer/mark-done", json={"task_id": required["id"]})
+
+    response = client.post("/timer/start", json={"task_id": task["id"]})
+    assert response.status_code == 200
+
+
 def test_starting_a_new_timer_stops_the_previous_one(client):
     first = create_leaf(client, "First")
     second = create_leaf(client, "Second")

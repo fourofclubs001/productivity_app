@@ -69,6 +69,36 @@ test('ctrl+z after marking done reverts the task back to in_progress', async ({ 
   await expect(pickerOptions(page).getByRole('button', { name: taskName, exact: true })).toBeVisible()
 })
 
+test('starting a timer on a task with an unmet prerequisite is rejected with a dialog', async ({
+  page,
+}) => {
+  const suffix = Date.now()
+  const requiredName = `Blocker ${suffix}`
+  const taskName = `Blocked ${suffix}`
+
+  await page.goto('/')
+  await page.getByTitle('New task').click()
+  await page.getByLabel('Name', { exact: true }).fill(requiredName)
+  await page.getByLabel('Definition of done').fill('done')
+  await page.getByRole('button', { name: 'Create' }).click()
+
+  await page.getByTitle('New task').click()
+  await page.getByLabel('Name', { exact: true }).fill(taskName)
+  await page.getByLabel('Definition of done').fill('done')
+  await page.getByRole('button', { name: 'Create' }).click()
+  // taskName is now selected in the detail panel.
+  await page.getByLabel('Add requirement').selectOption({ label: requiredName })
+  await page.getByTitle('Add requirement').click()
+
+  await page.getByRole('button', { name: 'Execute' }).click()
+  await selectExecuteTask(page, taskName)
+  await page.getByRole('button', { name: 'Start' }).click()
+
+  await expect(page.getByText(/cannot be time-tracked until its prerequisites/i)).toBeVisible()
+  await page.getByRole('button', { name: 'OK' }).click()
+  await expect(page.getByText('Tracking')).not.toBeVisible()
+})
+
 test('stopping without marking done keeps the task selectable again', async ({ page }) => {
   const taskName = `Timer resume ${Date.now()}`
 

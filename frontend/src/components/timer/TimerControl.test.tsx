@@ -74,7 +74,25 @@ describe('TimerControl (idle)', () => {
     expect(startButton).not.toBeDisabled()
 
     fireEvent.click(startButton)
-    expect(startMutate).toHaveBeenCalledWith('leaf')
+    expect(startMutate).toHaveBeenCalledWith('leaf', expect.objectContaining({ onError: expect.any(Function) }))
+  })
+
+  it('shows a dialog when starting the timer is rejected (e.g. an unmet prerequisite)', () => {
+    startMutate.mockImplementation(
+      (_taskId?: unknown, options?: { onError?: (error: unknown) => void }) => {
+        options?.onError?.(new Error('Task cannot be time-tracked until its prerequisites are sprint-done'))
+      },
+    )
+    const task = makeTask({ id: 'leaf', name: 'Leaf task', is_leaf: true })
+    renderTimerControl([task])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select a task…' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Leaf task' }))
+    fireEvent.click(screen.getByText('Start'))
+
+    expect(screen.getByText(/prerequisites are sprint-done/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+    expect(screen.queryByText(/prerequisites are sprint-done/i)).not.toBeInTheDocument()
   })
 })
 

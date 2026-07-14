@@ -30,6 +30,26 @@ class IntervalService:
         # TaskService over the same repo.
         self._task_service = task_service or TaskService(task_repo)
 
+    async def _unmet_scheduling_prerequisites(
+        self, required_ids: set[str], new_start: datetime
+    ) -> list[str]:
+        """Required tasks that block scheduling something to start at
+        new_start: a task can only be scheduled for a time after each of its
+        prerequisites' own latest scheduled interval ends. A prerequisite
+        with no interval at all blocks scheduling outright -- "after it" is
+        meaningless if it isn't scheduled yet.
+        """
+        unmet = []
+        for required_id in required_ids:
+            existing = await self._intervals.list_for_task(required_id)
+            if not existing:
+                unmet.append(required_id)
+                continue
+            latest_end = max(datetime.fromisoformat(interval["end"]) for interval in existing)
+            if new_start < latest_end:
+                unmet.append(required_id)
+        return unmet
+
     async def create_interval(self, payload: IntervalCreate) -> IntervalOut:
         if payload.end <= payload.start:
             raise InvalidIntervalError
@@ -41,11 +61,7 @@ class IntervalService:
             raise TaskNotLeafError(payload.task_id)
 
         if task_node.requires:
-            unmet = []
-            for required_id in task_node.requires:
-                required_task = await self._task_service.get_task(required_id)
-                if required_task.state != TaskState.done:
-                    unmet.append(required_id)
+            unmet = await self._unmet_scheduling_prerequisites(task_node.requires, payload.start)
             if unmet:
                 raise UnmetPrerequisiteError(payload.task_id, unmet)
 
@@ -75,6 +91,12 @@ class IntervalService:
         data = await self._intervals.get(interval_id)
         if data is None:
             raise IntervalNotFoundError(interval_id)
+
+        task_node = await self._tasks.load_node(data["task_id"])
+        if task_node is not None and task_node.requires:
+            unmet = await self._unmet_scheduling_prerequisites(task_node.requires, payload.start)
+            if unmet:
+                raise UnmetPrerequisiteError(data["task_id"], unmet)
 
         week_start = await self._intervals.update(interval_id, payload.start, payload.end)
         return IntervalOut(

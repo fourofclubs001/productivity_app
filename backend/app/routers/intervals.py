@@ -40,6 +40,8 @@ async def update_interval(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except InvalidIntervalError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except UnmetPrerequisiteError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.delete("/{interval_id}", status_code=204)

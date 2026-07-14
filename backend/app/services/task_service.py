@@ -6,6 +6,7 @@ from app.repositories.task_repository import ORDER_STEP, TaskNode, TaskRepositor
 from app.services.errors import (
     CycleError,
     InvalidColorError,
+    RequirementAncestorError,
     RequirementCycleError,
     SelfParentError,
     SelfRequirementError,
@@ -297,6 +298,15 @@ class TaskService:
         # of required_id's own prerequisites.
         if is_reachable(required_id, task_id, lambda tid: requires_graph.get(tid, set())):
             raise RequirementCycleError(task_id, required_id)
+
+        # A task's completion is already derived from its own descendants
+        # (see _compute_state), so requiring an ancestor would make task_id's
+        # completion depend on required_id, which itself depends on task_id --
+        # a cycle across the parent/child DAG and the requirement DAG that
+        # the check above (requirement-DAG-only) can't catch on its own.
+        graph = await self._repo.load_graph()
+        if is_reachable(task_id, required_id, lambda tid: graph[tid].parents):
+            raise RequirementAncestorError(task_id, required_id)
 
         await self._repo.add_requirement_edge(task_id, required_id)
         return await self.get_task(task_id)

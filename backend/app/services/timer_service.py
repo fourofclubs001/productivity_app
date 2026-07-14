@@ -7,17 +7,25 @@ from app.repositories.entry_repository import EntryRepository
 from app.repositories.task_repository import TaskRepository
 from app.services.errors import (
     NoActiveTimerError,
+    PrerequisiteNotSprintDoneError,
     TaskNotFoundError,
     TaskNotInProgressError,
     TaskNotLeafError,
     TaskNotSprintDoneError,
 )
+from app.services.task_service import TaskService
 
 
 class TimerService:
-    def __init__(self, entry_repo: EntryRepository, task_repo: TaskRepository) -> None:
+    def __init__(
+        self,
+        entry_repo: EntryRepository,
+        task_repo: TaskRepository,
+        task_service: TaskService | None = None,
+    ) -> None:
         self._entries = entry_repo
         self._tasks = task_repo
+        self._task_service = task_service or TaskService(task_repo)
 
     async def start(self, task_id: str) -> EntryOut:
         task_node = await self._tasks.load_node(task_id)
@@ -25,6 +33,15 @@ class TimerService:
             raise TaskNotFoundError(task_id)
         if task_node.children:
             raise TaskNotLeafError(task_id)
+
+        if task_node.requires:
+            unmet = []
+            for required_id in task_node.requires:
+                required_task = await self._task_service.get_task(required_id)
+                if required_task.state not in (TaskState.sprint_done, TaskState.done):
+                    unmet.append(required_id)
+            if unmet:
+                raise PrerequisiteNotSprintDoneError(task_id, unmet)
 
         now = datetime.now(UTC)
 

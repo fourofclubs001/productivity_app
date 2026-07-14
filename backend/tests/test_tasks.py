@@ -330,6 +330,37 @@ def test_transitive_requirement_cycle_rejected(client):
     assert response.status_code == 400
 
 
+def test_requiring_an_ancestor_is_rejected(client):
+    parent = create_task(client, name="Parent")
+    child = create_task(client, name="Child", parent_ids=[parent["id"]])
+
+    response = client.post(f"/tasks/{child['id']}/requires", json={"required_id": parent["id"]})
+    assert response.status_code == 400
+
+
+def test_requiring_a_grandparent_is_rejected(client):
+    grandparent = create_task(client, name="Grandparent")
+    parent = create_task(client, name="Parent", parent_ids=[grandparent["id"]])
+    child = create_task(client, name="Child", parent_ids=[parent["id"]])
+
+    response = client.post(
+        f"/tasks/{child['id']}/requires", json={"required_id": grandparent["id"]}
+    )
+    assert response.status_code == 400
+
+
+def test_requiring_a_descendant_is_still_allowed(client):
+    parent = create_task(client, name="Parent")
+    child = create_task(client, name="Child", parent_ids=[parent["id"]])
+
+    # The reverse direction (a parent requiring its own child) isn't the
+    # ancestor-cycle case this guard targets -- only unrelated tasks would
+    # normally be required, but a descendant-as-requirement doesn't create
+    # the completion-depends-on-itself cycle an ancestor-as-requirement does.
+    response = client.post(f"/tasks/{parent['id']}/requires", json={"required_id": child["id"]})
+    assert response.status_code == 200
+
+
 def test_deleting_a_task_cleans_up_requirement_edges(client):
     task = create_task(client, name="Task")
     required = create_task(client, name="Required")

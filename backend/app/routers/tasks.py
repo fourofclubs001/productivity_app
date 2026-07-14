@@ -19,6 +19,7 @@ from app.repositories.interval_repository import IntervalRepository
 from app.services.errors import (
     CycleError,
     InvalidColorError,
+    RequirementAncestorError,
     RequirementCycleError,
     SelfParentError,
     SelfRequirementError,
@@ -137,6 +138,8 @@ async def add_requirement(
     except SelfRequirementError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except RequirementCycleError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RequirementAncestorError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
