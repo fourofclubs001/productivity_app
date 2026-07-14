@@ -4,11 +4,19 @@ import 'react-big-calendar/lib/css/react-big-calendar.css'
 import './calendar.css'
 import type { Entry, Interval, Task } from '../../types'
 import { localizer } from '../../lib/calendarLocalizer'
+import { computeDiffSegments } from '../../lib/intervalDiff'
 import { chipFillStyle, primaryChipColor } from './eventColor'
 import CalendarDayHeader from './CalendarDayHeader'
 import CalendarTimezoneLabel from './CalendarTimezoneLabel'
 
 export type EvaluateMode = 'planned' | 'real' | 'diff'
+
+export interface ExplainGapParams {
+  taskId: string
+  intervalId: string
+  start: Date
+  end: Date
+}
 
 interface CalendarEvent {
   id: string
@@ -17,6 +25,9 @@ interface CalendarEvent {
   end: Date
   colors: string[]
   kind: 'planned' | 'real'
+  taskId?: string
+  intervalId?: string
+  diffKind?: 'covered' | 'uncovered'
 }
 
 export default function EvaluateCalendar({
@@ -25,12 +36,14 @@ export default function EvaluateCalendar({
   intervals,
   entries,
   tasksById,
+  onExplainGap,
 }: {
   mode: EvaluateMode
   weekAnchor: Date
   intervals: Interval[]
   entries: Entry[]
   tasksById: Map<string, Task>
+  onExplainGap?: (params: ExplainGapParams) => void
 }) {
   const events = useMemo<CalendarEvent[]>(() => {
     const planned: CalendarEvent[] = intervals.map((interval) => {
@@ -59,7 +72,28 @@ export default function EvaluateCalendar({
 
     if (mode === 'planned') return planned
     if (mode === 'real') return real
-    return [...planned, ...real]
+
+    // Diff mode splits each planned interval into covered/uncovered
+    // sub-segments instead of rendering it as one solid chip. The separate
+    // `real` chips are still concatenated as-is (unchanged from before) so
+    // tracked time with no corresponding plan stays visible.
+    const diffSegments: CalendarEvent[] = computeDiffSegments(intervals, entries).map(
+      (segment, index) => {
+        const task = tasksById.get(segment.taskId)
+        return {
+          id: `diff-${segment.intervalId}-${index}`,
+          title: task?.name ?? 'Unknown task',
+          start: segment.start,
+          end: segment.end,
+          colors: task?.effective_colors ?? [],
+          kind: 'planned',
+          taskId: segment.taskId,
+          intervalId: segment.intervalId,
+          diffKind: segment.covered ? 'covered' : 'uncovered',
+        }
+      },
+    )
+    return [...diffSegments, ...real]
   }, [mode, intervals, entries, tasksById])
 
   return (
@@ -72,17 +106,39 @@ export default function EvaluateCalendar({
       onNavigate={() => {}}
       toolbar={false}
       selectable={false}
-      eventPropGetter={(event: CalendarEvent) => ({
-        style:
-          event.kind === 'real'
-            ? { ...chipFillStyle(event.colors), border: 'none' }
-            : {
-                backgroundColor: 'transparent',
-                border: `1px dashed ${primaryChipColor(event.colors)}`,
-                color: primaryChipColor(event.colors),
-              },
-      })}
-      components={{ header: CalendarDayHeader, timeGutterHeader: CalendarTimezoneLabel }}
+      onSelectEvent={(event: CalendarEvent) => {
+        if (mode !== 'diff' || event.diffKind !== 'uncovered') return
+        if (!event.taskId || !event.intervalId) return
+        onExplainGap?.({
+          taskId: event.taskId,
+          intervalId: event.intervalId,
+          start: event.start,
+          end: event.end,
+        })
+      }}
+      eventPropGetter={(event: CalendarEvent) => {
+        if (event.kind === 'real') {
+          return { style: { ...chipFillStyle(event.colors), border: 'none' } }
+        }
+        const isUncoveredGap = event.diffKind === 'uncovered'
+        return {
+          style: {
+            backgroundColor: 'transparent',
+            border: `1px dashed ${primaryChipColor(event.colors)}`,
+            color: primaryChipColor(event.colors),
+            cursor: isUncoveredGap ? 'pointer' : undefined,
+            fontWeight: isUncoveredGap ? 600 : undefined,
+            boxShadow: isUncoveredGap ? `inset 0 0 0 1px ${primaryChipColor(event.colors)}` : undefined,
+          },
+        }
+      }}
+      components={{
+        header: CalendarDayHeader,
+        timeGutterHeader: CalendarTimezoneLabel,
+        event: ({ event }: { event: CalendarEvent }) => (
+          <span data-testid={`event-${event.diffKind ?? event.kind}`}>{event.title}</span>
+        ),
+      }}
       style={{ height: '100%' }}
     />
   )

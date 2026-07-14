@@ -3,7 +3,11 @@ import { useTasks } from '../api/tasks'
 import { useIntervalsForWeek } from '../api/intervals'
 import { useEntriesForWeek } from '../api/timer'
 import { useEvaluatePeriod } from '../api/evaluate'
-import EvaluateCalendar, { type EvaluateMode } from '../components/calendar/EvaluateCalendar'
+import EvaluateCalendar, {
+  type EvaluateMode,
+  type ExplainGapParams,
+} from '../components/calendar/EvaluateCalendar'
+import ExplainGapDialog from '../components/evaluate/ExplainGapDialog'
 import StatsPanel from '../components/evaluate/StatsPanel'
 import TaskFilter from '../components/evaluate/TaskFilter'
 import { formatWeekLabel, mondayOf, shiftWeek, weekStartKey } from '../lib/week'
@@ -45,6 +49,7 @@ export default function EvaluateView() {
   const [granularity, setGranularity] = useState<Granularity>('week')
   const [periodAnchor, setPeriodAnchor] = useState(() => utcNow())
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([])
+  const [explainGap, setExplainGap] = useState<ExplainGapParams | null>(null)
 
   const { data: tasks } = useTasks()
   const { data: intervals = [] } = useIntervalsForWeek(weekStart)
@@ -133,9 +138,21 @@ export default function EvaluateView() {
               intervals={intervals}
               entries={entries}
               tasksById={tasksById}
+              onExplainGap={setExplainGap}
             />
           </div>
         </>
+      )}
+
+      {explainGap && (
+        <ExplainGapDialog
+          taskId={explainGap.taskId}
+          taskName={tasksById.get(explainGap.taskId)?.name ?? 'Unknown task'}
+          intervalId={explainGap.intervalId}
+          start={explainGap.start}
+          end={explainGap.end}
+          onClose={() => setExplainGap(null)}
+        />
       )}
 
       {subtab === 'metrics' && (
