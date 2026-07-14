@@ -99,6 +99,62 @@ def test_update_interval_rejects_end_before_start(client):
     assert response.status_code == 400
 
 
+async def test_update_interval_fully_past_is_locked_entirely(client, redis_client):
+    task = create_leaf(client)
+    past_start = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=3)
+    past_end = past_start + timedelta(hours=1)
+    interval_id = str(uuid4())
+    await IntervalRepository(redis_client).create(interval_id, task["id"], past_start, past_end)
+
+    response = client.patch(
+        f"/intervals/{interval_id}",
+        json={
+            "start": iso(past_start + timedelta(minutes=5)),
+            "end": iso(past_end + timedelta(minutes=5)),
+        },
+    )
+    assert response.status_code == 400
+
+
+async def test_update_interval_in_progress_locks_start_but_not_end(client, redis_client):
+    task = create_leaf(client)
+    now = datetime.now(UTC).replace(tzinfo=None)
+    start = now - timedelta(minutes=30)
+    end = now + timedelta(minutes=30)
+    interval_id = str(uuid4())
+    await IntervalRepository(redis_client).create(interval_id, task["id"], start, end)
+
+    blocked = client.patch(
+        f"/intervals/{interval_id}",
+        json={"start": iso(start + timedelta(minutes=5)), "end": iso(end)},
+    )
+    assert blocked.status_code == 400
+
+    allowed = client.patch(
+        f"/intervals/{interval_id}",
+        json={"start": iso(start), "end": iso(end + timedelta(hours=1))},
+    )
+    assert allowed.status_code == 200
+
+
+def test_update_interval_fully_future_stays_editable_but_not_into_the_past(client):
+    task = create_leaf(client)
+    interval = create_interval(client, task["id"], START, START + timedelta(hours=1))
+
+    moved = client.patch(
+        f"/intervals/{interval['id']}",
+        json={"start": iso(START + timedelta(hours=2)), "end": iso(START + timedelta(hours=3))},
+    )
+    assert moved.status_code == 200
+
+    past_start = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=1)
+    rejected = client.patch(
+        f"/intervals/{interval['id']}",
+        json={"start": iso(past_start), "end": iso(past_start + timedelta(hours=1))},
+    )
+    assert rejected.status_code == 400
+
+
 def test_update_missing_interval_returns_404(client):
     start = START
     response = client.patch(

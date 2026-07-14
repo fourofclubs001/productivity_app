@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Calendar } from 'react-big-calendar'
 import dragAndDropImport, {
   type EventInteractionArgs,
@@ -18,12 +18,14 @@ import { formatWeekLabel, mondayOf, shiftWeek, weekStartKey } from '../../lib/we
 import { localizer } from '../../lib/calendarLocalizer'
 import { utcNow } from '../../lib/time'
 import { resolveDropSlot, slotToInterval } from '../../lib/calendarGeometry'
+import { isFullyPast, isInProgress } from '../../lib/intervalTiming'
 import { useUndo } from '../../undo/UndoProvider'
 import { chipFillStyle } from './eventColor'
 import CalendarDayHeader from './CalendarDayHeader'
 import CalendarTimezoneLabel from './CalendarTimezoneLabel'
 import ContextMenu from './ContextMenu'
 import AlertDialog from '../common/AlertDialog'
+import EditIntervalTimeModal from './EditIntervalTimeModal'
 
 interface CalendarEvent {
   id: string
@@ -58,7 +60,14 @@ export default function PlanCalendar({
     y: number
     interval: Interval
   } | null>(null)
+  const [editingInterval, setEditingInterval] = useState<Interval | null>(null)
+  const [now, setNow] = useState(() => new Date())
   const wrapperRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30_000)
+    return () => clearInterval(timer)
+  }, [])
 
   const weekStart = weekStartKey(weekAnchor)
   const isCurrentWeek = weekStart === weekStartKey(utcNow())
@@ -134,7 +143,20 @@ export default function PlanCalendar({
     if (!interval) return
     const previousStart = interval.start
     const previousEnd = interval.end
-    const input = { start: new Date(start).toISOString(), end: new Date(end).toISOString() }
+    const newStart = new Date(start)
+
+    // The backend is the real guard, but pre-empting here avoids a
+    // round-trip for the common case: an in-progress interval's start is
+    // locked (it's already begun), only its end can still move.
+    if (
+      isInProgress({ start: new Date(previousStart), end: new Date(previousEnd) }, now) &&
+      newStart.getTime() !== new Date(previousStart).getTime()
+    ) {
+      setScheduleError('This time slot has already started — its start time can no longer be moved.')
+      return
+    }
+
+    const input = { start: newStart.toISOString(), end: new Date(end).toISOString() }
     setScheduleError(null)
     updateInterval.mutate(
       { id: interval.id, input },
@@ -213,6 +235,8 @@ export default function PlanCalendar({
           toolbar={false}
           selectable={false}
           resizable
+          draggableAccessor={(event: CalendarEvent) => !isFullyPast(event, now)}
+          resizableAccessor={(event: CalendarEvent) => !isFullyPast(event, now)}
           onEventDrop={handleEventChange}
           onEventResize={handleEventChange}
           onSelectEvent={(event: CalendarEvent) => {
@@ -220,7 +244,11 @@ export default function PlanCalendar({
             if (interval) onOpenTask(interval.task_id)
           }}
           eventPropGetter={(event: CalendarEvent) => ({
-            style: { ...chipFillStyle(event.colors), border: 'none' },
+            style: {
+              ...chipFillStyle(event.colors),
+              border: 'none',
+              opacity: isFullyPast(event, now) ? 0.55 : 1,
+            },
           })}
           components={{
             header: CalendarDayHeader,
@@ -250,11 +278,22 @@ export default function PlanCalendar({
           onClose={() => setContextMenu(null)}
           items={[
             {
+              label: 'Edit time',
+              onSelect: () => setEditingInterval(contextMenu.interval),
+            },
+            {
               label: 'Delete',
               danger: true,
               onSelect: () => deleteIntervalWithUndo(contextMenu.interval),
             },
           ]}
+        />
+      )}
+
+      {editingInterval && (
+        <EditIntervalTimeModal
+          interval={editingInterval}
+          onClose={() => setEditingInterval(null)}
         />
       )}
     </div>

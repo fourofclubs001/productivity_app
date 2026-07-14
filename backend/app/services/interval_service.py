@@ -6,6 +6,7 @@ from app.models.task import TaskState
 from app.repositories.interval_repository import IntervalRepository
 from app.repositories.task_repository import TaskRepository
 from app.services.errors import (
+    IntervalLockedError,
     IntervalNotFoundError,
     InvalidIntervalError,
     PastIntervalError,
@@ -47,6 +48,28 @@ class IntervalService:
         now = datetime.now(UTC).replace(tzinfo=None)
         if _as_utc_naive(start) < now:
             raise PastIntervalError
+
+    def _enforce_edit_lock(
+        self, existing_start: datetime, existing_end: datetime, new_start: datetime
+    ) -> None:
+        """A scheduled interval's edit rules depend on where "now" falls
+        relative to its *current* (pre-edit) bounds: fully past -> locked
+        entirely; in progress -> its start can't move, only its end; fully
+        future -> both free, but the new start still can't be pushed into
+        the past. Mirrors the frontend's lib/intervalTiming.ts three-way
+        split -- keep the boundary semantics identical if either changes.
+        """
+        now = datetime.now(UTC).replace(tzinfo=None)
+        start = _as_utc_naive(existing_start)
+        end = _as_utc_naive(existing_end)
+
+        if end <= now:
+            raise IntervalLockedError
+        if start <= now < end:
+            if _as_utc_naive(new_start) != start:
+                raise IntervalLockedError
+            return
+        self._reject_if_past_start(new_start)
 
     async def _unmet_scheduling_prerequisites(
         self, required_ids: set[str], new_start: datetime
@@ -110,6 +133,12 @@ class IntervalService:
         data = await self._intervals.get(interval_id)
         if data is None:
             raise IntervalNotFoundError(interval_id)
+
+        self._enforce_edit_lock(
+            datetime.fromisoformat(data["start"]),
+            datetime.fromisoformat(data["end"]),
+            payload.start,
+        )
 
         task_node = await self._tasks.load_node(data["task_id"])
         if task_node is not None and task_node.requires:

@@ -83,6 +83,13 @@ class PastIntervalError(Exception):
         super().__init__("A task can only be scheduled for a time after the current time")
 
 
+class IntervalLockedError(Exception):
+    def __init__(self) -> None:
+        super().__init__(
+            "This time slot has already started or ended and can no longer be edited that way"
+        )
+
+
 class IntervalNotFoundError(Exception):
     def __init__(self, interval_id: str) -> None:
         self.interval_id = interval_id

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.dependencies import apply_rollover, get_interval_service
 from app.models.interval import IntervalCreate, IntervalOut, IntervalUpdate
 from app.services.errors import (
+    IntervalLockedError,
     IntervalNotFoundError,
     InvalidIntervalError,
     PastIntervalError,
@@ -39,7 +40,7 @@ async def update_interval(
         return await service.update_interval(interval_id, payload)
     except IntervalNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except InvalidIntervalError as exc:
+    except (InvalidIntervalError, PastIntervalError, IntervalLockedError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except UnmetPrerequisiteError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
