@@ -5,9 +5,11 @@ from redis.asyncio import Redis
 
 from app.redis_client import get_redis
 from app.repositories.entry_repository import EntryRepository
+from app.repositories.excuse_repository import ExcuseRepository
 from app.repositories.interval_repository import IntervalRepository
 from app.repositories.task_repository import TaskRepository
 from app.services.evaluate_service import EvaluateService
+from app.services.excuse_service import ExcuseService
 from app.services.interval_service import IntervalService
 from app.services.rollover_service import RolloverService
 from app.services.task_service import TaskService
@@ -30,6 +32,10 @@ def get_timer_service(redis: Annotated[Redis, Depends(get_redis)]) -> TimerServi
 
 def get_evaluate_service(redis: Annotated[Redis, Depends(get_redis)]) -> EvaluateService:
     return EvaluateService(TaskRepository(redis), IntervalRepository(redis), EntryRepository(redis))
+
+
+def get_excuse_service(redis: Annotated[Redis, Depends(get_redis)]) -> ExcuseService:
+    return ExcuseService(ExcuseRepository(redis), TaskRepository(redis))
 
 
 def get_rollover_service(redis: Annotated[Redis, Depends(get_redis)]) -> RolloverService:

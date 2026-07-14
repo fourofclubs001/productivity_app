@@ -120,3 +120,14 @@ class TaskNotSprintDoneError(Exception):
     def __init__(self, task_id: str) -> None:
         self.task_id = task_id
         super().__init__(f"Task {task_id!r} is not sprint-done and cannot be reverted")
+
+
+class ExcuseSelectionRequiredError(Exception):
+    def __init__(self) -> None:
+        super().__init__("Provide exactly one of excuse_id or new_excuse_text")
+
+
+class ExcuseNotFoundError(Exception):
+    def __init__(self, excuse_id: str) -> None:
+        self.excuse_id = excuse_id
+        super().__init__(f"Excuse {excuse_id!r} not found")

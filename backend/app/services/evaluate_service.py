@@ -1,6 +1,5 @@
 from collections import defaultdict
 from datetime import UTC, date, datetime, timedelta
-from enum import Enum
 
 from pydantic import BaseModel
 
@@ -8,14 +7,11 @@ from app.models.task import TaskState
 from app.repositories.entry_repository import EntryRepository
 from app.repositories.interval_repository import IntervalRepository, monday_of
 from app.repositories.task_repository import TaskNode, TaskRepository
+from app.services.period_utils import Granularity, period_bounds
+
+__all__ = ["EvaluatePeriodResult", "EvaluateService", "Granularity"]
 
 FINISHED_STATES = {TaskState.sprint_done, TaskState.done}
-
-
-class Granularity(str, Enum):
-    day = "day"
-    week = "week"
-    month = "month"
 
 
 class TaskPeriodStats(BaseModel):
@@ -67,22 +63,6 @@ def _descendant_leaves(task_id: str, graph: dict[str, TaskNode]) -> set[str]:
     return result
 
 
-def _period_bounds(granularity: Granularity, anchor: date) -> tuple[date, date]:
-    """Returns [start, end) for the period containing `anchor`, end exclusive."""
-    if granularity == Granularity.day:
-        return anchor, anchor + timedelta(days=1)
-    if granularity == Granularity.week:
-        start = monday_of(anchor)
-        return start, start + timedelta(days=7)
-
-    start = anchor.replace(day=1)
-    if start.month == 12:
-        end = start.replace(year=start.year + 1, month=1)
-    else:
-        end = start.replace(month=start.month + 1)
-    return start, end
-
-
 class EvaluateService:
     def __init__(
         self,
@@ -97,7 +77,7 @@ class EvaluateService:
     async def evaluate_period(
         self, granularity: Granularity, anchor: date, task_ids: list[str] | None = None
     ) -> EvaluatePeriodResult:
-        start, end = _period_bounds(granularity, anchor)
+        start, end = period_bounds(granularity, anchor)
         range_start_dt = datetime(start.year, start.month, start.day, tzinfo=UTC)
         range_end_dt = datetime(end.year, end.month, end.day, tzinfo=UTC)
 
