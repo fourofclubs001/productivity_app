@@ -10,6 +10,7 @@ from app.services.errors import (
     RequirementCycleError,
     SelfParentError,
     SelfRequirementError,
+    TaskNotEligibleForBacklogOverrideError,
     TaskNotFoundError,
     TaskNotLeafError,
 )
@@ -25,6 +26,9 @@ def _order_of(node: TaskNode) -> float:
 
 def _sorted_by_order(ids: set[str] | list[str], graph: dict[str, TaskNode]) -> list[str]:
     return sorted(ids, key=lambda task_id: (_order_of(graph[task_id]), task_id))
+
+
+_FINISHED_STATES = {TaskState.sprint_done, TaskState.done}
 
 
 def _compute_state(task_id: str, graph: dict[str, TaskNode]) -> TaskState:
@@ -45,6 +49,18 @@ def _compute_state(task_id: str, graph: dict[str, TaskNode]) -> TaskState:
             leaf_states.add(TaskState(current_node.fields.get("state", TaskState.backlog.value)))
         else:
             stack.extend(current_node.children)
+
+    # A "kept as backlog" override (set via keep_as_backlog, when the user
+    # declines to remove a parent whose children are all finished) only
+    # applies while that same finished-ness still holds -- the moment a
+    # child is reopened or a new not-yet-finished child is added, this
+    # condition goes false and the override is silently bypassed, falling
+    # through to normal live computation below. No explicit clear-on-event
+    # logic is needed; it's just another input to the same derivation.
+    if node.fields.get("state_override") == TaskState.backlog.value and leaf_states and (
+        leaf_states <= _FINISHED_STATES
+    ):
+        return TaskState.backlog
 
     if leaf_states and all(state == TaskState.done for state in leaf_states):
         return TaskState.done
@@ -315,4 +331,29 @@ class TaskService:
         if not await self._repo.exists(task_id):
             raise TaskNotFoundError(task_id)
         await self._repo.remove_requirement_edge(task_id, required_id)
+        return await self.get_task(task_id)
+
+    async def keep_as_backlog(self, task_id: str) -> TaskOut:
+        """Called when the user declines to remove a parent whose children
+        have all finished (v01 item 10's confirmation) -- forces its display
+        to `backlog` (see the override check in _compute_state) instead of
+        the `done` it would otherwise live-compute to, so it reads as a
+        fresh, reusable container rather than a finished task.
+        """
+        graph = await self._repo.load_graph()
+        if task_id not in graph:
+            raise TaskNotFoundError(task_id)
+
+        node = graph[task_id]
+        if not node.children:
+            raise TaskNotEligibleForBacklogOverrideError(task_id)
+
+        leaf_states = {
+            TaskState(graph[leaf_id].fields.get("state", TaskState.backlog.value))
+            for leaf_id in leaf_descendants(task_id, graph)
+        }
+        if not leaf_states or not leaf_states <= _FINISHED_STATES:
+            raise TaskNotEligibleForBacklogOverrideError(task_id)
+
+        await self._repo.update_fields(task_id, {"state_override": TaskState.backlog.value})
         return await self.get_task(task_id)

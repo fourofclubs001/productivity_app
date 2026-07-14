@@ -24,6 +24,7 @@ from app.services.errors import (
     RequirementCycleError,
     SelfParentError,
     SelfRequirementError,
+    TaskNotEligibleForBacklogOverrideError,
     TaskNotFoundError,
     TaskNotLeafError,
 )
@@ -156,3 +157,13 @@ async def remove_requirement(task_id: str, required_id: str, service: ServiceDep
         return await service.remove_requirement(task_id, required_id)
     except TaskNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/{task_id}/keep-as-backlog", response_model=TaskOut)
+async def keep_as_backlog(task_id: str, service: ServiceDep) -> TaskOut:
+    try:
+        return await service.keep_as_backlog(task_id)
+    except TaskNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except TaskNotEligibleForBacklogOverrideError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

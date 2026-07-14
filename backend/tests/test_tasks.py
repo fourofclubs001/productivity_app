@@ -407,3 +407,70 @@ def test_estimated_hours_rollup_is_zero_with_no_leaf_estimates(client):
     create_task(client, name="Child", parent_ids=[parent["id"]])
     body = client.get(f"/tasks/{parent['id']}").json()
     assert body["estimated_hours"] == 0
+
+
+async def test_keep_as_backlog_overrides_computed_done_state(client, redis_client):
+    parent = create_task(client, name="Goal")
+    child_a = create_task(client, name="A", parent_ids=[parent["id"]])
+    child_b = create_task(client, name="B", parent_ids=[parent["id"]])
+    await redis_client.hset(f"task:{child_a['id']}", "state", "done")
+    await redis_client.hset(f"task:{child_b['id']}", "state", "sprint_done")
+
+    before = client.get(f"/tasks/{parent['id']}").json()
+    assert before["state"] == "in_progress"  # sprint_done counts as "active" per _compute_state
+
+    response = client.post(f"/tasks/{parent['id']}/keep-as-backlog")
+    assert response.status_code == 200
+    assert response.json()["state"] == "backlog"
+
+    after = client.get(f"/tasks/{parent['id']}").json()
+    assert after["state"] == "backlog"
+
+
+async def test_keep_as_backlog_override_bypassed_once_a_child_regresses(client, redis_client):
+    parent = create_task(client, name="Goal")
+    child = create_task(client, name="A", parent_ids=[parent["id"]])
+    await redis_client.hset(f"task:{child['id']}", "state", "done")
+
+    client.post(f"/tasks/{parent['id']}/keep-as-backlog")
+    assert client.get(f"/tasks/{parent['id']}").json()["state"] == "backlog"
+
+    # Reopen the child -- the override's "all finished" condition no longer
+    # holds, so it should be silently bypassed, falling through to the
+    # normal live-computed state.
+    await redis_client.hset(f"task:{child['id']}", "state", "in_progress")
+    assert client.get(f"/tasks/{parent['id']}").json()["state"] == "in_progress"
+
+
+async def test_keep_as_backlog_override_bypassed_once_a_new_child_is_added(client, redis_client):
+    parent = create_task(client, name="Goal")
+    child = create_task(client, name="A", parent_ids=[parent["id"]])
+    await redis_client.hset(f"task:{child['id']}", "state", "sprint_done")
+
+    client.post(f"/tasks/{parent['id']}/keep-as-backlog")
+    assert client.get(f"/tasks/{parent['id']}").json()["state"] == "backlog"
+
+    create_task(client, name="C (new)", parent_ids=[parent["id"]])
+    assert client.get(f"/tasks/{parent['id']}").json()["state"] == "in_progress"
+
+
+def test_keep_as_backlog_rejects_a_leaf_task(client):
+    task = create_task(client, name="Leaf")
+    response = client.post(f"/tasks/{task['id']}/keep-as-backlog")
+    assert response.status_code == 400
+
+
+async def test_keep_as_backlog_rejects_when_not_all_children_are_finished(client, redis_client):
+    parent = create_task(client, name="Goal")
+    child_a = create_task(client, name="A", parent_ids=[parent["id"]])
+    create_task(client, name="B", parent_ids=[parent["id"]])
+    await redis_client.hset(f"task:{child_a['id']}", "state", "done")
+    # child_b is still backlog -- not all finished.
+
+    response = client.post(f"/tasks/{parent['id']}/keep-as-backlog")
+    assert response.status_code == 400
+
+
+def test_keep_as_backlog_rejects_missing_task(client):
+    response = client.post("/tasks/missing/keep-as-backlog")
+    assert response.status_code == 404

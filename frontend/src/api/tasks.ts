@@ -50,6 +50,8 @@ const tasksApi = {
       method: 'PATCH',
       body: JSON.stringify({ after_id: afterId, before_id: beforeId, order }),
     }),
+  keepAsBacklog: (id: string) =>
+    apiFetch<Task>(`/tasks/${id}/keep-as-backlog`, { method: 'POST' }),
 }
 
 const TASKS_KEY = ['tasks']
@@ -138,6 +140,14 @@ export function useReorderTask() {
       beforeId: string | null
       order?: number
     }) => tasksApi.reorder(id, afterId, beforeId, order),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: TASKS_KEY }),
+  })
+}
+
+export function useKeepAsBacklog() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => tasksApi.keepAsBacklog(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: TASKS_KEY }),
   })
 }

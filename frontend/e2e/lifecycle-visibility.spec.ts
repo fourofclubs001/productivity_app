@@ -50,7 +50,7 @@ test('confirming removal hides the parent, and ctrl+z restores it', async ({ pag
   await expect(promptText).toBeVisible()
 })
 
-test('declining removal keeps the parent visible and does not ask again after reload', async ({
+test('declining removal keeps the parent visible as Backlog until a new child reopens it', async ({
   page,
   request,
 }) => {
@@ -66,6 +66,8 @@ test('declining removal keeps the parent visible and does not ask again after re
   await promptText.locator('..').getByRole('button', { name: 'No' }).click()
 
   // Parent renders normally now (not the prompt), and clicking it opens the detail panel.
+  const parentRow = tree.getByText(parent.name, { exact: true }).locator('..')
+  await expect(parentRow.getByText('Backlog')).toBeVisible()
   await tree.getByText(parent.name, { exact: true }).click()
   await expect(page.getByLabel('Task name')).toHaveValue(parent.name)
 
@@ -74,4 +76,18 @@ test('declining removal keeps the parent visible and does not ask again after re
   await expect(
     page.getByTestId('task-tree').getByText(new RegExp(`${parent.name}.*sub-tasks are all done`)),
   ).not.toBeVisible()
+  await expect(
+    page.getByTestId('task-tree').getByText(parent.name, { exact: true }).locator('..').getByText('Backlog'),
+  ).toBeVisible()
+
+  // Adding a new, not-yet-finished child makes the override's condition go
+  // false, so the badge reverts to the normal live-computed state.
+  await createTask(request, `Leaf2 ${suffix}`, [parent.id])
+  await page.reload()
+  const parentRowAfterNewChild = page
+    .getByTestId('task-tree')
+    .getByText(parent.name, { exact: true })
+    .locator('..')
+  await expect(parentRowAfterNewChild.getByText('Backlog')).not.toBeVisible()
+  await expect(parentRowAfterNewChild.getByText('In progress')).toBeVisible()
 })

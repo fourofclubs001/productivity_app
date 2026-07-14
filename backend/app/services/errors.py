@@ -73,6 +73,15 @@ class TaskNotLeafError(Exception):
         super().__init__(f"Task {task_id!r} is not a leaf task and cannot be scheduled")
 
 
+class TaskNotEligibleForBacklogOverrideError(Exception):
+    def __init__(self, task_id: str) -> None:
+        self.task_id = task_id
+        super().__init__(
+            f"Task {task_id!r} can only be kept as backlog once all of its sub-tasks are "
+            "sprint-done or done"
+        )
+
+
 class InvalidIntervalError(Exception):
     def __init__(self) -> None:
         super().__init__("Interval end must be after start")

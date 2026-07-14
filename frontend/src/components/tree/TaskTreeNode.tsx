@@ -2,6 +2,7 @@ import { useDraggable, useDroppable } from '@dnd-kit/core'
 import type { Task } from '../../types'
 import { isHiddenFromPlan, qualifiesForRemovalPrompt } from '../../lib/taskTree'
 import type { ParentDecision } from '../../lib/useParentDismissal'
+import { useKeepAsBacklog } from '../../api/tasks'
 import { useUndo, type UndoEntry } from '../../undo/UndoProvider'
 import ColorDots from './ColorDots'
 import StateBadge from './StateBadge'
@@ -40,6 +41,7 @@ export default function TaskTreeNode({
   })
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id: taskId })
   const { pushUndo } = useUndo()
+  const keepAsBacklog = useKeepAsBacklog()
 
   function hiddenEntry(): UndoEntry {
     return {
@@ -85,7 +87,10 @@ export default function TaskTreeNode({
         <div className="mt-1 flex justify-end gap-3">
           <button
             type="button"
-            onClick={() => onDecide(taskId, 'kept')}
+            onClick={() => {
+              onDecide(taskId, 'kept')
+              keepAsBacklog.mutate(taskId)
+            }}
             className="hover:text-text-primary"
           >
             No
