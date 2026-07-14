@@ -1,4 +1,5 @@
 import { test, expect, type APIRequestContext } from '@playwright/test'
+import { todayAt } from './helpers/time'
 
 const API_BASE = 'http://localhost:8001'
 
@@ -20,12 +21,6 @@ async function createTaskWithInterval(
 async function getIntervalForTask(request: APIRequestContext, taskId: string) {
   const list = await (await request.get(`${API_BASE}/intervals/by-task/${taskId}`)).json()
   return list[0]
-}
-
-function todayAt(hours: number) {
-  const date = new Date()
-  date.setUTCHours(hours, 0, 0, 0)
-  return date
 }
 
 test('dragging an existing event moves it to a new time', async ({ page, request }) => {

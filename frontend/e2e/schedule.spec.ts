@@ -13,13 +13,20 @@ async function dragTaskOntoCalendar(page: Page, taskName: string) {
   const row = page.getByTestId('task-tree').locator('.group', { hasText: taskName })
   await row.scrollIntoViewIfNeeded()
   const rowBox = await row.boundingBox()
-  const daySlot = page.locator('.rbc-day-slot').first()
+  // The last day column of the currently-displayed week (Sunday) -- always
+  // safely in the future relative to "now" no matter what day the test
+  // suite runs, avoiding the backend's "no past-dated intervals" guard (v02
+  // item 8). The y-offset (300px from the day column's top) stays within
+  // the actual viewport -- the column itself spans the full 24h and is far
+  // taller than the visible page, so a point near its bottom would be
+  // off-screen and never receive the drop.
+  const daySlot = page.locator('.rbc-day-slot').last()
   const slotBox = await daySlot.boundingBox()
   if (!rowBox || !slotBox) throw new Error('row or day-slot bounding box not found')
 
   await page.mouse.move(rowBox.x + rowBox.width / 2, rowBox.y + rowBox.height / 2)
   await page.mouse.down()
-  await page.mouse.move(slotBox.x + slotBox.width / 2, slotBox.y + 150, { steps: 10 })
+  await page.mouse.move(slotBox.x + slotBox.width / 2, slotBox.y + 300, { steps: 10 })
   await page.mouse.up()
 }
 
@@ -87,14 +94,33 @@ test('a task can be scheduled via the modal once its prerequisite is scheduled b
 
   await page.goto('/')
 
-  // Schedule the prerequisite first: 01:00-02:00 (today, the modal's
-  // default day) -- an arbitrary early hour unlikely to collide with the
-  // modal's own "now, rounded up" default time.
+  // Computed inside the browser (matching the modal's own local-time
+  // arithmetic in defaultTimeValue()) so these are always safely in the
+  // future relative to whatever "now" the page itself sees, avoiding the
+  // "no past-dated intervals" guard (v02 item 8) regardless of host/browser
+  // timezone or time of day.
+  const times = await page.evaluate(() => {
+    function hhmm(d: Date) {
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    }
+    const requiredStart = new Date()
+    requiredStart.setMinutes(0, 0, 0)
+    requiredStart.setHours(requiredStart.getHours() + 1)
+    const requiredEnd = new Date(requiredStart.getTime() + 60 * 60 * 1000)
+    const taskEnd = new Date(requiredEnd.getTime() + 60 * 60 * 1000)
+    return {
+      requiredStart: hhmm(requiredStart),
+      requiredEnd: hhmm(requiredEnd),
+      taskEnd: hhmm(taskEnd),
+    }
+  })
+
+  // Schedule the prerequisite first.
   await page.getByTestId('task-tree').getByText(required.name).click()
   await expect(page.getByLabel('Task name')).toHaveValue(required.name)
   await page.getByTitle('Add to calendar').click()
-  await page.getByLabel('Start hour').fill('01:00')
-  await page.getByLabel('End hour').fill('02:00')
+  await page.getByLabel('Start hour').fill(times.requiredStart)
+  await page.getByLabel('End hour').fill(times.requiredEnd)
   await page.locator('form').getByRole('button', { name: 'Add' }).click()
   await expect(page.locator('.rbc-event', { hasText: required.name })).toBeVisible()
 
@@ -102,8 +128,8 @@ test('a task can be scheduled via the modal once its prerequisite is scheduled b
   await page.getByTestId('task-tree').getByText(task.name).click()
   await expect(page.getByLabel('Task name')).toHaveValue(task.name)
   await page.getByTitle('Add to calendar').click()
-  await page.getByLabel('Start hour').fill('02:00')
-  await page.getByLabel('End hour').fill('03:00')
+  await page.getByLabel('Start hour').fill(times.requiredEnd)
+  await page.getByLabel('End hour').fill(times.taskEnd)
   await page.locator('form').getByRole('button', { name: 'Add' }).click()
   await expect(page.locator('.rbc-event', { hasText: task.name })).toBeVisible()
 })

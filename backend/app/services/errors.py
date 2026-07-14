@@ -78,6 +78,11 @@ class InvalidIntervalError(Exception):
         super().__init__("Interval end must be after start")
 
 
+class PastIntervalError(Exception):
+    def __init__(self) -> None:
+        super().__init__("A task can only be scheduled for a time after the current time")
+
+
 class IntervalNotFoundError(Exception):
     def __init__(self, interval_id: str) -> None:
         self.interval_id = interval_id

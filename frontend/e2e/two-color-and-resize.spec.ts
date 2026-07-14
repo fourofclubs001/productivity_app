@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { todayAt } from './helpers/time'
 
 const API_BASE = 'http://localhost:8001'
 
@@ -12,8 +13,7 @@ test('a task with two colors renders a diagonal split chip on the calendar', asy
     })
   ).json()
 
-  const start = new Date()
-  start.setUTCHours(9, 0, 0, 0)
+  const start = todayAt(9)
   const end = new Date(start.getTime() + 60 * 60 * 1000)
   await request.post(`${API_BASE}/intervals`, {
     data: { task_id: task.id, start: start.toISOString(), end: end.toISOString() },

@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -90,11 +91,17 @@ async def delete_task(
     except TaskNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    # A deleted task's future plan no longer makes sense; drop its reserved
-    # intervals too. Past execution entries are left as historical record.
+    # A deleted task's future plan no longer makes sense; drop its
+    # not-yet-started reserved intervals. Past (and in-progress) intervals
+    # are left alone as historical record.
     interval_repo = IntervalRepository(redis)
+    now = datetime.now(UTC)
     for interval in await interval_repo.list_for_task(task_id):
-        await interval_repo.delete(interval["id"])
+        start = datetime.fromisoformat(interval["start"])
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=UTC)
+        if start > now:
+            await interval_repo.delete(interval["id"])
 
 
 @router.post("/{task_id}/parents", response_model=TaskOut)

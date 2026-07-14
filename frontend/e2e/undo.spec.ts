@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { todayAt } from './helpers/time'
 
 const API_BASE = 'http://localhost:8001'
 
@@ -13,10 +14,8 @@ test('right-click deletes a scheduled interval, and ctrl+z restores it', async (
     })
   ).json()
 
-  const start = new Date()
-  start.setUTCHours(10, 0, 0, 0)
-  const end = new Date(start)
-  end.setUTCHours(11, 0, 0, 0)
+  const start = todayAt(10)
+  const end = new Date(start.getTime() + 60 * 60 * 1000)
   await request.post(`${API_BASE}/intervals`, {
     data: { task_id: task.id, start: start.toISOString(), end: end.toISOString() },
   })

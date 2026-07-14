@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from app.models.interval import IntervalCreate, IntervalOut, IntervalUpdate
@@ -8,12 +8,25 @@ from app.repositories.task_repository import TaskRepository
 from app.services.errors import (
     IntervalNotFoundError,
     InvalidIntervalError,
+    PastIntervalError,
     TaskNotFoundError,
     TaskNotLeafError,
     UnmetPrerequisiteError,
 )
 from app.services.graph_utils import leaf_descendants
 from app.services.task_service import TaskService
+
+
+def _as_utc_naive(dt: datetime) -> datetime:
+    """Normalize an interval boundary to a naive UTC datetime for comparison
+    against the current time. The frontend always sends timezone-aware ISO
+    timestamps, but some backend-internal/test callers pass naive datetimes
+    that are implicitly UTC already (this app stores/buckets everything in
+    UTC -- see PROJECT_STATUS.md).
+    """
+    if dt.tzinfo is not None:
+        return dt.astimezone(UTC).replace(tzinfo=None)
+    return dt
 
 
 class IntervalService:
@@ -29,6 +42,11 @@ class IntervalService:
         # prerequisites don't need to wire it up; defaults to a fresh
         # TaskService over the same repo.
         self._task_service = task_service or TaskService(task_repo)
+
+    def _reject_if_past_start(self, start: datetime) -> None:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        if _as_utc_naive(start) < now:
+            raise PastIntervalError
 
     async def _unmet_scheduling_prerequisites(
         self, required_ids: set[str], new_start: datetime
@@ -53,6 +71,7 @@ class IntervalService:
     async def create_interval(self, payload: IntervalCreate) -> IntervalOut:
         if payload.end <= payload.start:
             raise InvalidIntervalError
+        self._reject_if_past_start(payload.start)
 
         task_node = await self._tasks.load_node(payload.task_id)
         if task_node is None:

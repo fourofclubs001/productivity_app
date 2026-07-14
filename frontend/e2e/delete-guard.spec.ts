@@ -1,4 +1,7 @@
 import { test, expect } from '@playwright/test'
+import { todayAt } from './helpers/time'
+
+const API_BASE = 'http://localhost:8001'
 
 async function createTask(page: import('@playwright/test').Page, name: string) {
   await page.getByTitle('New task').click()
@@ -46,4 +49,28 @@ test('blocks deleting a task while its timer is running', async ({ page }) => {
   await page.getByText('Delete task').click()
   await page.getByRole('button', { name: 'Confirm' }).click()
   await expect(tree().getByText(taskName)).not.toBeVisible()
+})
+
+test('deleting a task removes its future-scheduled chip from the calendar', async ({
+  page,
+  request,
+}) => {
+  const taskName = `Delete cleanup ${Date.now()}`
+  const task = await (
+    await request.post(`${API_BASE}/tasks`, { data: { name: taskName, definition_of_done: 'd' } })
+  ).json()
+  const start = todayAt(9)
+  const end = new Date(start.getTime() + 60 * 60 * 1000)
+  await request.post(`${API_BASE}/intervals`, {
+    data: { task_id: task.id, start: start.toISOString(), end: end.toISOString() },
+  })
+
+  await page.goto('/')
+  await expect(page.locator('.rbc-event', { hasText: taskName })).toBeVisible()
+
+  await page.getByTestId('task-tree').getByText(taskName).click()
+  await page.getByText('Delete task').click()
+  await page.getByRole('button', { name: 'Confirm' }).click()
+
+  await expect(page.locator('.rbc-event', { hasText: taskName })).not.toBeVisible()
 })

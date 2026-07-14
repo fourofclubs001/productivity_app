@@ -1,8 +1,8 @@
 from datetime import date, datetime, timedelta
+from uuid import uuid4
 
 import pytest
 
-from app.models.interval import IntervalCreate
 from app.models.task import TaskCreate, TaskState
 from app.repositories.interval_repository import IntervalRepository
 from app.repositories.task_repository import TaskRepository
@@ -17,6 +17,7 @@ def services(redis_client):
     interval_repo = IntervalRepository(redis_client)
     return {
         "task_repo": task_repo,
+        "interval_repo": interval_repo,
         "tasks": TaskService(task_repo),
         "intervals": IntervalService(interval_repo, task_repo),
         "rollover": RolloverService(redis_client, interval_repo),
@@ -24,10 +25,24 @@ def services(redis_client):
 
 
 async def schedule(services, task_id: str, day: date) -> None:
+    """Seed a scheduled interval for an arbitrary (possibly simulated-past)
+    day, bypassing IntervalService's validation -- these tests plant
+    historical/future schedule state directly to drive RolloverService, not
+    exercising interval-creation rules like the "no past-dated intervals"
+    guard (v02 item 8), which would otherwise reject a deliberately-past day.
+    Replicates IntervalService.create_interval's backlog -> sprint_backlog
+    side effect, since that's part of what these tests assert on.
+    """
     start = datetime(day.year, day.month, day.day, 9)
-    await services["intervals"].create_interval(
-        IntervalCreate(task_id=task_id, start=start, end=start + timedelta(hours=1))
-    )
+    end = start + timedelta(hours=1)
+    await services["interval_repo"].create(str(uuid4()), task_id, start, end)
+
+    task_repo = services["task_repo"]
+    node = await task_repo.load_node(task_id)
+    if node is not None and TaskState(node.fields.get("state", TaskState.backlog.value)) == (
+        TaskState.backlog
+    ):
+        await task_repo.update_fields(task_id, {"state": TaskState.sprint_backlog.value})
 
 
 async def test_rollover_transitions_only_tasks_from_the_week_that_ended(services):

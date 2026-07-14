@@ -1,6 +1,41 @@
-from datetime import datetime, timedelta
+import calendar
+from datetime import UTC, datetime, timedelta
 
-WEEK_START = "2026-07-13"
+
+def _next_monday(weeks_ahead: int) -> datetime:
+    """A Monday comfortably in the future (never today), so these fixed
+    fixture times never collide with the "no past-dated intervals" guard
+    (v02 item 8) regardless of when the test suite happens to run.
+    """
+    now = datetime.now(UTC).replace(tzinfo=None, microsecond=0)
+    days_until_monday = (7 - now.weekday()) % 7 or 7
+    return (now + timedelta(days=days_until_monday + weeks_ahead * 7)).replace(
+        hour=0, minute=0, second=0
+    )
+
+
+def _add_months(year: int, month: int, delta: int) -> tuple[int, int]:
+    total = year * 12 + (month - 1) + delta
+    new_year, new_month0 = divmod(total, 12)
+    return new_year, new_month0 + 1
+
+
+_MONDAY = _next_monday(weeks_ahead=4)
+WEEK_START = _MONDAY.date().isoformat()
+NEXT_WEEK_START = (_MONDAY + timedelta(days=7)).date().isoformat()
+DAY_AFTER_WEEK_START = (_MONDAY + timedelta(days=1)).date().isoformat()
+START = _MONDAY + timedelta(hours=9)
+
+# A whole calendar month, comfortably in the future, used by the
+# month-granularity test below. Its start is deliberately not aligned to
+# _MONDAY -- it only needs to be far enough ahead to never collide with the
+# past-dated-interval guard, and to have neighboring months to probe against.
+_MONTH_YEAR, _MONTH = _add_months(_MONDAY.year, _MONDAY.month, 2)
+_DAYS_IN_MONTH = calendar.monthrange(_MONTH_YEAR, _MONTH)[1]
+MONTH_START = f"{_MONTH_YEAR:04d}-{_MONTH:02d}-01"
+_NEXT_MONTH_YEAR, _NEXT_MONTH = _add_months(_MONTH_YEAR, _MONTH, 1)
+NEXT_MONTH_START = f"{_NEXT_MONTH_YEAR:04d}-{_NEXT_MONTH:02d}-01"
+MONTH_MID_ANCHOR = f"{_MONTH_YEAR:04d}-{_MONTH:02d}-15"
 
 
 def create_leaf(client, name="Leaf", parent_ids=None):
@@ -36,8 +71,8 @@ def evaluate(client, granularity="week", anchor=WEEK_START, task_ids=None):
 def test_empty_week_has_zeroed_stats(client):
     body = evaluate(client)
     assert body["period"] == {
-        "period_start": "2026-07-13",
-        "period_end": "2026-07-20",
+        "period_start": WEEK_START,
+        "period_end": NEXT_WEEK_START,
         "planned_hours": 0,
         "executed_hours": 0,
         "percentage": None,
@@ -49,7 +84,7 @@ def test_empty_week_has_zeroed_stats(client):
 
 async def test_single_leaf_planned_vs_executed(client, redis_client):
     task = create_leaf(client, "Write report")
-    start = datetime(2026, 7, 13, 9, 0)
+    start = START
     create_interval(client, task["id"], start, start + timedelta(hours=2))
 
     # Simulate an hour of execution logged via the Execute view (built in an
@@ -81,7 +116,7 @@ async def test_node_aggregates_its_scheduled_children(client, redis_client):
     child_a = create_leaf(client, "A", parent_ids=[parent["id"]])
     child_b = create_leaf(client, "B", parent_ids=[parent["id"]])
 
-    start = datetime(2026, 7, 13, 9, 0)
+    start = START
     create_interval(client, child_a["id"], start, start + timedelta(hours=1))
     create_interval(
         client, child_b["id"], start + timedelta(days=1), start + timedelta(days=1, hours=3)
@@ -105,7 +140,7 @@ async def test_node_aggregates_its_scheduled_children(client, redis_client):
 
 def test_task_not_touched_this_week_is_excluded(client):
     task = create_leaf(client, "Untouched")
-    start = datetime(2026, 7, 20, 9, 0)  # a different week
+    start = START + timedelta(days=7)  # a different week
     create_interval(client, task["id"], start, start + timedelta(hours=1))
 
     body = evaluate(client)
@@ -115,7 +150,7 @@ def test_task_not_touched_this_week_is_excluded(client):
 
 async def test_executed_without_a_plan_has_no_percentage(client, redis_client):
     task = create_leaf(client, "Unplanned work")
-    start = datetime(2026, 7, 13, 9, 0)
+    start = START
     await redis_client.hset(
         "entry:e1",
         mapping={
@@ -135,40 +170,41 @@ async def test_executed_without_a_plan_has_no_percentage(client, redis_client):
 
 def test_day_granularity_only_covers_that_day(client):
     task = create_leaf(client, "Daily task")
-    start = datetime(2026, 7, 13, 9, 0)
+    start = START
     create_interval(client, task["id"], start, start + timedelta(hours=1))
     # Same week, different day - should not count for a single-day query.
     create_interval(
         client, task["id"], start + timedelta(days=1), start + timedelta(days=1, hours=2)
     )
 
-    body = evaluate(client, granularity="day", anchor="2026-07-13")
-    assert body["period"]["period_start"] == "2026-07-13"
-    assert body["period"]["period_end"] == "2026-07-14"
+    body = evaluate(client, granularity="day", anchor=WEEK_START)
+    assert body["period"]["period_start"] == WEEK_START
+    assert body["period"]["period_end"] == DAY_AFTER_WEEK_START
     assert body["period"]["planned_hours"] == 1
 
 
 def test_month_granularity_spans_multiple_weeks(client):
     task = create_leaf(client, "Monthly task")
-    early = datetime(2026, 7, 2, 9, 0)  # week starting 2026-06-29
-    late = datetime(2026, 7, 30, 9, 0)  # week starting 2026-07-27
+    early = datetime(_MONTH_YEAR, _MONTH, 2, 9, 0)  # early in the month
+    late = datetime(_MONTH_YEAR, _MONTH, _DAYS_IN_MONTH - 1, 9, 0)  # late in the month
     create_interval(client, task["id"], early, early + timedelta(hours=1))
     create_interval(client, task["id"], late, late + timedelta(hours=2))
-    # Just outside July, in the following week/month.
+    # Just outside the month, in the following one.
+    next_month_start = datetime(_NEXT_MONTH_YEAR, _NEXT_MONTH, 3, 9, 0)
     create_interval(
-        client, task["id"], datetime(2026, 8, 3, 9, 0), datetime(2026, 8, 3, 12, 0)
+        client, task["id"], next_month_start, next_month_start + timedelta(hours=3)
     )
 
-    body = evaluate(client, granularity="month", anchor="2026-07-15")
-    assert body["period"]["period_start"] == "2026-07-01"
-    assert body["period"]["period_end"] == "2026-08-01"
+    body = evaluate(client, granularity="month", anchor=MONTH_MID_ANCHOR)
+    assert body["period"]["period_start"] == MONTH_START
+    assert body["period"]["period_end"] == NEXT_MONTH_START
     assert body["period"]["planned_hours"] == 3
 
 
 def test_task_filter_narrows_to_selected_leaf(client):
     task_a = create_leaf(client, "A")
     task_b = create_leaf(client, "B")
-    start = datetime(2026, 7, 13, 9, 0)
+    start = START
     create_interval(client, task_a["id"], start, start + timedelta(hours=1))
     create_interval(client, task_b["id"], start, start + timedelta(hours=3))
 
@@ -184,7 +220,7 @@ def test_task_filter_on_a_goal_rolls_up_its_descendants(client):
     child_b = create_leaf(client, "B", parent_ids=[parent["id"]])
     other = create_leaf(client, "Unrelated")
 
-    start = datetime(2026, 7, 13, 9, 0)
+    start = START
     create_interval(client, child_a["id"], start, start + timedelta(hours=1))
     create_interval(client, child_b["id"], start, start + timedelta(hours=2))
     create_interval(client, other["id"], start, start + timedelta(hours=5))

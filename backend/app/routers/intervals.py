@@ -7,6 +7,7 @@ from app.models.interval import IntervalCreate, IntervalOut, IntervalUpdate
 from app.services.errors import (
     IntervalNotFoundError,
     InvalidIntervalError,
+    PastIntervalError,
     TaskNotFoundError,
     TaskNotLeafError,
     UnmetPrerequisiteError,
@@ -24,7 +25,7 @@ async def create_interval(payload: IntervalCreate, service: ServiceDep) -> Inter
         return await service.create_interval(payload)
     except TaskNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except (InvalidIntervalError, TaskNotLeafError) as exc:
+    except (InvalidIntervalError, TaskNotLeafError, PastIntervalError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except UnmetPrerequisiteError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
