@@ -1,0 +1,12 @@
+- at plan view calendar, when dragging a chip from an interval that is before the current time to an interval that is after, place the chip where it is intended, but also keep the original chip in its place
+- when rightclicking on a task at the plan left panel, the delete option must appear
+- when a task title and definition of done is edited at the plan view, details panel, a save and discard button must appear at the top right (to the left of the options logo). Then, the edition is saved or discarded when the corresponding button is pressed.
+- the ctrl+z should be apply to each view independetly. A ctrl+z while looking at the plan view should only affect the plan view elements, not the other views (except the change of information on the plan view is related to a change of the information on other views)
+- the time interval edition at detailed view should have date and time for start and end time, to cover plans that pass through midnight
+- at requirements drop down the task should display in the same way as in execute view drop down
+- it must only be possible to write excuses at events that are before the current time
+- the root task is not going back to backlog after last descendant task is sprint done or deleted and user decides to not mark as sprint done root task
+- when deleting a task that has been time tracked but not sprint done or done, the time tracked chip at execute lose its task name. Fix it in such a way that the time tracked task does not lose its name. Deleting a task from the plan view should no affect the tracked task on execute view, neither the display of information at evaluate view.
+- I should not be able to remove a plan chip that is before the current time clicking the "x" at the stated interval at the task detailed view. a dialog should say the deletion is not possible.
+- right click over a task at the plan left panel should you the delete option
+- at plan view calendar, when draging a task, it must not happend that a duplicate chip is dragged while there is still a chip in the original time interval. The drop is working good, removing the old chip and inserting the "duplicated" dragged chip on its time interval.
