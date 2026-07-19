@@ -16,6 +16,7 @@ const INTERVAL: Interval = {
   start: '2026-07-20T09:00:00.000Z',
   end: '2026-07-20T11:00:00.000Z',
   week_start: '2026-07-20',
+  task_name: null,
 }
 
 // Covers the first half of the planned interval, leaving 10:00-11:00 uncovered.
@@ -24,6 +25,7 @@ const PARTIAL_ENTRY: Entry = {
   task_id: 't1',
   start: '2026-07-20T09:00:00.000Z',
   end: '2026-07-20T10:00:00.000Z',
+  task_name: null,
 }
 
 function renderCalendar(
@@ -47,6 +49,22 @@ function renderCalendar(
 }
 
 describe('EvaluateCalendar diff mode', () => {
+  it('prefers the snapshotted task_name over a live (or missing) task lookup', () => {
+    const snapshotted: Interval = { ...INTERVAL, task_id: 'deleted-task', task_name: 'Deleted task' }
+    render(
+      <EvaluateCalendar
+        mode="planned"
+        weekAnchor={WEEK_ANCHOR}
+        intervals={[snapshotted]}
+        entries={[]}
+        tasksById={new Map()}
+      />,
+    )
+
+    expect(screen.getByText('Deleted task')).toBeInTheDocument()
+    expect(screen.queryByText('Unknown task')).not.toBeInTheDocument()
+  })
+
   it('splits a partially-covered planned interval into a covered and an uncovered segment', () => {
     renderCalendar('diff', [INTERVAL], [PARTIAL_ENTRY])
 

@@ -76,6 +76,41 @@ test('right-clicking a Plan tree row opens a Delete context menu', async ({ page
   await expect(tree().getByText(taskName)).not.toBeVisible()
 })
 
+test('deleting a task keeps its tracked-time chip name on Execute and Evaluate', async ({
+  page,
+}) => {
+  const taskName = `Snapshot survives deletion ${Date.now()}`
+  const tree = () => page.getByTestId('task-tree')
+
+  await page.goto('/')
+  await createTask(page, taskName)
+
+  await page.getByRole('button', { name: 'Execute' }).click()
+  await page.getByTestId('task-picker-trigger').click()
+  await page.getByTestId('task-picker-options').getByRole('button', { name: taskName, exact: true }).click()
+  await page.getByRole('button', { name: 'Start' }).click()
+  await expect(page.getByText('Tracking')).toBeVisible()
+  await page.getByRole('button', { name: 'Stop' }).click()
+  await page.getByRole('button', { name: 'No, keep in progress' }).click()
+
+  await expect(page.locator('.rbc-event', { hasText: taskName })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Plan' }).click()
+  await tree().getByText(taskName).click()
+  await deleteViaOptionsMenu(page)
+  await expect(tree().getByText(taskName)).not.toBeVisible()
+
+  await page.getByRole('button', { name: 'Execute' }).click()
+  await expect(page.locator('.rbc-event', { hasText: taskName })).toBeVisible()
+  await expect(page.locator('.rbc-event', { hasText: 'Unknown task' })).not.toBeVisible()
+
+  await page.getByRole('button', { name: 'Evaluate' }).click()
+  await page.getByRole('button', { name: 'Calendar', exact: true }).click()
+  await page.getByRole('button', { name: 'Real', exact: true }).click()
+  await expect(page.locator('.rbc-event', { hasText: taskName })).toBeVisible()
+  await expect(page.locator('.rbc-event', { hasText: 'Unknown task' })).not.toBeVisible()
+})
+
 test('deleting a task removes its future-scheduled chip from the calendar', async ({
   page,
   request,

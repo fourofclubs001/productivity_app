@@ -88,6 +88,7 @@ describe('computeDiffSegments', () => {
     start: PLANNED.start.toISOString(),
     end: PLANNED.end.toISOString(),
     week_start: '2026-07-20',
+    task_name: null,
   }
 
   it('filters real entries to the matching task_id', () => {
@@ -96,6 +97,7 @@ describe('computeDiffSegments', () => {
       task_id: 'other-task',
       start: at(9).toISOString(),
       end: at(10).toISOString(),
+      task_name: null,
     }
     const segments = computeDiffSegments([interval], [unrelated])
     expect(segments).toEqual([
@@ -106,7 +108,13 @@ describe('computeDiffSegments', () => {
   it('treats a still-running entry (end: null) as running until now', () => {
     vi.useFakeTimers()
     vi.setSystemTime(at(10))
-    const running: Entry = { id: 'e-running', task_id: 't1', start: at(9).toISOString(), end: null }
+    const running: Entry = {
+      id: 'e-running',
+      task_id: 't1',
+      start: at(9).toISOString(),
+      end: null,
+      task_name: null,
+    }
     const segments = computeDiffSegments([interval], [running])
     expect(segments).toEqual([
       { start: PLANNED.start, end: at(10), covered: true, intervalId: 'i1', taskId: 't1' },

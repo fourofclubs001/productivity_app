@@ -86,7 +86,14 @@ export function useDeleteTask() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => tasksApi.remove(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: TASKS_KEY }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: TASKS_KEY })
+      // Deleting a task prunes its future intervals server-side (v02 item
+      // 8) -- without this, the Plan calendar keeps showing a now-deleted
+      // interval's chip until an unrelated refetch happens to occur.
+      queryClient.invalidateQueries({ queryKey: ['intervals'] })
+      queryClient.invalidateQueries({ queryKey: ['entries'] })
+    },
   })
 }
 

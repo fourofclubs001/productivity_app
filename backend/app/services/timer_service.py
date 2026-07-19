@@ -49,12 +49,13 @@ class TimerService:
         if active_id is not None:
             await self._entries.set_end(active_id, now)
 
+        task_name = task_node.fields.get("name", "")
         entry_id = str(uuid4())
-        await self._entries.create(entry_id, task_id, now)
+        await self._entries.create(entry_id, task_id, now, task_name)
         await self._entries.set_active_id(entry_id)
         await self._tasks.update_fields(task_id, {"state": TaskState.in_progress.value})
 
-        return EntryOut(id=entry_id, task_id=task_id, start=now, end=None)
+        return EntryOut(id=entry_id, task_id=task_id, start=now, end=None, task_name=task_name)
 
     async def stop(self) -> EntryOut:
         active_id = await self._entries.get_active_id()
@@ -116,4 +117,5 @@ class TimerService:
             task_id=data["task_id"],
             start=datetime.fromisoformat(data["start"]),
             end=datetime.fromisoformat(data["end"]) if data.get("end") else None,
+            task_name=data.get("task_name"),
         )

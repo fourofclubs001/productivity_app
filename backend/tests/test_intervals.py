@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from app.repositories.interval_repository import IntervalRepository
+from app.repositories.interval_repository import IntervalRepository, interval_key
 
 
 def _next_monday(weeks_ahead: int) -> datetime:
@@ -328,7 +328,11 @@ async def test_deleting_a_task_leaves_its_past_intervals_untouched(client, redis
     past_week_start = (past_start - timedelta(days=past_start.weekday())).date().isoformat()
     past_interval_id = str(uuid4())
     await IntervalRepository(redis_client).create(
-        past_interval_id, task["id"], past_start, past_start + timedelta(hours=1)
+        past_interval_id,
+        task["id"],
+        past_start,
+        past_start + timedelta(hours=1),
+        task["name"],
     )
 
     create_interval(client, task["id"], START, START + timedelta(hours=1))
@@ -337,9 +341,35 @@ async def test_deleting_a_task_leaves_its_past_intervals_untouched(client, redis
 
     past_week = client.get("/intervals", params={"week_start": past_week_start}).json()
     assert [i["id"] for i in past_week] == [past_interval_id]
+    # The task is gone, but the name snapshotted at creation time survives.
+    assert past_week[0]["task_name"] == task["name"]
 
     future_week = client.get("/intervals", params={"week_start": WEEK_START}).json()
     assert future_week == []
+
+
+def test_create_interval_snapshots_the_task_name(client):
+    task = create_leaf(client, "Snapshot me")
+    interval = create_interval(client, task["id"], START, START + timedelta(hours=1))
+    assert interval["task_name"] == "Snapshot me"
+
+    week = client.get("/intervals", params={"week_start": WEEK_START}).json()
+    assert week[0]["task_name"] == "Snapshot me"
+
+
+async def test_interval_created_without_a_name_snapshot_falls_back_to_none(client, redis_client):
+    """Simulates a legacy interval created before this feature shipped --
+    the hash simply never had a task_name field, as opposed to one storing
+    an empty string."""
+    task = create_leaf(client)
+    interval_id = str(uuid4())
+    await IntervalRepository(redis_client).create(
+        interval_id, task["id"], START, START + timedelta(hours=1)
+    )
+    await redis_client.hdel(interval_key(interval_id), "task_name")
+
+    week = client.get("/intervals", params={"week_start": WEEK_START}).json()
+    assert week[0]["task_name"] is None
 
 
 def test_create_interval_blocked_when_prerequisite_has_no_interval_yet(client):

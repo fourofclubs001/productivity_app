@@ -24,12 +24,36 @@ def test_start_timer_sets_task_in_progress(client):
     body = response.json()
     assert body["task_id"] == task["id"]
     assert body["end"] is None
+    assert body["task_name"] == task["name"]
 
     task_after = client.get(f"/tasks/{task['id']}").json()
     assert task_after["state"] == "in_progress"
 
     active = client.get("/timer/active").json()
     assert active["id"] == body["id"]
+    assert active["task_name"] == task["name"]
+
+
+def test_entry_keeps_its_snapshotted_task_name_after_the_task_is_deleted(client):
+    task = create_leaf(client, "Doomed leaf")
+    start_response = client.post("/timer/start", json={"task_id": task["id"]})
+    entry_id = start_response.json()["id"]
+    client.post("/timer/stop")
+
+    client.delete(f"/tasks/{task['id']}")
+
+    week_start = client.get("/entries", params={"week_start": "2020-01-06"}).json()
+    assert week_start == []  # sanity: wrong week returns nothing, not an error
+
+    entries = client.get(
+        "/entries",
+        params={
+            "week_start": start_response.json()["start"][:10],
+        },
+    ).json()
+    matching = [e for e in entries if e["id"] == entry_id]
+    assert len(matching) == 1
+    assert matching[0]["task_name"] == "Doomed leaf"
 
 
 def test_start_timer_rejects_non_leaf_task(client):

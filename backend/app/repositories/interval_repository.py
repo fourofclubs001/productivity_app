@@ -24,7 +24,14 @@ class IntervalRepository:
     def __init__(self, redis: Redis) -> None:
         self._redis = redis
 
-    async def create(self, interval_id: str, task_id: str, start: datetime, end: datetime) -> str:
+    async def create(
+        self,
+        interval_id: str,
+        task_id: str,
+        start: datetime,
+        end: datetime,
+        task_name: str = "",
+    ) -> str:
         week_start = monday_of(start.date()).isoformat()
         await self._redis.hset(
             interval_key(interval_id),
@@ -33,6 +40,7 @@ class IntervalRepository:
                 "start": start.isoformat(),
                 "end": end.isoformat(),
                 "week_start": week_start,
+                "task_name": task_name,
             },
         )
         await self._redis.zadd(week_intervals_key(week_start), {interval_id: start.timestamp()})

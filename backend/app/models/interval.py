@@ -20,3 +20,4 @@ class IntervalOut(BaseModel):
     start: datetime
     end: datetime
     week_start: str
+    task_name: str | None = None

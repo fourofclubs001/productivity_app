@@ -157,7 +157,11 @@ export default function EvaluateView() {
       {explainGap && (
         <ExplainGapDialog
           taskId={explainGap.taskId}
-          taskName={tasksById.get(explainGap.taskId)?.name ?? 'Unknown task'}
+          taskName={
+            intervals.find((interval) => interval.id === explainGap.intervalId)?.task_name ??
+            tasksById.get(explainGap.taskId)?.name ??
+            'Unknown task'
+          }
           intervalId={explainGap.intervalId}
           start={explainGap.start}
           end={explainGap.end}

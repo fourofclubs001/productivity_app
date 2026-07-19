@@ -40,7 +40,7 @@ export default function ExecuteCalendar({ tasksById }: { tasksById: Map<string, 
       const task = tasksById.get(entry.task_id)
       return {
         id: `entry-${entry.id}`,
-        title: task?.name ?? 'Unknown task',
+        title: entry.task_name ?? task?.name ?? 'Unknown task',
         start: new Date(entry.start),
         end: entry.end ? new Date(entry.end) : now,
         colors: task?.effective_colors ?? [],
@@ -53,7 +53,7 @@ export default function ExecuteCalendar({ tasksById }: { tasksById: Map<string, 
         const task = tasksById.get(interval.task_id)
         return {
           id: `interval-${interval.id}`,
-          title: task?.name ?? 'Unknown task',
+          title: interval.task_name ?? task?.name ?? 'Unknown task',
           start: new Date(interval.start),
           end: new Date(interval.end),
           colors: task?.effective_colors ?? [],

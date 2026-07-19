@@ -16,3 +16,4 @@ class EntryOut(BaseModel):
     task_id: str
     start: datetime
     end: datetime | None
+    task_name: str | None = None

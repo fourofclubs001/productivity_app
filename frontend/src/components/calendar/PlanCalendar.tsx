@@ -228,7 +228,7 @@ export default function PlanCalendar({
         const task = tasksById.get(interval.task_id)
         return {
           id: interval.id,
-          title: task?.name ?? 'Unknown task',
+          title: interval.task_name ?? task?.name ?? 'Unknown task',
           start: new Date(interval.start),
           end: new Date(interval.end),
           colors: task?.effective_colors ?? [],

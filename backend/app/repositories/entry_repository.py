@@ -19,9 +19,12 @@ class EntryRepository:
     def __init__(self, redis: Redis) -> None:
         self._redis = redis
 
-    async def create(self, entry_id: str, task_id: str, start: datetime) -> None:
+    async def create(
+        self, entry_id: str, task_id: str, start: datetime, task_name: str = ""
+    ) -> None:
         await self._redis.hset(
-            entry_key(entry_id), mapping={"task_id": task_id, "start": start.isoformat()}
+            entry_key(entry_id),
+            mapping={"task_id": task_id, "start": start.isoformat(), "task_name": task_name},
         )
         await self._redis.zadd(ENTRIES_BY_START_KEY, {entry_id: start.timestamp()})
         await self._redis.sadd(task_entries_key(task_id), entry_id)

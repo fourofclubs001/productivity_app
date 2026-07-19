@@ -45,12 +45,17 @@ export default function EvaluateCalendar({
   tasksById: Map<string, Task>
   onExplainGap?: (params: ExplainGapParams) => void
 }) {
+  const intervalsById = useMemo(
+    () => new Map(intervals.map((interval) => [interval.id, interval])),
+    [intervals],
+  )
+
   const events = useMemo<CalendarEvent[]>(() => {
     const planned: CalendarEvent[] = intervals.map((interval) => {
       const task = tasksById.get(interval.task_id)
       return {
         id: `interval-${interval.id}`,
-        title: task?.name ?? 'Unknown task',
+        title: interval.task_name ?? task?.name ?? 'Unknown task',
         start: new Date(interval.start),
         end: new Date(interval.end),
         colors: task?.effective_colors ?? [],
@@ -62,7 +67,7 @@ export default function EvaluateCalendar({
       const task = tasksById.get(entry.task_id)
       return {
         id: `entry-${entry.id}`,
-        title: task?.name ?? 'Unknown task',
+        title: entry.task_name ?? task?.name ?? 'Unknown task',
         start: new Date(entry.start),
         end: entry.end ? new Date(entry.end) : new Date(),
         colors: task?.effective_colors ?? [],
@@ -80,9 +85,10 @@ export default function EvaluateCalendar({
     const diffSegments: CalendarEvent[] = computeDiffSegments(intervals, entries).map(
       (segment, index) => {
         const task = tasksById.get(segment.taskId)
+        const sourceInterval = intervalsById.get(segment.intervalId)
         return {
           id: `diff-${segment.intervalId}-${index}`,
-          title: task?.name ?? 'Unknown task',
+          title: sourceInterval?.task_name ?? task?.name ?? 'Unknown task',
           start: segment.start,
           end: segment.end,
           colors: task?.effective_colors ?? [],
@@ -94,7 +100,7 @@ export default function EvaluateCalendar({
       },
     )
     return [...diffSegments, ...real]
-  }, [mode, intervals, entries, tasksById])
+  }, [mode, intervals, entries, tasksById, intervalsById])
 
   return (
     <Calendar

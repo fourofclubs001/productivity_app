@@ -107,9 +107,10 @@ class IntervalService:
             if unmet:
                 raise UnmetPrerequisiteError(payload.task_id, unmet)
 
+        task_name = task_node.fields.get("name", "")
         interval_id = str(uuid4())
         week_start = await self._intervals.create(
-            interval_id, payload.task_id, payload.start, payload.end
+            interval_id, payload.task_id, payload.start, payload.end, task_name
         )
 
         current_state = TaskState(task_node.fields.get("state", TaskState.backlog.value))
@@ -124,6 +125,7 @@ class IntervalService:
             start=payload.start,
             end=payload.end,
             week_start=week_start,
+            task_name=task_name,
         )
 
     async def update_interval(self, interval_id: str, payload: IntervalUpdate) -> IntervalOut:
@@ -153,6 +155,7 @@ class IntervalService:
             start=payload.start,
             end=payload.end,
             week_start=week_start,
+            task_name=data.get("task_name"),
         )
 
     async def delete_interval(self, interval_id: str) -> None:
@@ -203,4 +206,5 @@ class IntervalService:
             start=datetime.fromisoformat(data["start"]),
             end=datetime.fromisoformat(data["end"]),
             week_start=data["week_start"],
+            task_name=data.get("task_name"),
         )
