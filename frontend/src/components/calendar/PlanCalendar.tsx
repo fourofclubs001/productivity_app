@@ -24,7 +24,7 @@ import {
   type GridGeometry,
   type PixelRect,
 } from '../../lib/calendarGeometry'
-import { isFullyPast, isInProgress } from '../../lib/intervalTiming'
+import { isFullyPast, isInProgress, resolveDragRescheduleAction } from '../../lib/intervalTiming'
 import {
   makeCreateIntervalEntry,
   makeDeleteIntervalEntry,
@@ -258,20 +258,28 @@ export default function PlanCalendar({
     if (!interval) return
     const previousStart = interval.start
     const previousEnd = interval.end
+    const previousRange = { start: new Date(previousStart), end: new Date(previousEnd) }
     const newStart = new Date(start)
+    const newEnd = new Date(end)
 
-    // The backend is the real guard, but pre-empting here avoids a
-    // round-trip for the common case: an in-progress interval's start is
-    // locked (it's already begun), only its end can still move.
-    if (
-      isInProgress({ start: new Date(previousStart), end: new Date(previousEnd) }, now) &&
-      newStart.getTime() !== new Date(previousStart).getTime()
-    ) {
-      setScheduleError('This time slot has already started — its start time can no longer be moved.')
+    const action = resolveDragRescheduleAction(previousRange, newStart, now)
+    if (action.type === 'reject') {
+      setScheduleError(action.message)
+      return
+    }
+    if (action.type === 'create') {
+      setScheduleError(null)
+      createInterval.mutate(
+        { task_id: interval.task_id, start: newStart.toISOString(), end: newEnd.toISOString() },
+        {
+          onSuccess: (created) => pushUndo(makeDeleteIntervalEntry(created, intervalMutators)),
+          onError: (error) => setScheduleError((error as Error).message),
+        },
+      )
       return
     }
 
-    const input = { start: newStart.toISOString(), end: new Date(end).toISOString() }
+    const input = { start: newStart.toISOString(), end: newEnd.toISOString() }
     setScheduleError(null)
     updateInterval.mutate(
       { id: interval.id, input },
@@ -350,7 +358,7 @@ export default function PlanCalendar({
           toolbar={false}
           selectable={false}
           resizable
-          draggableAccessor={(event: CalendarEvent) => !isFullyPast(event, now)}
+          draggableAccessor={() => true}
           resizableAccessor={(event: CalendarEvent) => !isFullyPast(event, now)}
           onEventDrop={handleEventChange}
           onEventResize={handleEventChange}
