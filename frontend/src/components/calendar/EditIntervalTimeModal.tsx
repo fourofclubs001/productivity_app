@@ -39,9 +39,7 @@ export default function EditIntervalTimeModal({
       >
         <h2 className="mb-3 text-sm font-semibold text-text-primary">Edit time</h2>
         <IntervalTimeFields value={value} onChange={setValue} />
-        {!canSubmit && (
-          <p className="mt-2 text-xs text-danger">End time must be after start time.</p>
-        )}
+        {!canSubmit && <p className="mt-2 text-xs text-danger">End must be after start.</p>}
         <div className="mt-4 flex justify-end gap-2">
           <button
             type="button"

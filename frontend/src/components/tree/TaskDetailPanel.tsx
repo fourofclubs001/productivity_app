@@ -261,47 +261,58 @@ export default function TaskDetailPanel({
                 .sort((a, b) => a.start.localeCompare(b.start))
                 .map((interval) =>
                   editingIntervalId === interval.id && editValue ? (
-                    <li
-                      key={interval.id}
-                      className="rounded bg-surface-alt px-2 py-1.5 text-xs text-text-secondary"
-                    >
-                      <IntervalTimeFields value={editValue} onChange={setEditValue} />
-                      <div className="mt-1.5 flex justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingIntervalId(null)
-                            setEditValue(null)
-                          }}
-                          className="text-text-secondary hover:text-text-primary"
+                    (() => {
+                      const { start: editStart, end: editEnd } = intervalTimeToDates(editValue)
+                      const canSubmitEdit = editEnd > editStart
+                      return (
+                        <li
+                          key={interval.id}
+                          className="rounded bg-surface-alt px-2 py-1.5 text-xs text-text-secondary"
                         >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const { start, end } = intervalTimeToDates(editValue)
-                            updateInterval.mutate(
-                              {
-                                id: interval.id,
-                                input: { start: start.toISOString(), end: end.toISOString() },
-                              },
-                              {
-                                onSuccess: () => {
-                                  setEditingIntervalId(null)
-                                  setEditValue(null)
-                                },
-                                onError: (error) => setAlertMessage((error as Error).message),
-                              },
-                            )
-                          }}
-                          disabled={updateInterval.isPending}
-                          className="font-medium text-accent hover:text-accent-hover disabled:opacity-50"
-                        >
-                          Save
-                        </button>
-                      </div>
-                    </li>
+                          <IntervalTimeFields value={editValue} onChange={setEditValue} />
+                          {!canSubmitEdit && (
+                            <p className="mt-1 text-danger">End must be after start.</p>
+                          )}
+                          <div className="mt-1.5 flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingIntervalId(null)
+                                setEditValue(null)
+                              }}
+                              className="text-text-secondary hover:text-text-primary"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                updateInterval.mutate(
+                                  {
+                                    id: interval.id,
+                                    input: {
+                                      start: editStart.toISOString(),
+                                      end: editEnd.toISOString(),
+                                    },
+                                  },
+                                  {
+                                    onSuccess: () => {
+                                      setEditingIntervalId(null)
+                                      setEditValue(null)
+                                    },
+                                    onError: (error) => setAlertMessage((error as Error).message),
+                                  },
+                                )
+                              }}
+                              disabled={!canSubmitEdit || updateInterval.isPending}
+                              className="font-medium text-accent hover:text-accent-hover disabled:opacity-50"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        </li>
+                      )
+                    })()
                   ) : (
                     <li
                       key={interval.id}

@@ -21,11 +21,10 @@ function localDateTimeParts(date: Date): { day: string; time: string } {
 // future, and deliberately offset from other specs' "next hour"/"today at 9
 // UTC" scheduling defaults so this spec's chip doesn't land exactly on top
 // of another spec's leftover event (this suite doesn't flush Redis between
-// specs -- see PROJECT_STATUS.md's crowding note). The "Add to calendar"
-// modal has a single shared Day field for both start and end, so start is
+// specs -- see PROJECT_STATUS.md's crowding note). Kept same-day (start is
 // nudged into the small hours of the next day rather than left near
-// midnight, where start+1h would otherwise roll onto a different calendar
-// day than start itself.
+// midnight) purely to keep this helper simple, not because the form
+// requires it.
 function futureSlotSameDay(): { start: Date; end: Date } {
   let start = new Date(Date.now() + 2 * 60 * 60 * 1000)
   if (start.getHours() >= 23) {
@@ -55,8 +54,9 @@ test('explaining a fully-uncovered gap attaches a new excuse, reflected in the E
   const { start, end } = futureSlotSameDay()
   const { day, time: startTime } = localDateTimeParts(start)
   const { time: endTime } = localDateTimeParts(end)
-  await page.getByLabel('Day').fill(day)
+  await page.getByLabel('Start date').fill(day)
   await page.getByLabel('Start hour').fill(startTime)
+  await page.getByLabel('End date').fill(day)
   await page.getByLabel('End hour').fill(endTime)
   await page.locator('form').getByRole('button', { name: 'Add' }).click()
 

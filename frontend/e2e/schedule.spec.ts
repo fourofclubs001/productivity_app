@@ -123,14 +123,19 @@ test('a task can be scheduled via the modal once its prerequisite is scheduled b
 
   await page.goto('/')
 
-  // Computed inside the browser (matching the modal's own local-time
-  // arithmetic in defaultTimeValue()) so these are always safely in the
-  // future relative to whatever "now" the page itself sees, avoiding the
-  // "no past-dated intervals" guard (v02 item 8) regardless of host/browser
-  // timezone or time of day.
+  // Computed inside the browser so these are always safely in the future
+  // relative to whatever "now" the page itself sees, avoiding the "no
+  // past-dated intervals" guard (v02 item 8) regardless of host/browser
+  // timezone or time of day. Both date and time-of-day are filled
+  // explicitly (rather than relying on the modal's own same-day default)
+  // so this stays deterministic even right around a real local midnight.
   const times = await page.evaluate(() => {
-    function hhmm(d: Date) {
-      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    function dateAndHhmm(d: Date) {
+      const pad = (n: number) => String(n).padStart(2, '0')
+      return {
+        date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+        time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+      }
     }
     const requiredStart = new Date()
     requiredStart.setMinutes(0, 0, 0)
@@ -138,9 +143,9 @@ test('a task can be scheduled via the modal once its prerequisite is scheduled b
     const requiredEnd = new Date(requiredStart.getTime() + 60 * 60 * 1000)
     const taskEnd = new Date(requiredEnd.getTime() + 60 * 60 * 1000)
     return {
-      requiredStart: hhmm(requiredStart),
-      requiredEnd: hhmm(requiredEnd),
-      taskEnd: hhmm(taskEnd),
+      requiredStart: dateAndHhmm(requiredStart),
+      requiredEnd: dateAndHhmm(requiredEnd),
+      taskEnd: dateAndHhmm(taskEnd),
     }
   })
 
@@ -148,8 +153,10 @@ test('a task can be scheduled via the modal once its prerequisite is scheduled b
   await page.getByTestId('task-tree').getByText(required.name).click()
   await expect(page.getByLabel('Task name')).toHaveValue(required.name)
   await page.getByTitle('Add to calendar').click()
-  await page.getByLabel('Start hour').fill(times.requiredStart)
-  await page.getByLabel('End hour').fill(times.requiredEnd)
+  await page.getByLabel('Start date').fill(times.requiredStart.date)
+  await page.getByLabel('Start hour').fill(times.requiredStart.time)
+  await page.getByLabel('End date').fill(times.requiredEnd.date)
+  await page.getByLabel('End hour').fill(times.requiredEnd.time)
   await page.locator('form').getByRole('button', { name: 'Add' }).click()
   await expect(page.locator('.rbc-event', { hasText: required.name })).toBeVisible()
 
@@ -157,8 +164,10 @@ test('a task can be scheduled via the modal once its prerequisite is scheduled b
   await page.getByTestId('task-tree').getByText(task.name).click()
   await expect(page.getByLabel('Task name')).toHaveValue(task.name)
   await page.getByTitle('Add to calendar').click()
-  await page.getByLabel('Start hour').fill(times.requiredEnd)
-  await page.getByLabel('End hour').fill(times.taskEnd)
+  await page.getByLabel('Start date').fill(times.requiredEnd.date)
+  await page.getByLabel('Start hour').fill(times.requiredEnd.time)
+  await page.getByLabel('End date').fill(times.taskEnd.date)
+  await page.getByLabel('End hour').fill(times.taskEnd.time)
   await page.locator('form').getByRole('button', { name: 'Add' }).click()
   await expect(page.locator('.rbc-event', { hasText: task.name })).toBeVisible()
 })

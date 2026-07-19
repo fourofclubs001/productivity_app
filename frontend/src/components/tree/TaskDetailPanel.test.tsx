@@ -313,8 +313,11 @@ describe('TaskDetailPanel', () => {
     // The row's button text is "<day>, HH:mm – HH:mm" -- match the dash
     // rather than hardcoding digits, since displayed time is in local TZ.
     fireEvent.click(screen.getByRole('button', { name: /–/ }))
-    const dayInput = screen.getByLabelText('Day') as HTMLInputElement
+    const dayInput = screen.getByLabelText('Start date') as HTMLInputElement
     fireEvent.change(screen.getByLabelText('Start hour'), { target: { value: '15:30' } })
+    // Push the end time later too so it stays after the new start regardless
+    // of which local timezone this test happens to run in.
+    fireEvent.change(screen.getByLabelText('End hour'), { target: { value: '23:59' } })
     fireEvent.click(screen.getByText('Save'))
 
     // Mirror the component's own local-time construction so this assertion
