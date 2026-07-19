@@ -138,17 +138,41 @@ export default function TaskDetailPanel({
             </span>
           )}
         </div>
-        <button
-          type="button"
-          title="Options"
-          onClick={(event) => {
-            const rect = event.currentTarget.getBoundingClientRect()
-            setOptionsMenuAnchor({ x: rect.left, y: rect.bottom })
-          }}
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-text-secondary hover:bg-surface-alt hover:text-text-primary"
-        >
-          ⋮
-        </button>
+        <div className="flex items-center gap-2">
+          {isDirty && (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setName(task.name)
+                  setDod(task.definition_of_done)
+                }}
+                className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-alt hover:text-text-primary"
+              >
+                Discard
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={updateTask.isPending || name.trim().length === 0}
+                className="rounded bg-accent px-2 py-1 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+              >
+                Save changes
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            title="Options"
+            onClick={(event) => {
+              const rect = event.currentTarget.getBoundingClientRect()
+              setOptionsMenuAnchor({ x: rect.left, y: rect.bottom })
+            }}
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-text-secondary hover:bg-surface-alt hover:text-text-primary"
+          >
+            ⋮
+          </button>
+        </div>
       </div>
 
       <input
@@ -185,17 +209,6 @@ export default function TaskDetailPanel({
           </p>
         )}
       </div>
-
-      {isDirty && (
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={updateTask.isPending || name.trim().length === 0}
-          className="mt-3 rounded bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
-        >
-          Save changes
-        </button>
-      )}
 
       <div className="mt-6">
         <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">

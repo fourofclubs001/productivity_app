@@ -35,3 +35,42 @@ test('creating a task auto-selects it, and a child task can be created from the 
   await parentRow.getByRole('button').first().click() // expand chevron
   await expect(tree.getByText(childName)).toBeVisible()
 })
+
+test('Save/Discard render top-right next to Options, and Discard reverts an unsaved edit', async ({
+  page,
+}) => {
+  await page.goto('/')
+
+  const taskName = `Save-discard ${Date.now()}`
+  await page.getByTitle('New task').click()
+  await page.getByLabel('Name', { exact: true }).fill(taskName)
+  await page.getByLabel('Definition of done').fill('done')
+  await page.getByRole('button', { name: 'Create' }).click()
+
+  await expect(page.getByLabel('Task name')).toHaveValue(taskName)
+  const panel = page.getByTestId('task-detail-panel')
+  await expect(panel.getByText('Save changes')).not.toBeVisible()
+  await expect(panel.getByText('Discard')).not.toBeVisible()
+
+  const newName = `${taskName} edited`
+  await page.getByLabel('Task name').fill(newName)
+
+  const header = panel.locator('.mb-4.flex.items-center.justify-between')
+  await expect(header.getByText('Save changes')).toBeVisible()
+  await expect(header.getByText('Discard')).toBeVisible()
+  await expect(header.getByTitle('Options')).toBeVisible()
+
+  await header.getByText('Discard').click()
+  await expect(page.getByLabel('Task name')).toHaveValue(taskName)
+  await expect(panel.getByText('Save changes')).not.toBeVisible()
+  await expect(panel.getByText('Discard')).not.toBeVisible()
+
+  await page.getByLabel('Task name').fill(newName)
+  await header.getByText('Save changes').click()
+  await expect(panel.getByText('Save changes')).not.toBeVisible()
+
+  // Confirm the save actually persisted server-side by re-selecting the task from the tree.
+  const tree = page.getByTestId('task-tree')
+  await tree.getByText(newName).click()
+  await expect(page.getByLabel('Task name')).toHaveValue(newName)
+})

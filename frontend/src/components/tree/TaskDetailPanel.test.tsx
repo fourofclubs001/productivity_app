@@ -107,6 +107,25 @@ describe('TaskDetailPanel', () => {
     })
   })
 
+  it('discards an in-progress edit, reverting to last-saved values without saving', () => {
+    const task = makeTask({ id: 't1', name: 'Task one', description: 'desc', definition_of_done: 'dod' })
+    render(
+      <TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} onAddChild={() => {}} />,
+    )
+
+    expect(screen.queryByText('Discard')).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByDisplayValue('Task one'), { target: { value: 'New name' } })
+    expect(screen.getByText('Discard')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('Discard'))
+
+    expect(screen.getByDisplayValue('Task one')).toBeInTheDocument()
+    expect(screen.queryByText('Discard')).not.toBeInTheDocument()
+    expect(screen.queryByText('Save changes')).not.toBeInTheDocument()
+    expect(updateMutate).not.toHaveBeenCalled()
+  })
+
   it('toggles a color immediately without needing Save', () => {
     const task = makeTask({ id: 't1' })
     render(
