@@ -17,6 +17,7 @@ import {
   useUpdateInterval,
 } from '../../api/intervals'
 import { useMarkDone, useRevertDone } from '../../api/timer'
+import { isFullyPast, isInProgress } from '../../lib/intervalTiming'
 import { descendantIds } from '../../lib/taskTree'
 import { makeRevertDoneEntry } from '../../lib/taskDoneUndoEntries'
 import { useUndo } from '../../undo/UndoProvider'
@@ -332,7 +333,19 @@ export default function TaskDetailPanel({
                       <button
                         type="button"
                         title="Remove this time slot"
-                        onClick={() => deleteInterval.mutate(interval.id)}
+                        onClick={() => {
+                          const range = { start: new Date(interval.start), end: new Date(interval.end) }
+                          const now = new Date()
+                          if (isFullyPast(range, now) || isInProgress(range, now)) {
+                            setAlertMessage(
+                              'This time slot has already started or ended and can no longer be deleted',
+                            )
+                            return
+                          }
+                          deleteInterval.mutate(interval.id, {
+                            onError: (error) => setAlertMessage((error as Error).message),
+                          })
+                        }}
                         className="text-text-secondary hover:text-danger"
                       >
                         ×

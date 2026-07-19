@@ -31,11 +31,12 @@ vi.mock('../../api/tasks', () => ({
 }))
 
 const updateIntervalMutate = vi.fn()
+const deleteIntervalMutate = vi.fn()
 const useIntervalsForTask = vi.fn(() => ({ data: [] as unknown[] }))
 
 vi.mock('../../api/intervals', () => ({
   useIntervalsForTask: () => useIntervalsForTask(),
-  useDeleteInterval: () => ({ mutate: vi.fn() }),
+  useDeleteInterval: () => ({ mutate: deleteIntervalMutate }),
   useUpdateInterval: () => ({ mutate: updateIntervalMutate, isPending: false }),
   useCreateInterval: () => ({ mutate: vi.fn(), isPending: false }),
   useTaskCoverage: () => ({ data: { covered_hours: 0 } }),
@@ -59,6 +60,7 @@ beforeEach(() => {
   addRequirementMutate.mockReset()
   removeRequirementMutate.mockReset()
   updateIntervalMutate.mockReset()
+  deleteIntervalMutate.mockReset()
   markDoneMutate.mockReset()
   markDoneMutateAsync.mockReset()
   revertDoneMutateAsync.mockReset()
@@ -327,6 +329,52 @@ describe('TaskDetailPanel', () => {
       { id: 'iv1', input: expect.objectContaining({ start: expectedStart }) },
       expect.any(Object),
     )
+  })
+
+  it('blocks deleting a past interval via the "x" button, showing a dialog instead', () => {
+    useIntervalsForTask.mockReturnValue({
+      data: [
+        {
+          id: 'iv1',
+          task_id: 't1',
+          start: '2020-01-01T09:00:00.000Z',
+          end: '2020-01-01T10:00:00.000Z',
+          week_start: '2019-12-30',
+        },
+      ],
+    })
+    const task = makeTask({ id: 't1', is_leaf: true })
+    render(
+      <TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} onAddChild={() => {}} />,
+    )
+
+    fireEvent.click(screen.getByTitle('Remove this time slot'))
+
+    expect(screen.getByText(/can no longer be deleted/i)).toBeInTheDocument()
+    expect(deleteIntervalMutate).not.toHaveBeenCalled()
+  })
+
+  it('allows deleting a future interval via the "x" button', () => {
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000)
+    useIntervalsForTask.mockReturnValue({
+      data: [
+        {
+          id: 'iv1',
+          task_id: 't1',
+          start: future.toISOString(),
+          end: new Date(future.getTime() + 60 * 60 * 1000).toISOString(),
+          week_start: '2020-01-01',
+        },
+      ],
+    })
+    const task = makeTask({ id: 't1', is_leaf: true })
+    render(
+      <TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} onAddChild={() => {}} />,
+    )
+
+    fireEvent.click(screen.getByTitle('Remove this time slot'))
+
+    expect(deleteIntervalMutate).toHaveBeenCalledWith('iv1', expect.any(Object))
   })
 
   it('has no manual estimate input -- coverage from the calendar is the only estimate display', () => {

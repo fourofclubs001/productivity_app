@@ -137,6 +137,41 @@ async def test_update_interval_in_progress_locks_start_but_not_end(client, redis
     assert allowed.status_code == 200
 
 
+async def test_delete_interval_fully_past_is_blocked(client, redis_client):
+    task = create_leaf(client)
+    past_start = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=3)
+    past_end = past_start + timedelta(hours=1)
+    interval_id = str(uuid4())
+    await IntervalRepository(redis_client).create(interval_id, task["id"], past_start, past_end)
+
+    response = client.delete(f"/intervals/{interval_id}")
+    assert response.status_code == 400
+
+    week_start = (past_start - timedelta(days=past_start.weekday())).date().isoformat()
+    still_there = client.get("/intervals", params={"week_start": week_start}).json()
+    assert [i["id"] for i in still_there] == [interval_id]
+
+
+async def test_delete_interval_in_progress_is_blocked(client, redis_client):
+    task = create_leaf(client)
+    now = datetime.now(UTC).replace(tzinfo=None)
+    start = now - timedelta(minutes=30)
+    end = now + timedelta(minutes=30)
+    interval_id = str(uuid4())
+    await IntervalRepository(redis_client).create(interval_id, task["id"], start, end)
+
+    response = client.delete(f"/intervals/{interval_id}")
+    assert response.status_code == 400
+
+
+def test_delete_interval_fully_future_still_succeeds(client):
+    task = create_leaf(client)
+    interval = create_interval(client, task["id"], START, START + timedelta(hours=1))
+
+    response = client.delete(f"/intervals/{interval['id']}")
+    assert response.status_code == 204
+
+
 def test_update_interval_fully_future_stays_editable_but_not_into_the_past(client):
     task = create_leaf(client)
     interval = create_interval(client, task["id"], START, START + timedelta(hours=1))

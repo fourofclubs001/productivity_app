@@ -54,8 +54,8 @@ describe('PlanCalendar', () => {
         {
           id: 'iv1',
           task_id: 't1',
-          start: '2026-07-15T10:00:00.000Z',
-          end: '2026-07-15T11:00:00.000Z',
+          start: '2026-07-15T14:00:00.000Z',
+          end: '2026-07-15T15:00:00.000Z',
           week_start: '2026-07-13',
         },
       ],
@@ -71,9 +71,32 @@ describe('PlanCalendar', () => {
     fireEvent.keyDown(window, { key: 'z', ctrlKey: true })
     expect(createMutateAsync).toHaveBeenCalledWith({
       task_id: 't1',
-      start: '2026-07-15T10:00:00.000Z',
-      end: '2026-07-15T11:00:00.000Z',
+      start: '2026-07-15T14:00:00.000Z',
+      end: '2026-07-15T15:00:00.000Z',
     })
+  })
+
+  it('blocks right-click deleting a past interval, showing a dialog instead', () => {
+    const task = makeTask({ id: 't1', name: 'Past task', is_leaf: true })
+    useIntervalsForWeek.mockReturnValue({
+      data: [
+        {
+          id: 'iv1',
+          task_id: 't1',
+          start: '2026-07-15T09:00:00.000Z',
+          end: '2026-07-15T10:00:00.000Z',
+          week_start: '2026-07-13',
+        },
+      ],
+    })
+
+    renderCalendar(new Map([[task.id, task]]))
+
+    fireEvent.contextMenu(screen.getByText('Past task'))
+    fireEvent.click(screen.getByText('Delete'))
+
+    expect(screen.getByText(/can no longer be deleted/i)).toBeInTheDocument()
+    expect(deleteMutate).not.toHaveBeenCalled()
   })
 
   it('opens the task detail view when a scheduled event is left-clicked', () => {

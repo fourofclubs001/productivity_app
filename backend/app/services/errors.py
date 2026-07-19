@@ -99,6 +99,13 @@ class IntervalLockedError(Exception):
         )
 
 
+class IntervalDeleteLockedError(Exception):
+    def __init__(self) -> None:
+        super().__init__(
+            "This time slot has already started or ended and can no longer be deleted"
+        )
+
+
 class IntervalNotFoundError(Exception):
     def __init__(self, interval_id: str) -> None:
         self.interval_id = interval_id

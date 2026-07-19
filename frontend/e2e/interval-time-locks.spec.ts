@@ -50,3 +50,33 @@ test('editing a scheduled interval time via the right-click context menu', async
   const [interval] = await listResponse.json()
   expect(interval.start).not.toBe(start.toISOString())
 })
+
+// Same past/in-progress-can't-reach-the-delete-lock limitation as above --
+// this only exercises the unblocked path (a fully-future interval can still
+// be deleted via the detail panel's "x"), via both entry points.
+test('a fully-future interval can still be deleted via the detail panel\'s "x"', async ({
+  page,
+  request,
+}) => {
+  const taskName = `PanelSlotRemoval ${Date.now()}`
+  const task = await (
+    await request.post(`${API_BASE}/tasks`, {
+      data: { name: taskName, definition_of_done: 'done' },
+    })
+  ).json()
+
+  const start = todayAt(9)
+  const end = new Date(start.getTime() + 60 * 60 * 1000)
+  await request.post(`${API_BASE}/intervals`, {
+    data: { task_id: task.id, start: start.toISOString(), end: end.toISOString() },
+  })
+
+  await page.goto('/')
+  await page.getByTestId('task-tree').getByText(taskName).click()
+  await expect(page.getByLabel('Task name')).toHaveValue(taskName)
+
+  await page.getByTitle('Remove this time slot').click()
+
+  await expect(page.getByText('Not scheduled.')).toBeVisible()
+  await expect(page.locator('.rbc-event', { hasText: taskName })).not.toBeVisible()
+})

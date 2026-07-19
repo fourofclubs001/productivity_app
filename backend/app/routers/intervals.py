@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.dependencies import apply_rollover, get_interval_service
 from app.models.interval import IntervalCreate, IntervalOut, IntervalUpdate
 from app.services.errors import (
+    IntervalDeleteLockedError,
     IntervalLockedError,
     IntervalNotFoundError,
     InvalidIntervalError,
@@ -52,6 +53,8 @@ async def delete_interval(interval_id: str, service: ServiceDep) -> None:
         await service.delete_interval(interval_id)
     except IntervalNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except IntervalDeleteLockedError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("", response_model=list[IntervalOut])

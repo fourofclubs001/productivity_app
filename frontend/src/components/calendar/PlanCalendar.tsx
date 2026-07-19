@@ -180,8 +180,16 @@ export default function PlanCalendar({
   })
 
   function deleteIntervalWithUndo(interval: Interval) {
+    const range = { start: new Date(interval.start), end: new Date(interval.end) }
+    if (isFullyPast(range, now) || isInProgress(range, now)) {
+      setScheduleError(
+        'This time slot has already started or ended and can no longer be deleted',
+      )
+      return
+    }
     deleteInterval.mutate(interval.id, {
       onSuccess: () => pushUndo(makeCreateIntervalEntry(interval, intervalMutators)),
+      onError: (error) => setScheduleError((error as Error).message),
     })
   }
 

@@ -6,6 +6,7 @@ from app.models.task import TaskState
 from app.repositories.interval_repository import IntervalRepository
 from app.repositories.task_repository import TaskRepository
 from app.services.errors import (
+    IntervalDeleteLockedError,
     IntervalLockedError,
     IntervalNotFoundError,
     InvalidIntervalError,
@@ -159,6 +160,19 @@ class IntervalService:
         )
 
     async def delete_interval(self, interval_id: str) -> None:
+        existing = await self._intervals.get(interval_id)
+        if existing is None:
+            raise IntervalNotFoundError(interval_id)
+
+        now = datetime.now(UTC).replace(tzinfo=None)
+        # Fully-past (end <= now) and in-progress (start <= now < end) are
+        # both blocked from deletion -- only a fully-future interval
+        # (start > now) may be deleted. Mirrors _enforce_edit_lock's
+        # boundary semantics, just collapsed to a single allow/deny check
+        # since there's no partial "end can still move" case for a delete.
+        if _as_utc_naive(datetime.fromisoformat(existing["start"])) <= now:
+            raise IntervalDeleteLockedError
+
         data = await self._intervals.delete(interval_id)
         if data is None:
             raise IntervalNotFoundError(interval_id)
