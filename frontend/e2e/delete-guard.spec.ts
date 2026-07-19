@@ -55,6 +55,27 @@ test('blocks deleting a task while its timer is running', async ({ page }) => {
   await expect(tree().getByText(taskName)).not.toBeVisible()
 })
 
+test('right-clicking a Plan tree row opens a Delete context menu', async ({ page }) => {
+  const taskName = `Right-click delete ${Date.now()}`
+  const tree = () => page.getByTestId('task-tree')
+
+  await page.goto('/')
+  await createTask(page, taskName)
+
+  await tree().getByText(taskName).click({ button: 'right' })
+  await page.getByRole('button', { name: 'Delete', exact: true }).click()
+  await expect(page.getByText(`Delete "${taskName}" permanently?`)).toBeVisible()
+
+  await page.getByRole('button', { name: 'Cancel' }).click()
+  await expect(tree().getByText(taskName)).toBeVisible()
+
+  await tree().getByText(taskName).click({ button: 'right' })
+  await page.getByRole('button', { name: 'Delete', exact: true }).click()
+  await page.getByRole('button', { name: 'Delete', exact: true }).click()
+  await expect(page.getByText(`Delete "${taskName}" permanently?`)).not.toBeVisible()
+  await expect(tree().getByText(taskName)).not.toBeVisible()
+})
+
 test('deleting a task removes its future-scheduled chip from the calendar', async ({
   page,
   request,

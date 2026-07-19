@@ -1,9 +1,13 @@
+import { useState } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import type { Task } from '../../types'
 import { isHiddenFromPlan, qualifiesForRemovalPrompt } from '../../lib/taskTree'
 import type { ParentDecision } from '../../lib/useParentDismissal'
-import { useKeepAsBacklog } from '../../api/tasks'
+import { useDeleteTask, useKeepAsBacklog } from '../../api/tasks'
 import { useUndo, type UndoEntry } from '../../undo/UndoProvider'
+import AlertDialog from '../common/AlertDialog'
+import ConfirmDialog from '../common/ConfirmDialog'
+import ContextMenu from '../calendar/ContextMenu'
 import ColorDots from './ColorDots'
 import StateBadge from './StateBadge'
 
@@ -42,6 +46,10 @@ export default function TaskTreeNode({
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id: taskId })
   const { pushUndo } = useUndo()
   const keepAsBacklog = useKeepAsBacklog()
+  const deleteTask = useDeleteTask()
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [alertMessage, setAlertMessage] = useState<string | null>(null)
 
   function hiddenEntry(): UndoEntry {
     return {
@@ -134,6 +142,10 @@ export default function TaskTreeNode({
         }`}
         style={{ paddingLeft: depth * 16 + 4 }}
         onClick={() => onSelect(taskId)}
+        onContextMenu={(event) => {
+          event.preventDefault()
+          setContextMenu({ x: event.clientX, y: event.clientY })
+        }}
       >
         <button
           type="button"
@@ -183,6 +195,34 @@ export default function TaskTreeNode({
           ))}
         </div>
       )}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          items={[
+            {
+              label: 'Delete',
+              danger: true,
+              onSelect: () => setConfirmingDelete(true),
+            },
+          ]}
+        />
+      )}
+      {confirmingDelete && (
+        <ConfirmDialog
+          message={`Delete "${task.name}" permanently?`}
+          confirmLabel="Delete"
+          onCancel={() => setConfirmingDelete(false)}
+          onConfirm={() =>
+            deleteTask.mutate(taskId, {
+              onError: (error) => setAlertMessage((error as Error).message),
+              onSettled: () => setConfirmingDelete(false),
+            })
+          }
+        />
+      )}
+      {alertMessage && <AlertDialog message={alertMessage} onClose={() => setAlertMessage(null)} />}
     </div>
   )
 }
