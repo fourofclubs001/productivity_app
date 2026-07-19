@@ -1,10 +1,11 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Calendar } from 'react-big-calendar'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import './calendar.css'
 import type { Entry, Interval, Task } from '../../types'
 import { localizer } from '../../lib/calendarLocalizer'
 import { computeDiffSegments } from '../../lib/intervalDiff'
+import { isFullyPast } from '../../lib/intervalTiming'
 import { chipFillStyle, primaryChipColor } from './eventColor'
 import CalendarDayHeader from './CalendarDayHeader'
 import CalendarTimezoneLabel from './CalendarTimezoneLabel'
@@ -49,6 +50,12 @@ export default function EvaluateCalendar({
     () => new Map(intervals.map((interval) => [interval.id, interval])),
     [intervals],
   )
+
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30_000)
+    return () => clearInterval(timer)
+  }, [])
 
   const events = useMemo<CalendarEvent[]>(() => {
     const planned: CalendarEvent[] = intervals.map((interval) => {
@@ -115,6 +122,9 @@ export default function EvaluateCalendar({
       onSelectEvent={(event: CalendarEvent) => {
         if (mode !== 'diff' || event.diffKind !== 'uncovered') return
         if (!event.taskId || !event.intervalId) return
+        // A future gap can't yet have been missed -- only a fully-past
+        // uncovered segment is explainable (v03 item 9).
+        if (!isFullyPast(event, now)) return
         onExplainGap?.({
           taskId: event.taskId,
           intervalId: event.intervalId,
@@ -126,7 +136,7 @@ export default function EvaluateCalendar({
         if (event.kind === 'real') {
           return { style: { ...chipFillStyle(event.colors), border: 'none' } }
         }
-        const isUncoveredGap = event.diffKind === 'uncovered'
+        const isUncoveredGap = event.diffKind === 'uncovered' && isFullyPast(event, now)
         return {
           style: {
             backgroundColor: 'transparent',

@@ -11,7 +11,12 @@ from app.models.excuse import (
 )
 from app.repositories.excuse_repository import ExcuseRepository
 from app.repositories.task_repository import TaskRepository
-from app.services.errors import ExcuseNotFoundError, ExcuseSelectionRequiredError, TaskNotFoundError
+from app.services.errors import (
+    ExcuseNotFoundError,
+    ExcuseSelectionRequiredError,
+    FutureGapExcuseError,
+    TaskNotFoundError,
+)
 from app.services.period_utils import Granularity, period_bounds
 
 
@@ -41,6 +46,14 @@ class ExcuseService:
             raise TaskNotFoundError(task_id)
 
         now = datetime.now(UTC)
+
+        # A gap that hasn't happened yet can't have been missed -- mirrors
+        # the frontend's isFullyPast check on EvaluateCalendar's diff chips
+        # (v03 item 9). A determined client hitting this endpoint directly
+        # for a future gap is still rejected here.
+        end_for_comparison = end if end.tzinfo is not None else end.replace(tzinfo=UTC)
+        if end_for_comparison > now:
+            raise FutureGapExcuseError()
 
         if excuse_id:
             excuse = await self._excuses.get_excuse(excuse_id)

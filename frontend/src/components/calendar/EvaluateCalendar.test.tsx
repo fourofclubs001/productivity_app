@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import EvaluateCalendar from './EvaluateCalendar'
 import { makeTask } from '../../test/taskFixtures'
 import type { Entry, Interval, Task } from '../../types'
@@ -9,6 +9,15 @@ import type { Entry, Interval, Task } from '../../types'
 // under), avoiding a local-midnight shift that would land react-big-calendar
 // on the wrong week.
 const WEEK_ANCHOR = new Date('2026-07-20T12:00:00Z')
+
+// Excuses can only be attached to fully-past gaps (v03 item 9) -- pin "now"
+// to the day after INTERVAL/PARTIAL_ENTRY below so their fixed fixture
+// times stay unambiguously past regardless of real wall-clock drift.
+beforeEach(() => {
+  vi.useFakeTimers()
+  vi.setSystemTime(new Date('2026-07-21T12:00:00Z'))
+})
+afterEach(() => vi.useRealTimers())
 
 const INTERVAL: Interval = {
   id: 'iv1',
@@ -71,6 +80,20 @@ describe('EvaluateCalendar diff mode', () => {
     expect(screen.getByTestId('event-covered')).toBeInTheDocument()
     expect(screen.getByTestId('event-uncovered')).toBeInTheDocument()
     expect(screen.getByTestId('event-real')).toBeInTheDocument()
+  })
+
+  it('does not call onExplainGap for a still-future uncovered segment (nothing missed yet)', () => {
+    const futureInterval: Interval = {
+      ...INTERVAL,
+      id: 'iv-future',
+      start: '2026-07-22T09:00:00.000Z',
+      end: '2026-07-22T11:00:00.000Z',
+    }
+    const onExplainGap = renderCalendar('diff', [futureInterval], [])
+
+    fireEvent.click(screen.getByTestId('event-uncovered'))
+
+    expect(onExplainGap).not.toHaveBeenCalled()
   })
 
   it('calls onExplainGap with the right params when the uncovered segment is clicked', () => {

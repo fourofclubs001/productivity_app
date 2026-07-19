@@ -10,7 +10,12 @@ from app.models.excuse import (
     ExcuseFrequencyResult,
     ExcuseOut,
 )
-from app.services.errors import ExcuseNotFoundError, ExcuseSelectionRequiredError, TaskNotFoundError
+from app.services.errors import (
+    ExcuseNotFoundError,
+    ExcuseSelectionRequiredError,
+    FutureGapExcuseError,
+    TaskNotFoundError,
+)
 from app.services.excuse_service import ExcuseService
 from app.services.period_utils import Granularity
 
@@ -39,7 +44,7 @@ async def attach_excuse(payload: AttachExcuseRequest, service: ServiceDep) -> Ex
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ExcuseNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ExcuseSelectionRequiredError as exc:
+    except (ExcuseSelectionRequiredError, FutureGapExcuseError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 

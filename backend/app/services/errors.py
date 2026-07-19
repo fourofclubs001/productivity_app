@@ -138,3 +138,8 @@ class ExcuseNotFoundError(Exception):
     def __init__(self, excuse_id: str) -> None:
         self.excuse_id = excuse_id
         super().__init__(f"Excuse {excuse_id!r} not found")
+
+
+class FutureGapExcuseError(Exception):
+    def __init__(self) -> None:
+        super().__init__("A future gap can't be explained -- it hasn't happened yet")

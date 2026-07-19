@@ -1,20 +1,22 @@
 from datetime import UTC, datetime, timedelta
 
 
-def _next_monday(weeks_ahead: int) -> datetime:
-    """A Monday comfortably in the future (never today), matching the
-    convention used across this suite (see test_evaluate.py) so these fixed
-    fixture times never collide with "today" regardless of when the suite
-    happens to run.
+def _monday_weeks_from_now(weeks: int) -> datetime:
+    """A Monday comfortably away from "today" (never today itself), so
+    these fixed fixture times never collide with "today" regardless of when
+    the suite happens to run. `weeks` may be negative for a past Monday --
+    excuses can now only be attached to gaps that are fully in the past
+    (v03 item 9), so this suite's gaps need to land safely in the past
+    rather than the future the rest of this repo's fixtures usually prefer.
     """
     now = datetime.now(UTC).replace(tzinfo=None, microsecond=0)
     days_until_monday = (7 - now.weekday()) % 7 or 7
-    return (now + timedelta(days=days_until_monday + weeks_ahead * 7)).replace(
+    return (now + timedelta(days=days_until_monday + weeks * 7)).replace(
         hour=0, minute=0, second=0
     )
 
 
-_MONDAY = _next_monday(weeks_ahead=4)
+_MONDAY = _monday_weeks_from_now(weeks=-4)
 WEEK_START = _MONDAY.date().isoformat()
 NEXT_WEEK_START = (_MONDAY + timedelta(days=7)).date().isoformat()
 START = _MONDAY + timedelta(hours=9)
@@ -221,6 +223,30 @@ def test_frequency_respects_task_ids_filter(client):
 
     body = frequency(client, task_ids=[task_a["id"]])
     assert [row["excuse_text"] for row in body["totals"]] == ["Got distracted"]
+
+
+def test_attach_rejects_a_future_gap(client):
+    task = create_leaf(client, "Write report")
+    future_start = _monday_weeks_from_now(weeks=4) + timedelta(hours=9)
+    response = attach(
+        client, task["id"], future_start, future_start + timedelta(hours=1),
+        new_excuse_text="Got distracted",
+    )
+    assert response.status_code == 400
+    assert client.get("/excuses").json() == []
+
+
+def test_attach_allows_a_gap_still_in_progress_partway_through(client):
+    """A gap ending exactly now (end <= now) is the boundary -- anything
+    with an end still in the future is rejected, mirroring isFullyPast."""
+    task = create_leaf(client, "Write report")
+    now = datetime.now(UTC).replace(tzinfo=None, microsecond=0)
+    just_past_end = now - timedelta(seconds=1)
+    response = attach(
+        client, task["id"], just_past_end - timedelta(hours=1), just_past_end,
+        new_excuse_text="Got distracted",
+    )
+    assert response.status_code == 200
 
 
 def test_frequency_excludes_attachments_outside_the_period(client):

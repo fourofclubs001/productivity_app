@@ -36,7 +36,7 @@ function futureSlotSameDay(): { start: Date; end: Date } {
   return { start, end }
 }
 
-test('explaining a fully-uncovered gap attaches a new excuse, reflected in the Excuses subtab', async ({
+test('a still-future uncovered gap is not explainable (nothing missed yet)', async ({
   page,
   request,
 }) => {
@@ -46,7 +46,8 @@ test('explaining a fully-uncovered gap attaches a new excuse, reflected in the E
 
   // Schedule the task (via the "Add to calendar" modal) and never track any
   // real time against it, so the whole planned interval is one uncovered
-  // gap in diff mode.
+  // gap in diff mode -- but it's still in the future, so it shouldn't be
+  // explainable yet (v03 item 9).
   await page.getByTestId('task-tree').getByText(task.name).click()
   await expect(page.getByLabel('Task name')).toHaveValue(task.name)
   await page.getByTitle('Add to calendar').click()
@@ -68,12 +69,37 @@ test('explaining a fully-uncovered gap attaches a new excuse, reflected in the E
   await expect(gapChip).toBeVisible()
   await gapChip.click()
 
-  await expect(page.getByRole('heading', { name: 'Explain this gap' })).toBeVisible()
-  await page.getByLabel('Or type a new one').fill('Got distracted')
-  await page.getByRole('button', { name: 'Save' }).click()
   await expect(page.getByRole('heading', { name: 'Explain this gap' })).not.toBeVisible()
+})
 
+test('a past excuse attachment shows up in the Excuses subtab', async ({ page, request }) => {
+  // Explaining a genuinely-past gap end-to-end via the calendar click isn't
+  // reachable through the public HTTP surface an E2E spec drives (creating
+  // a past-dated *planned interval* is rejected outright -- v02 item 8,
+  // same limitation documented in interval-time-locks.spec.ts). This
+  // exercises the rest of the feature -- a past excuse attachment (which
+  // /excuses/attach does accept directly, with no interval required)
+  // rendering correctly in the Excuses subtab. The click-to-explain gating
+  // itself and the backend's past/future acceptance are covered above and
+  // at the pytest level (test_excuses.py).
+  const task = await createTask(request, `PastExcuse ${Date.now()}`)
+  const end = new Date(Date.now() - 60 * 60 * 1000)
+  const start = new Date(end.getTime() - 60 * 60 * 1000)
+
+  const attachResponse = await request.post(`${API_BASE}/excuses/attach`, {
+    data: {
+      task_id: task.id,
+      start: start.toISOString(),
+      end: end.toISOString(),
+      new_excuse_text: 'Got distracted',
+    },
+  })
+  expect(attachResponse.ok()).toBe(true)
+
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Evaluate' }).click()
   await page.getByRole('button', { name: 'Excuses', exact: true }).click()
+
   await expect(page.getByRole('cell', { name: 'Got distracted' }).first()).toBeVisible()
   await expect(page.getByRole('cell', { name: task.name })).toBeVisible()
 })
