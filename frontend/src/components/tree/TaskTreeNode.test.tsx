@@ -19,7 +19,7 @@ beforeEach(() => {
 
 function renderNode(task: ReturnType<typeof makeTask>) {
   return render(
-    <UndoProvider>
+    <UndoProvider activeView="plan">
       <TaskTreeNode
         taskId={task.id}
         tasksById={new Map([[task.id, task]])}

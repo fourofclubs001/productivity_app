@@ -54,6 +54,7 @@ export default function TaskTreeNode({
   function hiddenEntry(): UndoEntry {
     return {
       label: 'Hide completed goal',
+      views: ['plan'],
       run: () => {
         onDecide(taskId, 'hidden')
         return visibleEntry()
@@ -64,6 +65,7 @@ export default function TaskTreeNode({
   function visibleEntry(): UndoEntry {
     return {
       label: 'Restore completed goal',
+      views: ['plan'],
       run: () => {
         onUndecide(taskId)
         return hiddenEntry()

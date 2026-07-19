@@ -52,6 +52,7 @@ export default function TaskTree({
   function reorderEntry(taskId: string, target: number, current: number): UndoEntry {
     return {
       label: 'Reorder task',
+      views: ['plan'],
       run: async () => {
         await reorderTask.mutateAsync({ id: taskId, afterId: null, beforeId: null, order: target })
         return reorderEntry(taskId, current, target)
@@ -62,6 +63,7 @@ export default function TaskTree({
   function setParentsEntry(taskId: string, target: string[], current: string[]): UndoEntry {
     return {
       label: 'Move task',
+      views: ['plan'],
       run: async () => {
         for (const parentId of current) {
           await removeParent.mutateAsync({ id: taskId, parentId })

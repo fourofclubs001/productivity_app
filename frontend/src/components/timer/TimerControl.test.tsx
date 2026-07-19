@@ -24,7 +24,7 @@ vi.mock('../../api/timer', () => ({
 
 function renderTimerControl(tasks: ReturnType<typeof makeTask>[]) {
   return render(
-    <UndoProvider>
+    <UndoProvider activeView="execute">
       <TimerControl tasks={tasks} />
     </UndoProvider>,
   )

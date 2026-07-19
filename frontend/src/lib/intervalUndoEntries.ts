@@ -24,6 +24,7 @@ export function makeUpdateTimeEntry(
 ): UndoEntry {
   return {
     label: 'Move/resize scheduled task',
+    views: ['plan'],
     run: async () => {
       await updateIntervalAsync({ id: intervalId, input: target })
       return makeUpdateTimeEntry(intervalId, current, target, updateIntervalAsync)
@@ -42,6 +43,7 @@ export function makeDeleteIntervalEntry(
 ): UndoEntry {
   return {
     label: 'Add reserved time slot',
+    views: ['plan'],
     run: async () => {
       await mutators.deleteIntervalAsync(interval.id)
       return makeCreateIntervalEntry(interval, mutators)
@@ -57,6 +59,7 @@ export function makeCreateIntervalEntry(
 ): UndoEntry {
   return {
     label: 'Delete reserved time slot',
+    views: ['plan'],
     run: async () => {
       const created = await mutators.createIntervalAsync({
         task_id: interval.task_id,

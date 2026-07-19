@@ -7,7 +7,7 @@ import { UndoProvider } from '../../undo/UndoProvider'
 // AddToCalendarModal (opened from this panel) pushes an undo entry on
 // create, so every render needs a real UndoProvider ancestor.
 function render(ui: Parameters<typeof rtlRender>[0]) {
-  return rtlRender(<UndoProvider>{ui}</UndoProvider>)
+  return rtlRender(<UndoProvider activeView="plan">{ui}</UndoProvider>)
 }
 
 const updateMutate = vi.fn()

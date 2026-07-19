@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { UndoProvider, useUndo, type UndoEntry } from './UndoProvider'
+import type { ViewKey } from '../lib/views'
 
 // The keydown handler's undo/redo work is async (an entry's run() is
 // awaited even when it resolves synchronously, since `await` always defers
@@ -25,9 +26,24 @@ async function pressRedo(shiftInstead = false) {
   })
 }
 
-function TestHarness({ onUndo }: { onUndo: () => void }) {
+function TestHarness({
+  onUndo,
+  onRedo,
+  views = ['plan'],
+}: {
+  onUndo: () => void
+  onRedo?: () => void
+  views?: ViewKey[]
+}) {
   const { pushUndo } = useUndo()
-  const noopRedo: UndoEntry = { label: 'redo', run: () => noopRedo }
+  const noopRedo: UndoEntry = {
+    label: 'redo',
+    views,
+    run: () => {
+      onRedo?.()
+      return noopRedo
+    },
+  }
   return (
     <div>
       <button
@@ -35,6 +51,7 @@ function TestHarness({ onUndo }: { onUndo: () => void }) {
         onClick={() =>
           pushUndo({
             label: 'test',
+            views,
             run: () => {
               onUndo()
               return noopRedo
@@ -51,7 +68,7 @@ function TestHarness({ onUndo }: { onUndo: () => void }) {
 
 function TwoEntryHarness({ first, second }: { first: () => void; second: () => void }) {
   const { pushUndo } = useUndo()
-  const noopRedo: UndoEntry = { label: 'redo', run: () => noopRedo }
+  const noopRedo: UndoEntry = { label: 'redo', views: ['plan'], run: () => noopRedo }
   return (
     <div>
       <button
@@ -59,6 +76,7 @@ function TwoEntryHarness({ first, second }: { first: () => void; second: () => v
         onClick={() =>
           pushUndo({
             label: 'first',
+            views: ['plan'],
             run: () => {
               first()
               return noopRedo
@@ -73,6 +91,7 @@ function TwoEntryHarness({ first, second }: { first: () => void; second: () => v
         onClick={() =>
           pushUndo({
             label: 'second',
+            views: ['plan'],
             run: () => {
               second()
               return noopRedo
@@ -96,6 +115,7 @@ function ChurningHarness({ onLog }: { onLog: (message: string) => void }) {
   function deleteEntry(id: number): UndoEntry {
     return {
       label: `delete ${id}`,
+      views: ['plan'],
       run: () => {
         onLog(`delete ${id}`)
         return createEntry()
@@ -106,6 +126,7 @@ function ChurningHarness({ onLog }: { onLog: (message: string) => void }) {
   function createEntry(): UndoEntry {
     return {
       label: 'create',
+      views: ['plan'],
       run: () => {
         const id = nextId.current++
         onLog(`create ${id}`)
@@ -128,6 +149,39 @@ function ChurningHarness({ onLog }: { onLog: (message: string) => void }) {
   )
 }
 
+/** Pushes one entry per view, tagged with the view named on its own button,
+ * so a test can assert which entries survive an undo scoped to a given
+ * view without needing to swap `activeView` mid-test. */
+function MultiViewHarness({ onLog }: { onLog: (message: string) => void }) {
+  const { pushUndo } = useUndo()
+  function makeEntry(label: string, views: ViewKey[]): UndoEntry {
+    return {
+      label,
+      views,
+      run: () => {
+        onLog(`undo ${label}`)
+        return makeEntry(label, views)
+      },
+    }
+  }
+  function push(label: string, views: ViewKey[]) {
+    pushUndo(makeEntry(label, views))
+  }
+  return (
+    <div>
+      <button type="button" onClick={() => push('plan-action', ['plan'])}>
+        Push plan action
+      </button>
+      <button type="button" onClick={() => push('execute-action', ['execute'])}>
+        Push execute action
+      </button>
+      <button type="button" onClick={() => push('cross-action', ['plan', 'execute'])}>
+        Push cross-view action
+      </button>
+    </div>
+  )
+}
+
 describe('UndoProvider', () => {
   it('throws when useUndo is called outside a provider', () => {
     const BadComponent = () => {
@@ -140,7 +194,7 @@ describe('UndoProvider', () => {
   it('runs the most recently pushed undo entry on ctrl+z', async () => {
     const onUndo = vi.fn()
     render(
-      <UndoProvider>
+      <UndoProvider activeView="plan">
         <TestHarness onUndo={onUndo} />
       </UndoProvider>,
     )
@@ -155,7 +209,7 @@ describe('UndoProvider', () => {
     const first = vi.fn()
     const second = vi.fn()
     render(
-      <UndoProvider>
+      <UndoProvider activeView="plan">
         <TwoEntryHarness first={first} second={second} />
       </UndoProvider>,
     )
@@ -178,7 +232,7 @@ describe('UndoProvider', () => {
   it('does not intercept ctrl+z while focus is inside a text field', async () => {
     const onUndo = vi.fn()
     render(
-      <UndoProvider>
+      <UndoProvider activeView="plan">
         <TestHarness onUndo={onUndo} />
       </UndoProvider>,
     )
@@ -194,7 +248,7 @@ describe('UndoProvider', () => {
   it('ctrl+y redoes what ctrl+z undid', async () => {
     const log: string[] = []
     render(
-      <UndoProvider>
+      <UndoProvider activeView="plan">
         <ChurningHarness onLog={(m) => log.push(m)} />
       </UndoProvider>,
     )
@@ -212,7 +266,7 @@ describe('UndoProvider', () => {
   it('ctrl+shift+z also redoes', async () => {
     const log: string[] = []
     render(
-      <UndoProvider>
+      <UndoProvider activeView="plan">
         <ChurningHarness onLog={(m) => log.push(m)} />
       </UndoProvider>,
     )
@@ -227,7 +281,7 @@ describe('UndoProvider', () => {
   it('stays correct across repeated undo/redo cycles as the resource id churns', async () => {
     const log: string[] = []
     render(
-      <UndoProvider>
+      <UndoProvider activeView="plan">
         <ChurningHarness onLog={(m) => log.push(m)} />
       </UndoProvider>,
     )
@@ -241,10 +295,10 @@ describe('UndoProvider', () => {
     expect(log).toEqual(['create 1', 'delete 1', 'create 2', 'delete 2', 'create 3'])
   })
 
-  it('a fresh undoable action clears the redo stack', async () => {
+  it('a fresh undoable action clears the redo stack for its own view', async () => {
     const log: string[] = []
     render(
-      <UndoProvider>
+      <UndoProvider activeView="plan">
         <ChurningHarness onLog={(m) => log.push(m)} />
       </UndoProvider>,
     )
@@ -257,5 +311,94 @@ describe('UndoProvider', () => {
 
     await pressRedo() // nothing to redo
     expect(log).toEqual([])
+  })
+
+  describe('per-view scoping (v03 item 8)', () => {
+    it('ctrl+z on a view only pops that view\'s entries, leaving others in place', async () => {
+      const log: string[] = []
+      const { rerender } = render(
+        <UndoProvider activeView="plan">
+          <MultiViewHarness onLog={(m) => log.push(m)} />
+        </UndoProvider>,
+      )
+
+      fireEvent.click(screen.getByText('Push plan action'))
+      fireEvent.click(screen.getByText('Push execute action'))
+
+      // On Plan, ctrl+z should skip over the top "execute-action" entry and
+      // pop "plan-action" instead -- not discarding the skipped entry.
+      await pressUndo()
+      expect(log).toEqual(['undo plan-action'])
+
+      // Switch to Execute: its entry is still there, untouched by the above.
+      rerender(
+        <UndoProvider activeView="execute">
+          <MultiViewHarness onLog={(m) => log.push(m)} />
+        </UndoProvider>,
+      )
+      await pressUndo()
+      expect(log).toEqual(['undo plan-action', 'undo execute-action'])
+    })
+
+    it('a cross-view entry is poppable from either of its tagged views', async () => {
+      const log: string[] = []
+      render(
+        <UndoProvider activeView="execute">
+          <MultiViewHarness onLog={(m) => log.push(m)} />
+        </UndoProvider>,
+      )
+
+      fireEvent.click(screen.getByText('Push cross-view action'))
+      await pressUndo()
+
+      expect(log).toEqual(['undo cross-action'])
+    })
+
+    it('ctrl+z on a view with no matching entries is a no-op', async () => {
+      const log: string[] = []
+      render(
+        <UndoProvider activeView="evaluate">
+          <MultiViewHarness onLog={(m) => log.push(m)} />
+        </UndoProvider>,
+      )
+
+      fireEvent.click(screen.getByText('Push plan action'))
+      fireEvent.click(screen.getByText('Push execute action'))
+      await pressUndo()
+
+      expect(log).toEqual([])
+    })
+
+    it('pushing a new Plan action does not clear Execute\'s pending redo', async () => {
+      const onExecuteUndo = vi.fn()
+      const onExecuteRedo = vi.fn()
+      const onPlanUndo = vi.fn()
+      const { rerender } = render(
+        <UndoProvider activeView="execute">
+          <TestHarness onUndo={onExecuteUndo} onRedo={onExecuteRedo} views={['execute']} />
+        </UndoProvider>,
+      )
+
+      fireEvent.click(screen.getByText('Do something undoable'))
+      await pressUndo() // Execute now has a pending redo entry
+
+      rerender(
+        <UndoProvider activeView="plan">
+          <TestHarness onUndo={onPlanUndo} views={['plan']} />
+        </UndoProvider>,
+      )
+      fireEvent.click(screen.getByText('Do something undoable'))
+      await pressUndo() // Plan's own action, unrelated to Execute's redo entry
+
+      rerender(
+        <UndoProvider activeView="execute">
+          <TestHarness onUndo={onExecuteUndo} onRedo={onExecuteRedo} views={['execute']} />
+        </UndoProvider>,
+      )
+      await pressRedo()
+
+      // Execute's redo entry survived the unrelated Plan push/undo above.
+      expect(onExecuteRedo).toHaveBeenCalledTimes(1)
+    })
   })
 })
