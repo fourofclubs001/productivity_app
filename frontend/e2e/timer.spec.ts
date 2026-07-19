@@ -87,8 +87,8 @@ test('starting a timer on a task with an unmet prerequisite is rejected with a d
   await page.getByLabel('Definition of done').fill('done')
   await page.getByRole('button', { name: 'Create' }).click()
   // taskName is now selected in the detail panel.
-  await page.getByLabel('Add requirement').selectOption({ label: requiredName })
-  await page.getByTitle('Add requirement').click()
+  await page.getByRole('button', { name: 'Add requirement…' }).click()
+  await page.getByRole('button', { name: requiredName, exact: true }).click()
 
   await page.getByRole('button', { name: 'Execute' }).click()
   await selectExecuteTask(page, taskName)

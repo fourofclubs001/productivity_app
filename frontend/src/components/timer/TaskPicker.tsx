@@ -8,10 +8,18 @@ export default function TaskPicker({
   tasks,
   selectedId,
   onSelect,
+  isHidden = (task) => task.is_leaf && UNSELECTABLE_LEAF_STATES.has(task.state),
+  isSelectable = (task) => task.is_leaf,
+  placeholder = 'Select a task…',
+  emptyMessage = 'No tasks available to track',
 }: {
   tasks: Task[]
   selectedId: string
   onSelect: (id: string) => void
+  isHidden?: (task: Task) => boolean
+  isSelectable?: (task: Task) => boolean
+  placeholder?: string
+  emptyMessage?: string
 }) {
   const [open, setOpen] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -37,16 +45,9 @@ export default function TaskPicker({
 
   const tasksById = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks])
 
-  // Parent/goal rows stay visible for navigation (item 25), but only leaf
-  // tasks that aren't sprint_done/done can actually be picked.
   const visibleIds = useMemo(
-    () =>
-      new Set(
-        tasks
-          .filter((task) => !task.is_leaf || !UNSELECTABLE_LEAF_STATES.has(task.state))
-          .map((task) => task.id),
-      ),
-    [tasks],
+    () => new Set(tasks.filter((task) => !isHidden(task)).map((task) => task.id)),
+    [tasks, isHidden],
   )
   const rootIds = useMemo(() => treeRootIds(visibleIds, tasksById), [visibleIds, tasksById])
 
@@ -78,7 +79,7 @@ export default function TaskPicker({
         onClick={() => setOpen((prev) => !prev)}
         className="min-w-[12rem] rounded border border-border bg-surface px-2 py-1.5 text-left text-sm text-text-primary hover:bg-surface-hover"
       >
-        {selectedTask ? selectedTask.name : 'Select a task…'}
+        {selectedTask ? selectedTask.name : placeholder}
       </button>
       {open && (
         <div
@@ -86,7 +87,7 @@ export default function TaskPicker({
           className="absolute left-0 z-20 mt-1 max-h-72 w-72 overflow-y-auto rounded-lg border border-border bg-surface p-1 shadow-xl"
         >
           {rows.length === 0 && (
-            <p className="px-2 py-2 text-xs text-text-secondary">No tasks available to track</p>
+            <p className="px-2 py-2 text-xs text-text-secondary">{emptyMessage}</p>
           )}
           {rows.map(({ id, depth }) => {
             const task = tasksById.get(id)
@@ -108,7 +109,7 @@ export default function TaskPicker({
                 >
                   {hasVisibleChildren ? (isExpanded ? '▾' : '▸') : ''}
                 </button>
-                {task.is_leaf ? (
+                {isSelectable(task) ? (
                   <button
                     type="button"
                     onClick={() => select(id)}

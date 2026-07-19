@@ -1,4 +1,4 @@
-import { fireEvent, render as rtlRender, screen, within } from '@testing-library/react'
+import { fireEvent, render as rtlRender, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import TaskDetailPanel from './TaskDetailPanel'
 import { makeTask } from '../../test/taskFixtures'
@@ -185,7 +185,7 @@ describe('TaskDetailPanel', () => {
     expect(removeParentMutate).toHaveBeenCalledWith({ id: 't1', parentId: 'p1' })
   })
 
-  it('adds a requirement when a candidate is selected and Add is clicked', () => {
+  it('adds a requirement when a candidate is picked from the tree-style Requires picker', () => {
     const other = makeTask({ id: 'r1', name: 'Required task' })
     const task = makeTask({ id: 't1' })
     render(
@@ -201,11 +201,34 @@ describe('TaskDetailPanel', () => {
       />,
     )
 
-    const select = screen.getByDisplayValue('Add requirement…')
-    fireEvent.change(select, { target: { value: 'r1' } })
-    fireEvent.click(within(select.closest('div')!).getByText('Add'))
+    fireEvent.click(screen.getByRole('button', { name: 'Add requirement…' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Required task' }))
     expect(addRequirementMutate).toHaveBeenCalledWith(
       { id: 't1', requiredId: 'r1' },
+      expect.any(Object),
+    )
+  })
+
+  it('shows a goal (non-leaf) task as a selectable row in the Requires picker', () => {
+    const goal = makeTask({ id: 'g1', name: 'Goal task', is_leaf: false, children_ids: ['c1'] })
+    const task = makeTask({ id: 't1' })
+    render(
+      <TaskDetailPanel
+        task={task}
+        tasksById={
+          new Map([
+            [task.id, task],
+            [goal.id, goal],
+          ])
+        }
+        onAddChild={() => {}}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add requirement…' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Goal task' }))
+    expect(addRequirementMutate).toHaveBeenCalledWith(
+      { id: 't1', requiredId: 'g1' },
       expect.any(Object),
     )
   })
@@ -251,10 +274,8 @@ describe('TaskDetailPanel', () => {
       />,
     )
 
-    fireEvent.change(screen.getByLabelText('Add requirement'), {
-      target: { value: candidate.id },
-    })
-    fireEvent.click(screen.getByTitle('Add requirement'))
+    fireEvent.click(screen.getByRole('button', { name: 'Add requirement…' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Candidate task' }))
 
     expect(screen.getByText(/would create a cycle/i)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'OK' }))

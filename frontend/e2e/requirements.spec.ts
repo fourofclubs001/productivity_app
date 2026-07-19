@@ -9,8 +9,8 @@ async function createTask(page: import('@playwright/test').Page, name: string) {
 }
 
 async function addRequirement(page: import('@playwright/test').Page, label: string) {
-  await page.getByLabel('Add requirement').selectOption({ label })
-  await page.getByTitle('Add requirement').click()
+  await page.getByRole('button', { name: 'Add requirement…' }).click()
+  await page.getByRole('button', { name: label, exact: true }).click()
 }
 
 test('a task can be marked as requiring another, then the requirement removed', async ({
@@ -32,6 +32,31 @@ test('a task can be marked as requiring another, then the requirement removed', 
 
   await page.getByTitle('Remove requirement').click()
   await expect(panel.getByText('No prerequisites')).toBeVisible()
+})
+
+test('the Requires picker renders as an indented tree and allows selecting a goal (non-leaf) task', async ({
+  page,
+}) => {
+  const suffix = Date.now()
+  const goalName = `Goal ${suffix}`
+  const childName = `Goal child ${suffix}`
+  const taskName = `Task ${suffix}`
+
+  await page.goto('/')
+  await createTask(page, goalName)
+  await page.getByTitle('Create child task').click()
+  await page.getByLabel('Name', { exact: true }).fill(childName)
+  await page.getByLabel('Definition of done').fill('done')
+  await page.getByRole('button', { name: 'Create' }).click()
+
+  await createTask(page, taskName)
+  // taskName is selected; open the Requires picker and pick the goal itself.
+  await page.getByRole('button', { name: 'Add requirement…' }).click()
+  await expect(page.getByTestId('task-picker-options').getByText(goalName)).toBeVisible()
+  await page.getByTestId('task-picker-options').getByRole('button', { name: goalName, exact: true }).click()
+
+  const panel = page.getByTestId('task-detail-panel')
+  await expect(panel.locator('span', { hasText: goalName })).toBeVisible()
 })
 
 test('adding a requirement that would create a cycle is rejected with a dialog', async ({

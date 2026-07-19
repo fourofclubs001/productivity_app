@@ -28,6 +28,7 @@ import IntervalTimeFields, {
   type IntervalTimeValue,
 } from '../calendar/IntervalTimeFields'
 import DoneConfirmModal from '../timer/DoneConfirmModal'
+import TaskPicker from '../timer/TaskPicker'
 import ColorSwatchPicker from './ColorSwatchPicker'
 import StateBadge from './StateBadge'
 import AlertDialog from '../common/AlertDialog'
@@ -66,7 +67,6 @@ export default function TaskDetailPanel({
   )
   const [showDoneConfirm, setShowDoneConfirm] = useState(false)
   const [addParentId, setAddParentId] = useState('')
-  const [addRequiredId, setAddRequiredId] = useState('')
   const [showAddToCalendar, setShowAddToCalendar] = useState(false)
   const [editingIntervalId, setEditingIntervalId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState<IntervalTimeValue | null>(null)
@@ -79,7 +79,6 @@ export default function TaskDetailPanel({
     setOptionsMenuAnchor(null)
     setShowDoneConfirm(false)
     setAddParentId('')
-    setAddRequiredId('')
     setShowAddToCalendar(false)
     setEditingIntervalId(null)
     setEditValue(null)
@@ -445,37 +444,23 @@ export default function TaskDetailPanel({
           })}
         </div>
         {requirementCandidates.length > 0 && (
-          <div className="mt-2 flex gap-2">
-            <select
-              aria-label="Add requirement"
-              value={addRequiredId}
-              onChange={(event) => setAddRequiredId(event.target.value)}
-              className="flex-1 rounded border border-border bg-surface px-2 py-1 text-xs text-text-primary"
-            >
-              <option value="">Add requirement…</option>
-              {requirementCandidates.map((candidate) => (
-                <option key={candidate.id} value={candidate.id}>
-                  {candidate.name}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              title="Add requirement"
-              disabled={!addRequiredId || addRequirement.isPending}
-              onClick={() => {
+          <div className="mt-2">
+            <TaskPicker
+              tasks={Array.from(tasksById.values())}
+              selectedId=""
+              onSelect={(requiredId) =>
                 addRequirement.mutate(
-                  { id: task.id, requiredId: addRequiredId },
-                  {
-                    onSuccess: () => setAddRequiredId(''),
-                    onError: (error) => setAlertMessage((error as Error).message),
-                  },
+                  { id: task.id, requiredId },
+                  { onError: (error) => setAlertMessage((error as Error).message) },
                 )
-              }}
-              className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-alt disabled:opacity-50"
-            >
-              Add
-            </button>
+              }
+              isHidden={(candidate) =>
+                candidate.id === task.id || task.requires_ids.includes(candidate.id)
+              }
+              isSelectable={() => true}
+              placeholder="Add requirement…"
+              emptyMessage="No tasks available to add as a requirement"
+            />
           </div>
         )}
       </div>
