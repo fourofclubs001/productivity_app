@@ -74,6 +74,8 @@ export default function PlanCalendar({
   const [editingInterval, setEditingInterval] = useState<Interval | null>(null)
   const [now, setNow] = useState(() => new Date())
   const [dragPreview, setDragPreview] = useState<{ rect: PixelRect; task: Task } | null>(null)
+  const [draggingEventId, setDraggingEventId] = useState<string | null>(null)
+  const dragCandidateRef = useRef<{ id: string; x: number; y: number } | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -89,6 +91,63 @@ export default function PlanCalendar({
   const updateInterval = useUpdateInterval()
   const deleteInterval = useDeleteInterval()
   const { pushUndo } = useUndo()
+
+  // withDragAndDrop's own reschedule-drag (as opposed to the dnd-kit drag
+  // from the left tree panel, handled separately below) fires its onMouseDown
+  // handler on every press of a draggable chip -- including a plain click,
+  // not just an actual drag -- so it can't be used to detect "really
+  // dragging." Instead, track mousedown-then-movement-past-a-threshold
+  // ourselves (mirroring how the library's own Selection helper distinguishes
+  // a click from a drag) via a data-interval-id attribute on the custom event
+  // renderer below. No onDragEnd/onDragCancel exists either, so this is
+  // cleared defensively on mouseup/Escape too, not just on a successful drop.
+  useEffect(() => {
+    const wrapper = wrapperRef.current
+    if (!wrapper) return
+    const MOVE_THRESHOLD_PX = 5
+
+    function onMouseDown(domEvent: MouseEvent) {
+      const eventEl = (domEvent.target as HTMLElement).closest<HTMLElement>('[data-interval-id]')
+      if (!eventEl) return
+      dragCandidateRef.current = {
+        id: eventEl.dataset.intervalId!,
+        x: domEvent.clientX,
+        y: domEvent.clientY,
+      }
+    }
+
+    function onMouseMove(domEvent: MouseEvent) {
+      const candidate = dragCandidateRef.current
+      if (!candidate) return
+      const dx = domEvent.clientX - candidate.x
+      const dy = domEvent.clientY - candidate.y
+      if (Math.hypot(dx, dy) <= MOVE_THRESHOLD_PX) return
+      dragCandidateRef.current = null
+      const interval = intervals.find((i) => i.id === candidate.id)
+      if (!interval) return
+      if (isFullyPast({ start: new Date(interval.start), end: new Date(interval.end) }, now)) return
+      setDraggingEventId(candidate.id)
+    }
+
+    function clear() {
+      dragCandidateRef.current = null
+      setDraggingEventId(null)
+    }
+    function onKeyDown(domEvent: KeyboardEvent) {
+      if (domEvent.key === 'Escape') clear()
+    }
+
+    wrapper.addEventListener('mousedown', onMouseDown)
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', clear)
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      wrapper.removeEventListener('mousedown', onMouseDown)
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', clear)
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [intervals, now])
 
   const { setNodeRef, isOver } = useDroppable({ id: 'plan-calendar' })
   function setCalendarRef(node: HTMLDivElement | null) {
@@ -194,6 +253,7 @@ export default function PlanCalendar({
   }
 
   function handleEventChange({ event, start, end }: EventInteractionArgs<CalendarEvent>) {
+    setDraggingEventId(null)
     const interval = intervals.find((i) => i.id === event.id)
     if (!interval) return
     const previousStart = interval.start
@@ -302,7 +362,7 @@ export default function PlanCalendar({
             style: {
               ...chipFillStyle(event.colors),
               border: 'none',
-              opacity: isFullyPast(event, now) ? 0.55 : 1,
+              opacity: event.id === draggingEventId ? 0 : isFullyPast(event, now) ? 0.55 : 1,
             },
           })}
           components={{
@@ -311,6 +371,7 @@ export default function PlanCalendar({
             event: ({ event, title }: { event: CalendarEvent; title: string }) => (
               <div
                 className="h-full w-full truncate"
+                data-interval-id={event.id}
                 onContextMenu={(domEvent) => {
                   domEvent.preventDefault()
                   const interval = intervals.find((i) => i.id === event.id)
