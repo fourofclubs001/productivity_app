@@ -235,9 +235,19 @@ describe('qualifiesForRemovalPrompt', () => {
     expect(qualifiesForRemovalPrompt(leaf, new Map(), {})).toBe(false)
   })
 
-  it('does not qualify a childless parent', () => {
-    const parent = makeTask({ id: 'p', is_leaf: false, children_ids: [] })
+  it('does not qualify a childless parent that never had children', () => {
+    const parent = makeTask({ id: 'p', is_leaf: false, children_ids: [], ever_had_children: false })
     expect(qualifiesForRemovalPrompt(parent, new Map([['p', parent]]), {})).toBe(false)
+  })
+
+  it('qualifies a parent whose last remaining child was deleted outright (v03 item 10)', () => {
+    const parent = makeTask({ id: 'p', is_leaf: false, children_ids: [], ever_had_children: true })
+    expect(qualifiesForRemovalPrompt(parent, new Map([['p', parent]]), {})).toBe(true)
+  })
+
+  it('still respects an existing decision for a now-childless former goal', () => {
+    const parent = makeTask({ id: 'p', is_leaf: false, children_ids: [], ever_had_children: true })
+    expect(qualifiesForRemovalPrompt(parent, new Map([['p', parent]]), { p: 'kept' })).toBe(false)
   })
 
   it('does not qualify when some children are still active', () => {

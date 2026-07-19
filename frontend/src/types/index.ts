@@ -16,6 +16,7 @@ export interface Task {
   requires_ids: string[]
   required_by_ids: string[]
   estimated_hours: number | null
+  ever_had_children: boolean
 }
 
 export interface Interval {

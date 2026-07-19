@@ -79,6 +79,10 @@ class TaskRepository:
         await self._redis.sadd(children_key(parent_id), child_id)
         await self._redis.sadd(parents_key(child_id), parent_id)
         await self._redis.srem(ROOTS_KEY, child_id)
+        # Monotonic marker: once a task has ever had a child, it's permanently
+        # treated as a goal (not a leaf) even if later emptied out entirely --
+        # see _compute_state/keep_as_backlog (v03 item 10).
+        await self._redis.hset(task_key(parent_id), "ever_had_children", "1")
 
     async def remove_child_edge(self, parent_id: str, child_id: str) -> None:
         await self._redis.srem(children_key(parent_id), child_id)

@@ -91,3 +91,45 @@ test('declining removal keeps the parent visible as Backlog until a new child re
   await expect(parentRowAfterNewChild.getByText('Backlog')).not.toBeVisible()
   await expect(parentRowAfterNewChild.getByText('In progress')).toBeVisible()
 })
+
+test('deleting a parent\'s only child outright (not completing it) also offers to keep it as backlog', async ({
+  page,
+  request,
+}) => {
+  const suffix = Date.now()
+  const parent = await createTask(request, `Goal ${suffix}`)
+  const child = await createTask(request, `Leaf ${suffix}`, [parent.id])
+
+  await page.goto('/')
+  const tree = page.getByTestId('task-tree')
+  const parentRowGroup = tree.locator('.group', { hasText: parent.name })
+  await parentRowGroup.getByRole('button').first().click() // expand chevron
+  await expect(tree.getByText(child.name)).toBeVisible()
+
+  // Delete the child outright via the API (equivalent to right-click
+  // Delete on its tree row), rather than completing it.
+  await request.delete(`${API_BASE}/tasks/${child.id}`)
+  await page.reload()
+
+  const promptText = tree.getByText(new RegExp(`${parent.name}.*sub-tasks are all done`))
+  await expect(promptText).toBeVisible()
+
+  await promptText.locator('..').getByRole('button', { name: 'No' }).click()
+  const parentRow = tree.getByText(parent.name, { exact: true }).locator('..')
+  await expect(parentRow.getByText('Backlog')).toBeVisible()
+
+  await page.reload()
+  await expect(page.getByTestId('task-tree').getByText(parent.name, { exact: true })).toBeVisible()
+  await expect(
+    page.getByTestId('task-tree').getByText(new RegExp(`${parent.name}.*sub-tasks are all done`)),
+  ).not.toBeVisible()
+
+  // A task the parent never had before still shows as a plain leaf, not
+  // triggering the prompt -- only a childless *former* goal does.
+  const untouchedLeaf = await createTask(request, `Untouched ${suffix}`)
+  await page.reload()
+  await expect(page.getByTestId('task-tree').getByText(untouchedLeaf.name)).toBeVisible()
+  await expect(
+    page.getByTestId('task-tree').getByText(new RegExp(`${untouchedLeaf.name}.*sub-tasks are all done`)),
+  ).not.toBeVisible()
+})

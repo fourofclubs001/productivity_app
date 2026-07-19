@@ -17,6 +17,7 @@ export function makeTask(overrides: Partial<Task> = {}): Task {
     requires_ids: [],
     required_by_ids: [],
     estimated_hours: null,
+    ever_had_children: false,
     ...overrides,
   }
 }

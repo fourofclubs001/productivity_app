@@ -54,7 +54,11 @@ export function qualifiesForRemovalPrompt(
   decisions: Record<string, ParentDecision>,
 ): boolean {
   if (task.is_leaf) return false
-  if (task.children_ids.length === 0) return false
+  // A task that never had children (a fresh leaf, or an intentionally
+  // empty new root) never qualifies -- only a task transitioning from "had
+  // children" to "has none" (its last child deleted outright, not
+  // completed) does, per ever_had_children (v03 item 10).
+  if (task.children_ids.length === 0 && !task.ever_had_children) return false
   if (decisions[task.id]) return false
   return task.children_ids.every((childId) => {
     const child = tasksById.get(childId)

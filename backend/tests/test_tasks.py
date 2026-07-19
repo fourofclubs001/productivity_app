@@ -474,3 +474,59 @@ async def test_keep_as_backlog_rejects_when_not_all_children_are_finished(client
 def test_keep_as_backlog_rejects_missing_task(client):
     response = client.post("/tasks/missing/keep-as-backlog")
     assert response.status_code == 404
+
+
+def test_deleting_a_tasks_last_remaining_child_reads_as_backlog_not_a_leaf(client):
+    parent = create_task(client, name="Goal")
+    child = create_task(client, name="Only child", parent_ids=[parent["id"]])
+
+    before = client.get(f"/tasks/{parent['id']}").json()
+    assert before["is_leaf"] is False
+    assert before["ever_had_children"] is True
+
+    client.delete(f"/tasks/{child['id']}")
+
+    after = client.get(f"/tasks/{parent['id']}").json()
+    assert after["children_ids"] == []
+    # Reads as backlog (the live-computed default over an empty leaf set),
+    # not as a leaf just because it currently has zero children.
+    assert after["state"] == "backlog"
+    assert after["is_leaf"] is False
+    assert after["ever_had_children"] is True
+
+
+def test_a_task_that_never_had_children_is_unaffected(client):
+    task = create_task(client, name="Always a leaf")
+    body = client.get(f"/tasks/{task['id']}").json()
+    assert body["is_leaf"] is True
+    assert body["ever_had_children"] is False
+
+
+def test_keep_as_backlog_succeeds_after_the_last_child_is_deleted_outright(client):
+    parent = create_task(client, name="Goal")
+    child = create_task(client, name="Only child", parent_ids=[parent["id"]])
+    client.delete(f"/tasks/{child['id']}")
+
+    response = client.post(f"/tasks/{parent['id']}/keep-as-backlog")
+    assert response.status_code == 200
+    assert response.json()["state"] == "backlog"
+
+    after = client.get(f"/tasks/{parent['id']}").json()
+    assert after["state"] == "backlog"
+    assert after["is_leaf"] is False
+
+
+async def test_keep_as_backlog_override_bypassed_once_a_new_child_is_added_after_deletion(
+    client, redis_client
+):
+    parent = create_task(client, name="Goal")
+    child = create_task(client, name="Only child", parent_ids=[parent["id"]])
+    client.delete(f"/tasks/{child['id']}")
+    client.post(f"/tasks/{parent['id']}/keep-as-backlog")
+    assert client.get(f"/tasks/{parent['id']}").json()["state"] == "backlog"
+
+    new_child = create_task(client, name="New child", parent_ids=[parent["id"]])
+    await redis_client.hset(f"task:{new_child['id']}", "state", "in_progress")
+    after = client.get(f"/tasks/{parent['id']}").json()
+    assert after["state"] == "in_progress"
+    assert after["is_leaf"] is False

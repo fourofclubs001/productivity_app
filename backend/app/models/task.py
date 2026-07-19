@@ -77,3 +77,8 @@ class TaskOut(BaseModel):
     # Leaf: its own value if set, else None. Parent: sum of leaf descendants'
     # values (0 if none of them have anything set).
     estimated_hours: float | None
+    # Monotonic: true once this task has ever had a child, even if it was
+    # later emptied out entirely by deleting its last child outright (as
+    # opposed to a task that never had children at all). Keeps it reading
+    # as a goal (is_leaf: false) rather than reverting to a leaf.
+    ever_had_children: bool

@@ -33,32 +33,40 @@ _FINISHED_STATES = {TaskState.sprint_done, TaskState.done}
 
 def _compute_state(task_id: str, graph: dict[str, TaskNode]) -> TaskState:
     node = graph[task_id]
-    if not node.children:
+    ever_had_children = node.fields.get("ever_had_children") == "1"
+    if not node.children and not ever_had_children:
         return TaskState(node.fields.get("state", TaskState.backlog.value))
 
     leaf_states: set[TaskState] = set()
-    visited: set[str] = set()
-    stack = [task_id]
-    while stack:
-        current = stack.pop()
-        if current in visited:
-            continue
-        visited.add(current)
-        current_node = graph[current]
-        if not current_node.children:
-            leaf_states.add(TaskState(current_node.fields.get("state", TaskState.backlog.value)))
-        else:
-            stack.extend(current_node.children)
+    if node.children:
+        visited: set[str] = set()
+        stack = [task_id]
+        while stack:
+            current = stack.pop()
+            if current in visited:
+                continue
+            visited.add(current)
+            current_node = graph[current]
+            if not current_node.children:
+                state = current_node.fields.get("state", TaskState.backlog.value)
+                leaf_states.add(TaskState(state))
+            else:
+                stack.extend(current_node.children)
+    # else: a childless former-goal (its last child was deleted outright,
+    # not completed) -- leaf_states stays empty rather than reading the
+    # node's own raw state, so it falls through to the same override check
+    # and backlog default as a goal with all-finished children (v03 item 10).
 
     # A "kept as backlog" override (set via keep_as_backlog, when the user
-    # declines to remove a parent whose children are all finished) only
-    # applies while that same finished-ness still holds -- the moment a
-    # child is reopened or a new not-yet-finished child is added, this
-    # condition goes false and the override is silently bypassed, falling
-    # through to normal live computation below. No explicit clear-on-event
-    # logic is needed; it's just another input to the same derivation.
-    if node.fields.get("state_override") == TaskState.backlog.value and leaf_states and (
-        leaf_states <= _FINISHED_STATES
+    # declines to remove a parent whose children are all finished, or whose
+    # last child was deleted outright) only applies while that same
+    # finished-ness (or childlessness) still holds -- the moment a child is
+    # reopened or a new not-yet-finished child is added, this condition goes
+    # false and the override is silently bypassed, falling through to
+    # normal live computation below. No explicit clear-on-event logic is
+    # needed; it's just another input to the same derivation.
+    if node.fields.get("state_override") == TaskState.backlog.value and (
+        not leaf_states or leaf_states <= _FINISHED_STATES
     ):
         return TaskState.backlog
 
@@ -119,13 +127,14 @@ class TaskService:
             created_at=datetime.fromisoformat(node.fields["created_at"]),
             colors=sorted(node.colors),
             effective_colors=sorted(_compute_effective_colors(task_id, graph, color_memo)),
-            is_leaf=not node.children,
+            is_leaf=not node.children and node.fields.get("ever_had_children") != "1",
             parent_ids=sorted(node.parents),
             children_ids=_sorted_by_order(node.children, graph),
             order=_order_of(node),
             requires_ids=sorted(node.requires),
             required_by_ids=sorted(node.required_by),
             estimated_hours=_estimated_hours(task_id, graph),
+            ever_had_children=node.fields.get("ever_had_children") == "1",
         )
 
     async def create_task(self, payload: TaskCreate) -> TaskOut:
@@ -345,15 +354,19 @@ class TaskService:
             raise TaskNotFoundError(task_id)
 
         node = graph[task_id]
-        if not node.children:
+        if not node.children and node.fields.get("ever_had_children") != "1":
             raise TaskNotEligibleForBacklogOverrideError(task_id)
 
-        leaf_states = {
-            TaskState(graph[leaf_id].fields.get("state", TaskState.backlog.value))
-            for leaf_id in leaf_descendants(task_id, graph)
-        }
-        if not leaf_states or not leaf_states <= _FINISHED_STATES:
-            raise TaskNotEligibleForBacklogOverrideError(task_id)
+        if node.children:
+            leaf_states = {
+                TaskState(graph[leaf_id].fields.get("state", TaskState.backlog.value))
+                for leaf_id in leaf_descendants(task_id, graph)
+            }
+            if not leaf_states or not leaf_states <= _FINISHED_STATES:
+                raise TaskNotEligibleForBacklogOverrideError(task_id)
+        # else: last remaining child was deleted outright, leaving this
+        # childless -- vacuously eligible, mirroring the frontend's
+        # qualifiesForRemovalPrompt (v03 item 10).
 
         await self._repo.update_fields(task_id, {"state_override": TaskState.backlog.value})
         return await self.get_task(task_id)
