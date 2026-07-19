@@ -4,14 +4,14 @@ Working notes for picking this project back up in a future session. Not user-fac
 docs (see `README.md` for that) — this is "what's true right now and how we work
 here."
 
-## Where things stand (as of commit `80f515a`, v02 pass complete)
+## Where things stand (as of commit `95e3d79`, v03 pass complete)
 
 The app is fully built and working: Plan / Execute / Evaluate views, FastAPI +
 Redis backend, React + Tailwind frontend, Google Workspace/Calendar-styled light
-theme. v00 (8 items), v01 (30 items, M1–M12), and now v02 (19 items, M13–M23)
-are all fully implemented, committed, and pushed. **Next up: interpret
-`prompts/app_improvements_v03.md`** (already dropped in the repo, untracked) —
-see the bottom of this file.
+theme. v00 (8 items), v01 (30 items, M1–M12), v02 (19 items, M13–M23), and now
+v03 (11 items, M24–M34) are all fully implemented, committed, and pushed.
+No `prompts/app_improvements_vNN.md` is currently pending — the next session
+should wait for a new one to be dropped in, per the workflow below.
 
 ### v02 milestones (M13–M23, one commit each, all pushed)
 
@@ -123,6 +123,97 @@ see the bottom of this file.
   fully-uncovered gap → save a new excuse → see it in the Excuses subtab).
   **This completes the v02 pass.**
 
+### v03 milestones (M24–M34, one commit each, all pushed)
+
+- **M24** (`c3fd340`) — item 3: "Save"/"Discard" buttons moved from below
+  "Estimated time" to the detail panel header's top-right, next to the kebab
+  (⋮) Options button. New "Discard" resets local `name`/`dod` state back to
+  the task's last-saved values, no mutation, no navigation.
+- **M25** (`2655f01`) — item 2: right-click "Delete" on a Plan left-panel task
+  row, reusing the same `ContextMenu`/`ConfirmDialog` pair the calendar
+  chip's right-click and the detail panel's kebab menu already use, wired to
+  `useDeleteTask`.
+- **M26** (`158b1dd`) — item 5: Requires dropdown gets Execute's `TaskPicker`
+  indented-tree presentation instead of a flat alphabetical `<select>`.
+  Generalized `TaskPicker` with `isHidden`/`isSelectable`/`placeholder`/
+  `emptyMessage` props (defaults preserve Execute's existing behavior
+  exactly) — Requires passes `isSelectable={() => true}` so goal (non-leaf)
+  tasks stay selectable there, unlike Execute's leaf-only restriction.
+- **M27** (`194a40e`) — item 4: `IntervalTimeFields.tsx`'s single shared `day`
+  field split into independent `startDate`/`endDate`, so an interval can
+  represent a plan crossing midnight. Validation now compares full combined
+  datetimes. `defaultTimeValue()`'s 1-hour quick-default is clamped to stay
+  same-day when the natural +1h would cross midnight, because of a
+  **newly-discovered, unfixed latent bug**: PlanCalendar's react-big-calendar
+  week/day grid doesn't render a chip at all for an event whose date range
+  spans midnight (confirmed via a throwaway debug spec) — see "Known
+  limitations" below.
+- **M28** (`a1ee33b`) — item 11: `Entry`/`Interval` now snapshot the task's
+  name at creation time (`task_name`, nullable for pre-existing rows), so a
+  deleted task's still-preserved past intervals/entries keep showing their
+  real name on Execute/Evaluate/Plan instead of falling through to "Unknown
+  task". Surfaced and fixed a real bug along the way: `useDeleteTask()`
+  never invalidated the intervals/entries query caches, so the Plan calendar
+  kept showing a just-deleted task's future-interval chip (previously masked
+  because its title silently fell back to "Unknown task" once the task left
+  the cache, which looked enough like "gone" to pass the pre-existing test).
+- **M29** (`0040bcc`) — item 6: interval *deletion* brought under the same
+  edit-lock M15/M16 already apply to interval *editing* — new
+  `IntervalDeleteLockedError`, raised whenever the interval's start isn't
+  strictly in the future. Both delete entry points (detail panel's "×",
+  calendar chip's right-click "Delete") now show an explanatory dialog
+  instead of calling the mutation, applied consistently to both.
+- **M30** (`dc73948`) — item 9: excuses can now only be attached to gaps
+  fully in the past — a future planned interval trivially has no real
+  tracked time yet, so it isn't "missed" yet either. `EvaluateCalendar`'s
+  diff-mode uncovered segments only fire `onExplainGap` (and only get
+  interactive styling) once `isFullyPast`; backend `ExcuseService.attach`
+  gets a matching `FutureGapExcuseError` guard against a client hitting the
+  endpoint directly.
+- **M31** (`7fe35e0`) — item 7: the existing-chip reschedule drag now hides
+  the source chip for the gesture's duration instead of showing react-big-
+  calendar's default "looks like two chips" visual. **Gotcha discovered**:
+  the addon's own `onDragStart`/`onBeginAction` fires on *every* mousedown on
+  a draggable chip — including a plain click, not just a real drag — so
+  using it directly to hide the chip broke left-click-to-open-detail
+  entirely (root-caused by reading the library's source, since the bug
+  reproduced identically in isolation). Fixed by tracking mousedown-then-
+  movement-past-a-5px-threshold ourselves, mirroring how the library's own
+  `Selection` helper distinguishes a click from a drag.
+- **M32** (`57ae008`) — item 1: dragging a past-locked chip's start to a
+  future slot now creates a new interval at the drop target and leaves the
+  original completely untouched (a copy, not a move) — a deliberate,
+  narrow exception to the M16 edit lock. Dragging to another past slot is
+  still rejected. `draggableAccessor` relaxed to allow starting the gesture
+  for any chip; the branch logic is extracted to a pure
+  `resolveDragRescheduleAction()` in `intervalTiming.ts` so it's unit-
+  testable directly, since genuinely past/in-progress intervals can't be
+  created through the public API at all (same limitation as M16/M29's lock
+  tests).
+- **M33** (`229c20e`) — item 8: Ctrl+Z/Ctrl+Y scoped per view. Each
+  `UndoEntry` now carries a `views: ViewKey[]` tag (new `lib/views.ts`), set
+  at push time — normally just the pushing view, except the mark/revert-done
+  pair (pushed from both Execute's stop-timer flow and Plan's own "Mark
+  sprint done" button, touching state both views' displays depend on), which
+  is tagged for both. `App.tsx` threads its `activeView` state into
+  `UndoProvider` as a prop; Ctrl+Z/Ctrl+Y scan the stack from the top for the
+  most recent entry tagged with the active view and splice it out —
+  skipped-over entries for other views stay in place, poppable once that
+  view is active again. Pushing a new entry only invalidates the redo stack
+  for its own view(s).
+- **M34** (`95e3d79`) — item 10: a root task now returns to `backlog`
+  (rather than reading as a leaf) when its last remaining child is deleted
+  outright, not just completed. New monotonic `ever_had_children` marker
+  (set the instant a task gains its first child, in
+  `TaskRepository.add_child_edge` — the single choke point every
+  parent-gaining path funnels through) keeps a childless former-goal reading
+  as `is_leaf: false` and its state as the normal live-computed default
+  (or the `state_override` "keep as backlog" choice) rather than falling
+  back to its own raw `state` field. `keep_as_backlog` and the frontend's
+  `qualifiesForRemovalPrompt` are both relaxed to accept this case, reusing
+  the existing "keep as backlog?" prompt row unchanged. A task that never
+  had children is unaffected.
+
 ## The workflow established for this project
 
 This has repeated three times now (initial build, v00, v01) and is worth reusing:
@@ -148,11 +239,24 @@ This has repeated three times now (initial build, v00, v01) and is worth reusing
    gotcha above), write a throwaway spec, then delete it (and any screenshots)
    before committing — don't commit assertion-less or debug-only specs.
 
-**A `prompts/app_improvements_v03.md` was dropped into the repo (untracked) partway
-through the v02 pass** — not yet read or acted on. v02 is now fully done, so per the
-workflow above, this is the next thing: interpret it, clarify, commit, plan, implement.
-
 ## Known limitations (deliberately deferred, not bugs)
+
+- **PlanCalendar doesn't render a chip for an interval whose date range spans
+  midnight** (discovered in M27, v03 pass) — react-big-calendar's
+  week/day time grid appears to compute zero height (or misattribute the
+  segment) for an event whose start and end fall on different calendar days,
+  so it's invisible in the Plan week view even though the data is correct and
+  fully retrievable (confirmed via a throwaway debug spec: `GET
+  /intervals/by-task/{id}` returns the right start/end, the detail panel's
+  "Sprint schedule" list shows it correctly, only the `.rbc-event` chip
+  itself never appears). Item 4 (M27) made cross-midnight intervals
+  representable in the edit UI for the first time, which is what surfaced
+  this; `IntervalTimeFields.tsx`'s `defaultTimeValue()` was clamped to avoid
+  the *default* 1-hour quick-add ever landing on one by accident, but a user
+  who deliberately edits an interval to cross midnight will still hit this
+  rendering gap. Would need PlanCalendar to clip/split such an event into
+  per-day segments (the way react-big-calendar's month view handles
+  multi-day all-day events) to actually fix.
 
 - **Google Calendar sync** — not implemented. Reserving time in Plan is local-only.
 - **No auth/users** — single-user by design for this stage.
@@ -185,6 +289,13 @@ workflow above, this is the next thing: interpret it, clarify, commit, plan, imp
   the end of the file list. Retrying (`npx playwright test` again, or just the
   affected file alone) has so far always passed. Not fixed — would need either a
   per-spec Redis flush (slower) or more deliberately-isolated fixture data.
+  **Recurred repeatedly during the v03 pass** (M25, M27, M29, M31, M34) as the
+  suite grew further — same symptom each time (an isolated single-file or
+  single-test re-run always passed), and occasionally a substring collision
+  in a locator name (e.g. a new test's task literally named "...Delete..." or
+  "...Cancel...") ambiguously matched a same-named button elsewhere in the
+  DOM once enough tasks piled up; fixed case-by-case by renaming the fixture
+  data, not by addressing the underlying no-flush-between-specs cause.
 
 ## Environment notes
 
@@ -269,13 +380,18 @@ docker compose -f docker-compose.dev.yml up --build     # dev: isolated data, po
 
 ## Next possible steps
 
-- Read and interpret `prompts/app_improvements_v03.md` (already dropped in the
-  repo, untracked) per the established workflow — this is the next thing now
-  that v02 (M13–M23) is fully done.
+- No `prompts/app_improvements_vNN.md` is currently pending. When the next one
+  is dropped in, follow the workflow above (interpret, clarify, commit, plan,
+  implement).
+- Consider actually fixing PlanCalendar's midnight-crossing-event rendering
+  gap (found in the v03 pass, M27/M34) if a user hits it in practice —
+  needs per-day segment clipping in `PlanCalendar.tsx`, not attempted.
 - Consider actually fixing the M18 dnd-kit scrolled-container drag bug (currently
   only worked around in tests) if it turns out to bite a real user.
 - Revisit the UTC-vs-local-timezone limitation if week/day boundaries ever look
   wrong to the user in practice.
 - Revisit the tree auto-expand-on-add-child gap if it becomes annoying.
 - Consider a per-spec (not per-run) Redis flush for the Playwright suite if the
-  crowding-related flakiness noted above gets worse as more specs are added.
+  crowding-related flakiness noted above gets worse as more specs are added
+  (it has: the v03 pass hit it repeatedly across several specs, always
+  resolved by an isolated re-run).
