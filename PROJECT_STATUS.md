@@ -214,6 +214,51 @@ should wait for a new one to be dropped in, per the workflow below.
   the existing "keep as backlog?" prompt row unchanged. A task that never
   had children is unaffected.
 
+### Post-v03 ad hoc fix: cross-midnight chip rendering
+
+- Fixed the "PlanCalendar doesn't render a chip for a cross-midnight interval"
+  known limitation flagged during M27/M34 above, prompted by the user hitting
+  it in practice on the **Execute** calendar (a tracked time entry that ran
+  past midnight had no visible chip at all). Root cause was confirmed to be
+  in `react-big-calendar` itself, not app-specific: its week/day time grid
+  simply can't render an event whose start/end fall on different **local**
+  calendar days, and all three calendars (`PlanCalendar.tsx`,
+  `ExecuteCalendar.tsx`, `EvaluateCalendar.tsx`) feed it events through the
+  same path, so the bug was never actually Plan-only, just first noticed
+  there.
+  - Fix: new `frontend/src/lib/splitEventAcrossDays.ts` (`splitAcrossDays`)
+    clips any event spanning local midnight into one segment per day it
+    touches — mirroring how the library's own month view already splits
+    multi-day all-day events. All three calendars' `events` memos now
+    `flatMap` through it.
+  - `PlanCalendar.tsx` is the one interactive calendar (drag-move, edge-
+    resize), so a new `CalendarEvent.isMultiDaySegment` flag disables
+    `draggableAccessor`/`resizableAccessor` for split segments — dragging a
+    visually-clipped day-segment would otherwise report only that day's
+    partial range to `onEventDrop`/`onEventResize`, silently truncating the
+    real interval. The custom mousedown/mousemove drag-arm listener (see
+    M31's gotcha above) got the same guard. A cross-midnight interval stays
+    fully editable via the existing "Edit time" modal (typed start/end
+    dates, from M27) and right-click delete; only body-drag/edge-resize are
+    excluded for that one case.
+  - Execute/Evaluate needed no such guard — they're read-only, so splitting
+    is purely a rendering change there.
+  - **Gotcha hit while testing:** a Vitest fixture using UTC interval times
+    that "obviously" crossed midnight didn't actually trigger a split,
+    because the test runner's local timezone (GMT-3) shifts the wall-clock
+    crossing point — `splitAcrossDays` correctly operates on *local*
+    calendar days (matching how react-big-calendar buckets day columns via
+    `calendarLocalizer.ts`'s date-fns localizer), not UTC days. Fixed by
+    using a 30h+ span in the fixture, which guarantees crossing a local
+    midnight regardless of the runner's offset.
+  - Verified via new unit tests (`splitEventAcrossDays.test.ts`, plus a
+    `PlanCalendar.test.tsx` case covering both rendered segments and that
+    right-click delete / left-click-open still resolve to the one underlying
+    interval) and a throwaway Playwright spec against the dev stack
+    (confirmed 2 chips render for both a Plan interval and an Execute
+    entry crossing midnight; deleted before committing, per the usual
+    throwaway-spec convention).
+
 ## The workflow established for this project
 
 This has repeated three times now (initial build, v00, v01) and is worth reusing:
@@ -240,23 +285,6 @@ This has repeated three times now (initial build, v00, v01) and is worth reusing
    before committing — don't commit assertion-less or debug-only specs.
 
 ## Known limitations (deliberately deferred, not bugs)
-
-- **PlanCalendar doesn't render a chip for an interval whose date range spans
-  midnight** (discovered in M27, v03 pass) — react-big-calendar's
-  week/day time grid appears to compute zero height (or misattribute the
-  segment) for an event whose start and end fall on different calendar days,
-  so it's invisible in the Plan week view even though the data is correct and
-  fully retrievable (confirmed via a throwaway debug spec: `GET
-  /intervals/by-task/{id}` returns the right start/end, the detail panel's
-  "Sprint schedule" list shows it correctly, only the `.rbc-event` chip
-  itself never appears). Item 4 (M27) made cross-midnight intervals
-  representable in the edit UI for the first time, which is what surfaced
-  this; `IntervalTimeFields.tsx`'s `defaultTimeValue()` was clamped to avoid
-  the *default* 1-hour quick-add ever landing on one by accident, but a user
-  who deliberately edits an interval to cross midnight will still hit this
-  rendering gap. Would need PlanCalendar to clip/split such an event into
-  per-day segments (the way react-big-calendar's month view handles
-  multi-day all-day events) to actually fix.
 
 - **Google Calendar sync** — not implemented. Reserving time in Plan is local-only.
 - **No auth/users** — single-user by design for this stage.
@@ -383,9 +411,6 @@ docker compose -f docker-compose.dev.yml up --build     # dev: isolated data, po
 - No `prompts/app_improvements_vNN.md` is currently pending. When the next one
   is dropped in, follow the workflow above (interpret, clarify, commit, plan,
   implement).
-- Consider actually fixing PlanCalendar's midnight-crossing-event rendering
-  gap (found in the v03 pass, M27/M34) if a user hits it in practice —
-  needs per-day segment clipping in `PlanCalendar.tsx`, not attempted.
 - Consider actually fixing the M18 dnd-kit scrolled-container drag bug (currently
   only worked around in tests) if it turns out to bite a real user.
 - Revisit the UTC-vs-local-timezone limitation if week/day boundaries ever look

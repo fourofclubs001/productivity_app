@@ -6,6 +6,7 @@ import type { Entry, Interval, Task } from '../../types'
 import { localizer } from '../../lib/calendarLocalizer'
 import { computeDiffSegments } from '../../lib/intervalDiff'
 import { isFullyPast } from '../../lib/intervalTiming'
+import { splitAcrossDays } from '../../lib/splitEventAcrossDays'
 import { chipFillStyle, primaryChipColor } from './eventColor'
 import CalendarDayHeader from './CalendarDayHeader'
 import CalendarTimezoneLabel from './CalendarTimezoneLabel'
@@ -58,28 +59,28 @@ export default function EvaluateCalendar({
   }, [])
 
   const events = useMemo<CalendarEvent[]>(() => {
-    const planned: CalendarEvent[] = intervals.map((interval) => {
+    const planned: CalendarEvent[] = intervals.flatMap((interval) => {
       const task = tasksById.get(interval.task_id)
-      return {
+      return splitAcrossDays({
         id: `interval-${interval.id}`,
         title: interval.task_name ?? task?.name ?? 'Unknown task',
         start: new Date(interval.start),
         end: new Date(interval.end),
         colors: task?.effective_colors ?? [],
-        kind: 'planned',
-      }
+        kind: 'planned' as const,
+      })
     })
 
-    const real: CalendarEvent[] = entries.map((entry) => {
+    const real: CalendarEvent[] = entries.flatMap((entry) => {
       const task = tasksById.get(entry.task_id)
-      return {
+      return splitAcrossDays({
         id: `entry-${entry.id}`,
         title: entry.task_name ?? task?.name ?? 'Unknown task',
         start: new Date(entry.start),
         end: entry.end ? new Date(entry.end) : new Date(),
         colors: task?.effective_colors ?? [],
-        kind: 'real',
-      }
+        kind: 'real' as const,
+      })
     })
 
     if (mode === 'planned') return planned
@@ -89,21 +90,21 @@ export default function EvaluateCalendar({
     // sub-segments instead of rendering it as one solid chip. The separate
     // `real` chips are still concatenated as-is (unchanged from before) so
     // tracked time with no corresponding plan stays visible.
-    const diffSegments: CalendarEvent[] = computeDiffSegments(intervals, entries).map(
+    const diffSegments: CalendarEvent[] = computeDiffSegments(intervals, entries).flatMap(
       (segment, index) => {
         const task = tasksById.get(segment.taskId)
         const sourceInterval = intervalsById.get(segment.intervalId)
-        return {
+        return splitAcrossDays({
           id: `diff-${segment.intervalId}-${index}`,
           title: sourceInterval?.task_name ?? task?.name ?? 'Unknown task',
           start: segment.start,
           end: segment.end,
           colors: task?.effective_colors ?? [],
-          kind: 'planned',
+          kind: 'planned' as const,
           taskId: segment.taskId,
           intervalId: segment.intervalId,
-          diffKind: segment.covered ? 'covered' : 'uncovered',
-        }
+          diffKind: segment.covered ? ('covered' as const) : ('uncovered' as const),
+        })
       },
     )
     return [...diffSegments, ...real]

@@ -8,6 +8,7 @@ import { useIntervalsForWeek } from '../../api/intervals'
 import { formatWeekLabel, mondayOf, shiftWeek, weekStartKey } from '../../lib/week'
 import { localizer } from '../../lib/calendarLocalizer'
 import { utcNow } from '../../lib/time'
+import { splitAcrossDays } from '../../lib/splitEventAcrossDays'
 import { chipFillStyle } from './eventColor'
 import CalendarDayHeader from './CalendarDayHeader'
 import CalendarTimezoneLabel from './CalendarTimezoneLabel'
@@ -36,28 +37,28 @@ export default function ExecuteCalendar({ tasksById }: { tasksById: Map<string, 
   const { data: intervals = [] } = useIntervalsForWeek(weekStart)
 
   const events = useMemo<CalendarEvent[]>(() => {
-    const actual: CalendarEvent[] = entries.map((entry) => {
+    const actual: CalendarEvent[] = entries.flatMap((entry) => {
       const task = tasksById.get(entry.task_id)
-      return {
+      return splitAcrossDays({
         id: `entry-${entry.id}`,
         title: entry.task_name ?? task?.name ?? 'Unknown task',
         start: new Date(entry.start),
         end: entry.end ? new Date(entry.end) : now,
         colors: task?.effective_colors ?? [],
-      }
+      })
     })
 
     const planned: CalendarEvent[] = intervals
       .filter((interval) => new Date(interval.start) >= now)
-      .map((interval) => {
+      .flatMap((interval) => {
         const task = tasksById.get(interval.task_id)
-        return {
+        return splitAcrossDays({
           id: `interval-${interval.id}`,
           title: interval.task_name ?? task?.name ?? 'Unknown task',
           start: new Date(interval.start),
           end: new Date(interval.end),
           colors: task?.effective_colors ?? [],
-        }
+        })
       })
 
     return [...actual, ...planned]

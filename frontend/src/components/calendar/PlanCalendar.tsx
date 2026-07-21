@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { isSameDay } from 'date-fns'
 import { Calendar } from 'react-big-calendar'
 import dragAndDropImport, {
   type EventInteractionArgs,
@@ -25,6 +26,7 @@ import {
   type PixelRect,
 } from '../../lib/calendarGeometry'
 import { isFullyPast, isInProgress, resolveDragRescheduleAction } from '../../lib/intervalTiming'
+import { splitAcrossDays } from '../../lib/splitEventAcrossDays'
 import {
   makeCreateIntervalEntry,
   makeDeleteIntervalEntry,
@@ -44,6 +46,13 @@ interface CalendarEvent {
   start: Date
   end: Date
   colors: string[]
+  // True for a rendered day-segment of an interval that spans midnight (see
+  // splitAcrossDays) -- such a segment only reflects one day's portion of
+  // the real interval, so dragging/resizing it directly would silently
+  // shrink the underlying interval to that one day. Editing a cross-day
+  // interval stays possible via the "Edit time" modal's typed fields
+  // (independent start/end dates, from M27) instead.
+  isMultiDaySegment: boolean
 }
 
 // Vite's dev-server esbuild pre-bundling double-wraps this addon's default
@@ -125,7 +134,9 @@ export default function PlanCalendar({
       dragCandidateRef.current = null
       const interval = intervals.find((i) => i.id === candidate.id)
       if (!interval) return
-      if (isFullyPast({ start: new Date(interval.start), end: new Date(interval.end) }, now)) return
+      const range = { start: new Date(interval.start), end: new Date(interval.end) }
+      if (isFullyPast(range, now)) return
+      if (!isSameDay(range.start, range.end)) return
       setDraggingEventId(candidate.id)
     }
 
@@ -300,15 +311,16 @@ export default function PlanCalendar({
 
   const events = useMemo<CalendarEvent[]>(
     () =>
-      intervals.map((interval) => {
+      intervals.flatMap((interval) => {
         const task = tasksById.get(interval.task_id)
-        return {
+        const segments = splitAcrossDays({
           id: interval.id,
           title: interval.task_name ?? task?.name ?? 'Unknown task',
           start: new Date(interval.start),
           end: new Date(interval.end),
           colors: task?.effective_colors ?? [],
-        }
+        })
+        return segments.map((segment) => ({ ...segment, isMultiDaySegment: segments.length > 1 }))
       }),
     [intervals, tasksById],
   )
@@ -358,8 +370,10 @@ export default function PlanCalendar({
           toolbar={false}
           selectable={false}
           resizable
-          draggableAccessor={() => true}
-          resizableAccessor={(event: CalendarEvent) => !isFullyPast(event, now)}
+          draggableAccessor={(event: CalendarEvent) => !event.isMultiDaySegment}
+          resizableAccessor={(event: CalendarEvent) =>
+            !isFullyPast(event, now) && !event.isMultiDaySegment
+          }
           onEventDrop={handleEventChange}
           onEventResize={handleEventChange}
           onSelectEvent={(event: CalendarEvent) => {

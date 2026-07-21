@@ -119,4 +119,35 @@ describe('PlanCalendar', () => {
     fireEvent.click(screen.getByText('Scheduled task'))
     expect(onOpenTask).toHaveBeenCalledWith('t1')
   })
+
+  it('renders a cross-midnight interval as one chip per day, both wired to the same interval', () => {
+    const task = makeTask({ id: 't1', name: 'Overnight task', is_leaf: true })
+    useIntervalsForWeek.mockReturnValue({
+      data: [
+        {
+          id: 'iv1',
+          task_id: 't1',
+          // A 30h span, fully after the fixed "now" below, guarantees
+          // crossing a local midnight regardless of the test runner's
+          // timezone offset while staying unlocked (fully future).
+          start: '2026-07-16T10:00:00.000Z',
+          end: '2026-07-17T16:00:00.000Z',
+          week_start: '2026-07-13',
+        },
+      ],
+    })
+    const onOpenTask = vi.fn()
+
+    renderCalendar(new Map([[task.id, task]]), onOpenTask)
+
+    const chips = screen.getAllByText('Overnight task')
+    expect(chips).toHaveLength(2)
+
+    fireEvent.click(chips[0])
+    expect(onOpenTask).toHaveBeenCalledWith('t1')
+
+    fireEvent.contextMenu(chips[1])
+    fireEvent.click(screen.getByText('Delete'))
+    expect(deleteMutate).toHaveBeenCalledWith('iv1', expect.any(Object))
+  })
 })
