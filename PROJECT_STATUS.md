@@ -4,12 +4,14 @@ Working notes for picking this project back up in a future session. Not user-fac
 docs (see `README.md` for that) — this is "what's true right now and how we work
 here."
 
-## Where things stand (as of commit `95e3d79`, v03 pass complete)
+## Where things stand (as of commit `3eb5cc8`, v03 pass complete + one post-v03 fix)
 
 The app is fully built and working: Plan / Execute / Evaluate views, FastAPI +
 Redis backend, React + Tailwind frontend, Google Workspace/Calendar-styled light
-theme. v00 (8 items), v01 (30 items, M1–M12), v02 (19 items, M13–M23), and now
-v03 (11 items, M24–M34) are all fully implemented, committed, and pushed.
+theme. v00 (8 items), v01 (30 items, M1–M12), v02 (19 items, M13–M23), and
+v03 (11 items, M24–M34) are all fully implemented, committed, and pushed, plus
+one ad hoc post-v03 fix (cross-midnight chip rendering, see below). Deployed
+to prod (`docker compose up --build`) as of that commit.
 No `prompts/app_improvements_vNN.md` is currently pending — the next session
 should wait for a new one to be dropped in, per the workflow below.
 
