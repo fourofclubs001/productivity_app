@@ -1,0 +1,4 @@
+- add an option at every view to the top right to connecto with google calendar. Then the google calendar events will be visible on the app calendar views.
+- In the same cases the right click shows "delete" option, add an option that says "add to calendar" for event created before the google calendar connection were made. when clicking this option the event will be added to the google calendar.
+- after google calendar conection is done, every new planned event is added automatically to calendar. The executed time track is kept only for this app, is never communicated to google calendar.
+- add a tab at plan view left panel next to "task" for task that are rutinary. When creating a task on that tab, it must show a dialog for specifing when that task is repeated. Use the @references/recurrence_task png as reference. 
