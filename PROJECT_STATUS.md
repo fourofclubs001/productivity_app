@@ -4,14 +4,17 @@ Working notes for picking this project back up in a future session. Not user-fac
 docs (see `README.md` for that) — this is "what's true right now and how we work
 here."
 
-## Where things stand (as of commit `3eb5cc8`, v03 pass complete + one post-v03 fix)
+## Where things stand (as of commit `17b7cd7`, v04 pass complete)
 
 The app is fully built and working: Plan / Execute / Evaluate views, FastAPI +
 Redis backend, React + Tailwind frontend, Google Workspace/Calendar-styled light
-theme. v00 (8 items), v01 (30 items, M1–M12), v02 (19 items, M13–M23), and
-v03 (11 items, M24–M34) are all fully implemented, committed, and pushed, plus
-one ad hoc post-v03 fix (cross-midnight chip rendering, see below). Deployed
-to prod (`docker compose up --build`) as of that commit.
+theme. v00 (8 items), v01 (30 items, M1–M12), v02 (19 items, M13–M23), v03
+(11 items, M24–M34, plus one post-v03 ad hoc fix), and v04 (4 items, M35–M39:
+Google Calendar sync + routine/recurring tasks) are all fully implemented,
+committed, and pushed. **Not yet deployed to prod** as of `17b7cd7` — v04 needs
+a real Google OAuth Client ID/Secret in a root `.env` before prod is worth
+rebuilding (see "Google Calendar setup" below); the dev stack has been running
+throughout on the no-credentials fake adapter.
 No `prompts/app_improvements_vNN.md` is currently pending — the next session
 should wait for a new one to be dropped in, per the workflow below.
 
@@ -261,6 +264,100 @@ should wait for a new one to be dropped in, per the workflow below.
     entry crossing midnight; deleted before committing, per the usual
     throwaway-spec convention).
 
+### v04 milestones (M35–M39, one commit each, all pushed)
+
+First pass with a real external integration (Google Calendar) and a new
+recurring-schedule domain concept (routine tasks). Full design rationale is
+in `prompts/interpreted_app_improvements_v04.md`.
+
+- **M35** (`5589c35`) — item 1: real Google OAuth2 connect/disconnect. New
+  `GoogleAuthService`/`GoogleRepository` (single global token set in Redis —
+  `google:tokens` hash — no per-user auth in this app), new
+  `GET/POST /auth/google/*` routes, "Connect Google Calendar" control in the
+  shared nav bar (`App.tsx`). **Key pattern established here and reused by
+  every later Google milestone**: `app/dependencies.py`'s
+  `get_google_oauth_client`/`get_google_calendar_client` auto-select a
+  `Fake*` (no network, canned responses) vs `Httpx*` (real) implementation
+  based purely on whether `settings.google_client_id`/`google_client_secret`
+  are set — so dev/CI/Playwright always run against the deterministic fake
+  with zero real network calls, and dropping real credentials into a root
+  `.env` (see "Google Calendar setup" below) switches to genuine calls with
+  no other code change. 20 new pytest cases (113→133).
+- **M36** (`eee96fa`) — item 2: shared `GoogleSyncService`/
+  `GoogleCalendarClient` bridge (create/update/delete a Google event for an
+  interval) plus the manual "Add to Google Calendar" Plan-chip context-menu
+  item (`POST /intervals/{id}/push-to-google`) for intervals that predate
+  the connection. Shown only when connected and the interval has no
+  `google_event_id` yet. 4 new pytest cases (133→137).
+- **M37** (`eadb27e`) — item 3: automatic go-forward sync. `IntervalService.
+  create_interval`/`update_interval`/`delete_interval` each fold in a
+  best-effort Google push/update/delete when connected, reusing M36's
+  service unchanged — this is backend-only, no frontend diff, since
+  `google_event_id` was already surfaced from M36. Execute (tracked time)
+  is untouched, exactly per the request. 4 new pytest cases (137→141).
+  **Gotcha hit while testing**: the Google connection is a *single global
+  toggle*, unlike task/interval test fixtures which get isolation from
+  unique names — an earlier e2e spec leaving it connected leaked into later
+  specs assuming the default disconnected state. Fixed by having every
+  Google-related spec force-disconnect via the backend endpoint at its own
+  start, rather than relying on run order.
+- **M38** (`11113ce`) — item 4 backend half: routine tasks. A recurrence
+  rule (repeat every N day/week/month/year, weekly day-of-week selection,
+  ends never/on-date/after-N-occurrences — mirrors Google Calendar's own
+  "Custom recurrence" dialog, see `prompts/references/recurrence_task.png`)
+  lives as extra hash fields on the existing Task row — routines are leaf
+  tasks, not a separate domain, tracked via a new `routines:all` Redis set.
+  New `RoutineService.ensure_applied()` mirrors `RolloverService`'s
+  idempotent "catch up on read" pattern (explicit `now` override, **never**
+  mocks real time) to lazily generate occurrences through a rolling 28-day
+  window, reusing `IntervalService.create_interval` so every generated
+  occurrence automatically flows through M37's Google sync with no
+  duplicated logic. A `sprint_done`/`done` routine resets to `backlog` once
+  any of its occurrences has concluded. New `POST /routines`.
+  **Correctness gotcha caught in testing, not shipped**: an early version
+  of `occurrence_dates()` cascaded each step off the *previous candidate*
+  rather than always re-deriving from the recurrence's anchor date — this
+  silently drifted a monthly/yearly rule's day-of-month after a clamped
+  month (Jan 31 → Feb 28 → **Mar 28**, not Mar 31) and misaligned any
+  catch-up call resuming mid-window onto the wrong cadence entirely.
+  Rewritten to always phase-lock to the anchor (walk the full theoretical
+  sequence from the anchor on every call, filtering to what's new) — cheap
+  at this app's scale, and the only way to keep the rule's true cadence
+  regardless of when generation happens to run. 17 new pytest cases
+  (141→158). Backend-only milestone, no e2e spec (no UI yet).
+- **M39** (`17b7cd7`) — item 4 frontend half: Tasks/Routines tab strip above
+  the Plan left panel (new, since none existed before — the panel used to
+  render the task tree directly). New flat `RoutinesList.tsx` (routines are
+  leaf-only, no tree needed) and `NewRoutineDialog.tsx` (name+DoD +
+  first-occurrence start/duration via the existing `IntervalTimeFields` +
+  new `RecurrenceRuleFields.tsx`). Creating a routine immediately shows a
+  Plan chip with no manual drag, since M38's generation runs as part of
+  creation. `TaskDetailPanel` hides the Parents/Add-child-task sections for
+  a selected routine (permanently leaf, organizationally separate from the
+  main tree — never reparented in or out). 8 new vitest cases (170→178).
+  **This completes the v04 pass.**
+
+#### Google Calendar setup (needed before real-Google manual verification)
+
+Every M35–M39 automated test runs against the in-process fake adapter — no
+setup needed for those. To verify against your *actual* Google Calendar:
+1. Google Cloud Console → new/existing project → enable the Google Calendar
+   API → create an OAuth 2.0 Client ID (type "Web application"); Testing
+   mode is fine for this single-user app, just add your own account as a
+   test user.
+2. Add both authorized redirect URIs to that one client: `http://localhost:
+   8000/auth/google/callback` (prod) and `http://localhost:8001/auth/google/
+   callback` (dev).
+3. Create a root-level `.env` (already gitignored, doesn't exist yet as of
+   this commit) with `GOOGLE_CLIENT_ID=...` and `GOOGLE_CLIENT_SECRET=...`
+   — **not** `backend/.env`, since the prod Dockerfile `COPY`s the backend
+   directory at build time and would risk baking a secret into the image
+   layer. Docker Compose auto-substitutes `${GOOGLE_CLIENT_ID}` etc. from
+   this root `.env` into both compose files' backend `environment:` blocks.
+4. Rebuild whichever stack you're testing (`docker compose up --build` /
+   `docker compose -f docker-compose.dev.yml up --build`) so the new env
+   vars take effect, then use the nav bar's "Connect Google Calendar".
+
 ## The workflow established for this project
 
 This has repeated three times now (initial build, v00, v01) and is worth reusing:
@@ -288,7 +385,20 @@ This has repeated three times now (initial build, v00, v01) and is worth reusing
 
 ## Known limitations (deliberately deferred, not bugs)
 
-- **Google Calendar sync** — not implemented. Reserving time in Plan is local-only.
+- **Editing an existing routine's recurrence rule** (v04, M38/M39) — not
+  implemented. The New Routine dialog only covers creation; changing a
+  routine's repeat interval/days/end condition after the fact isn't
+  possible yet (delete and recreate is the only workaround). Flagged as a
+  natural follow-up in the v04 plan, not built since the interpreted
+  improvements list only asked for creation.
+- **Deleting or editing one routine-generated occurrence only affects that
+  one interval** (v04, M38) — no Google-Calendar-style "this event / this
+  and following / all events" semantics. Deliberately out of scope for v04.
+- **Google Calendar sync** (v04, M35–M37) — real OAuth2 connect/disconnect,
+  manual/automatic push of Plan intervals, all implemented. What's still
+  out of scope: syncing *from* Google back into this app (one-way only,
+  this app → Google), and Execute's tracked time is deliberately never
+  synced at all (see `prompts/interpreted_app_improvements_v04.md` item 3).
 - **No auth/users** — single-user by design for this stage.
 - **Timezone boundaries are UTC, not the user's local time.** The backend stores and
   buckets everything in UTC (`datetime.now(UTC)`, week/day/month math all UTC-based).
@@ -413,6 +523,11 @@ docker compose -f docker-compose.dev.yml up --build     # dev: isolated data, po
 - No `prompts/app_improvements_vNN.md` is currently pending. When the next one
   is dropped in, follow the workflow above (interpret, clarify, commit, plan,
   implement).
+- **v04 hasn't been deployed to prod yet** (`docker compose up --build` against
+  `docker-compose.yml`) — do that once you're ready, and drop real Google OAuth
+  credentials into a root `.env` first if real Calendar sync is wanted there
+  (see "Google Calendar setup" above; the app works fine on the fake adapter
+  with no credentials too, sync just silently no-ops).
 - Consider actually fixing the M18 dnd-kit scrolled-container drag bug (currently
   only worked around in tests) if it turns out to bite a real user.
 - Revisit the UTC-vs-local-timezone limitation if week/day boundaries ever look
@@ -420,5 +535,7 @@ docker compose -f docker-compose.dev.yml up --build     # dev: isolated data, po
 - Revisit the tree auto-expand-on-add-child gap if it becomes annoying.
 - Consider a per-spec (not per-run) Redis flush for the Playwright suite if the
   crowding-related flakiness noted above gets worse as more specs are added
-  (it has: the v03 pass hit it repeatedly across several specs, always
-  resolved by an isolated re-run).
+  (it has: recurred in both the v03 and v04 passes across several specs,
+  always resolved by an isolated re-run).
+- Editing an existing routine's recurrence rule (v04 limitation above) if it
+  turns out to be annoying in practice.
