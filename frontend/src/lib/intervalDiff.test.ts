@@ -89,6 +89,7 @@ describe('computeDiffSegments', () => {
     end: PLANNED.end.toISOString(),
     week_start: '2026-07-20',
     task_name: null,
+    google_event_id: null,
   }
 
   it('filters real entries to the matching task_id', () => {

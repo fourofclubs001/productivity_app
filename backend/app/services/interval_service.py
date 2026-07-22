@@ -6,6 +6,9 @@ from app.models.task import TaskState
 from app.repositories.interval_repository import IntervalRepository
 from app.repositories.task_repository import TaskRepository
 from app.services.errors import (
+    GoogleNotConnectedError,
+    GoogleSyncFailedError,
+    IntervalAlreadySyncedError,
     IntervalDeleteLockedError,
     IntervalLockedError,
     IntervalNotFoundError,
@@ -15,6 +18,7 @@ from app.services.errors import (
     TaskNotLeafError,
     UnmetPrerequisiteError,
 )
+from app.services.google_sync_service import GoogleSyncService
 from app.services.graph_utils import leaf_descendants
 from app.services.task_service import TaskService
 
@@ -37,6 +41,7 @@ class IntervalService:
         interval_repo: IntervalRepository,
         task_repo: TaskRepository,
         task_service: TaskService | None = None,
+        google: GoogleSyncService | None = None,
     ) -> None:
         self._intervals = interval_repo
         self._tasks = task_repo
@@ -44,6 +49,9 @@ class IntervalService:
         # prerequisites don't need to wire it up; defaults to a fresh
         # TaskService over the same repo.
         self._task_service = task_service or TaskService(task_repo)
+        # None means "no Google integration wired for this instance" (most
+        # tests) -- treated the same as "not connected" everywhere it's used.
+        self._google = google
 
     def _reject_if_past_start(self, start: datetime) -> None:
         now = datetime.now(UTC).replace(tzinfo=None)
@@ -127,6 +135,7 @@ class IntervalService:
             end=payload.end,
             week_start=week_start,
             task_name=task_name,
+            google_event_id=None,
         )
 
     async def update_interval(self, interval_id: str, payload: IntervalUpdate) -> IntervalOut:
@@ -157,7 +166,28 @@ class IntervalService:
             end=payload.end,
             week_start=week_start,
             task_name=data.get("task_name"),
+            google_event_id=data.get("google_event_id") or None,
         )
+
+    async def push_to_google(self, interval_id: str) -> IntervalOut:
+        data = await self._intervals.get(interval_id)
+        if data is None:
+            raise IntervalNotFoundError(interval_id)
+        if data.get("google_event_id"):
+            raise IntervalAlreadySyncedError(interval_id)
+        if self._google is None or not await self._google.is_connected():
+            raise GoogleNotConnectedError()
+
+        event_id = await self._google.push_interval(
+            data.get("task_name") or "",
+            datetime.fromisoformat(data["start"]),
+            datetime.fromisoformat(data["end"]),
+        )
+        if event_id is None:
+            raise GoogleSyncFailedError()
+
+        await self._intervals.set_google_event_id(interval_id, event_id)
+        return self._to_out({**data, "id": interval_id, "google_event_id": event_id})
 
     async def delete_interval(self, interval_id: str) -> None:
         existing = await self._intervals.get(interval_id)
@@ -221,4 +251,5 @@ class IntervalService:
             end=datetime.fromisoformat(data["end"]),
             week_start=data["week_start"],
             task_name=data.get("task_name"),
+            google_event_id=data.get("google_event_id") or None,
         )

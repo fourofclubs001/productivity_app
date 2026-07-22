@@ -5,6 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.dependencies import apply_rollover, get_interval_service
 from app.models.interval import IntervalCreate, IntervalOut, IntervalUpdate
 from app.services.errors import (
+    GoogleNotConnectedError,
+    GoogleSyncFailedError,
+    IntervalAlreadySyncedError,
     IntervalDeleteLockedError,
     IntervalLockedError,
     IntervalNotFoundError,
@@ -55,6 +58,16 @@ async def delete_interval(interval_id: str, service: ServiceDep) -> None:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except IntervalDeleteLockedError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/{interval_id}/push-to-google", response_model=IntervalOut)
+async def push_interval_to_google(interval_id: str, service: ServiceDep) -> IntervalOut:
+    try:
+        return await service.push_to_google(interval_id)
+    except IntervalNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (IntervalAlreadySyncedError, GoogleNotConnectedError, GoogleSyncFailedError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.get("", response_model=list[IntervalOut])

@@ -19,6 +19,7 @@ vi.mock('./api/intervals', () => ({
 vi.mock('./api/google', () => ({
   useGoogleConnectionStatus: () => ({ data: { connected: false } }),
   useDisconnectGoogle: () => ({ mutate: vi.fn() }),
+  usePushIntervalToGoogle: () => ({ mutate: vi.fn() }),
   googleLoginUrl: () => 'http://localhost:8000/auth/google/login',
 }))
 

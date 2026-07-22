@@ -21,3 +21,4 @@ class IntervalOut(BaseModel):
     end: datetime
     week_start: str
     task_name: str | None = None
+    google_event_id: str | None = None

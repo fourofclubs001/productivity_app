@@ -10,12 +10,19 @@ const createMutateAsync = vi.fn().mockResolvedValue(undefined)
 const updateMutate = vi.fn()
 const updateMutateAsync = vi.fn().mockResolvedValue(undefined)
 const useIntervalsForWeek = vi.fn(() => ({ data: [] as unknown[] }))
+const useGoogleConnectionStatus = vi.fn(() => ({ data: { connected: false } }))
+const pushIntervalToGoogleMutate = vi.fn()
 
 vi.mock('../../api/intervals', () => ({
   useIntervalsForWeek: () => useIntervalsForWeek(),
   useCreateInterval: () => ({ mutate: vi.fn(), mutateAsync: createMutateAsync }),
   useUpdateInterval: () => ({ mutate: updateMutate, mutateAsync: updateMutateAsync }),
   useDeleteInterval: () => ({ mutate: deleteMutate }),
+}))
+
+vi.mock('../../api/google', () => ({
+  useGoogleConnectionStatus: () => useGoogleConnectionStatus(),
+  usePushIntervalToGoogle: () => ({ mutate: pushIntervalToGoogleMutate }),
 }))
 
 function renderCalendar(tasksById: Map<string, Task>, onOpenTask: (taskId: string) => void = vi.fn()) {
@@ -28,7 +35,9 @@ beforeEach(() => {
   createMutateAsync.mockClear()
   updateMutate.mockClear()
   updateMutateAsync.mockClear()
+  pushIntervalToGoogleMutate.mockClear()
   useIntervalsForWeek.mockReturnValue({ data: [] })
+  useGoogleConnectionStatus.mockReturnValue({ data: { connected: false } })
 })
 
 describe('PlanCalendar', () => {
@@ -74,6 +83,74 @@ describe('PlanCalendar', () => {
       start: '2026-07-15T14:00:00.000Z',
       end: '2026-07-15T15:00:00.000Z',
     })
+  })
+
+  it('offers "Add to Google Calendar" for an unsynced interval once connected, and pushes it', () => {
+    const task = makeTask({ id: 't1', name: 'Unsynced task', is_leaf: true })
+    useGoogleConnectionStatus.mockReturnValue({ data: { connected: true } })
+    useIntervalsForWeek.mockReturnValue({
+      data: [
+        {
+          id: 'iv1',
+          task_id: 't1',
+          start: '2026-07-15T14:00:00.000Z',
+          end: '2026-07-15T15:00:00.000Z',
+          week_start: '2026-07-13',
+          google_event_id: null,
+        },
+      ],
+    })
+
+    renderCalendar(new Map([[task.id, task]]))
+
+    fireEvent.contextMenu(screen.getByText('Unsynced task'))
+    fireEvent.click(screen.getByText('Add to Google Calendar'))
+
+    expect(pushIntervalToGoogleMutate).toHaveBeenCalledWith('iv1', expect.any(Object))
+  })
+
+  it('does not offer "Add to Google Calendar" when disconnected', () => {
+    const task = makeTask({ id: 't1', name: 'Disconnected task', is_leaf: true })
+    useGoogleConnectionStatus.mockReturnValue({ data: { connected: false } })
+    useIntervalsForWeek.mockReturnValue({
+      data: [
+        {
+          id: 'iv1',
+          task_id: 't1',
+          start: '2026-07-15T14:00:00.000Z',
+          end: '2026-07-15T15:00:00.000Z',
+          week_start: '2026-07-13',
+          google_event_id: null,
+        },
+      ],
+    })
+
+    renderCalendar(new Map([[task.id, task]]))
+
+    fireEvent.contextMenu(screen.getByText('Disconnected task'))
+    expect(screen.queryByText('Add to Google Calendar')).not.toBeInTheDocument()
+  })
+
+  it('does not offer "Add to Google Calendar" for an already-synced interval', () => {
+    const task = makeTask({ id: 't1', name: 'Synced task', is_leaf: true })
+    useGoogleConnectionStatus.mockReturnValue({ data: { connected: true } })
+    useIntervalsForWeek.mockReturnValue({
+      data: [
+        {
+          id: 'iv1',
+          task_id: 't1',
+          start: '2026-07-15T14:00:00.000Z',
+          end: '2026-07-15T15:00:00.000Z',
+          week_start: '2026-07-13',
+          google_event_id: 'fake-event-1',
+        },
+      ],
+    })
+
+    renderCalendar(new Map([[task.id, task]]))
+
+    fireEvent.contextMenu(screen.getByText('Synced task'))
+    expect(screen.queryByText('Add to Google Calendar')).not.toBeInTheDocument()
   })
 
   it('blocks right-click deleting a past interval, showing a dialog instead', () => {

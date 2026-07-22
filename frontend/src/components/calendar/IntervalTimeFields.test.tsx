@@ -39,6 +39,7 @@ describe('intervalToTimeValue', () => {
       end: '2026-07-14T00:30:00.000Z',
       week_start: '2026-07-13',
       task_name: null,
+      google_event_id: null,
     }
 
     const value = intervalToTimeValue(interval)

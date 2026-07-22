@@ -26,6 +26,7 @@ const INTERVAL: Interval = {
   end: '2026-07-20T11:00:00.000Z',
   week_start: '2026-07-20',
   task_name: null,
+  google_event_id: null,
 }
 
 // Covers the first half of the planned interval, leaving 10:00-11:00 uncovered.

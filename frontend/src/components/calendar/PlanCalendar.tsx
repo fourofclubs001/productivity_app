@@ -27,6 +27,7 @@ import {
 } from '../../lib/calendarGeometry'
 import { isFullyPast, isInProgress, resolveDragRescheduleAction } from '../../lib/intervalTiming'
 import { splitAcrossDays } from '../../lib/splitEventAcrossDays'
+import { useGoogleConnectionStatus, usePushIntervalToGoogle } from '../../api/google'
 import {
   makeCreateIntervalEntry,
   makeDeleteIntervalEntry,
@@ -99,6 +100,8 @@ export default function PlanCalendar({
   const createInterval = useCreateInterval()
   const updateInterval = useUpdateInterval()
   const deleteInterval = useDeleteInterval()
+  const { data: googleStatus } = useGoogleConnectionStatus()
+  const pushIntervalToGoogle = usePushIntervalToGoogle()
   const { pushUndo } = useUndo()
 
   // withDragAndDrop's own reschedule-drag (as opposed to the dnd-kit drag
@@ -436,6 +439,18 @@ export default function PlanCalendar({
               label: 'Edit time',
               onSelect: () => setEditingInterval(contextMenu.interval),
             },
+            ...(googleStatus?.connected && !contextMenu.interval.google_event_id
+              ? [
+                  {
+                    label: 'Add to Google Calendar',
+                    onSelect: () =>
+                      pushIntervalToGoogle.mutate(contextMenu.interval.id, {
+                        onError: (error: unknown) =>
+                          setScheduleError((error as Error).message),
+                      }),
+                  },
+                ]
+              : []),
             {
               label: 'Delete',
               danger: true,

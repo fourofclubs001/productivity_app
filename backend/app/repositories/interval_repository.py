@@ -100,3 +100,6 @@ class IntervalRepository:
 
     async def count_for_task(self, task_id: str) -> int:
         return await self._redis.scard(task_intervals_key(task_id))
+
+    async def set_google_event_id(self, interval_id: str, google_event_id: str) -> None:
+        await self._redis.hset(interval_key(interval_id), "google_event_id", google_event_id)

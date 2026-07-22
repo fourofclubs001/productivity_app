@@ -26,6 +26,7 @@ export interface Interval {
   end: string
   week_start: string
   task_name: string | null
+  google_event_id: string | null
 }
 
 export interface Entry {

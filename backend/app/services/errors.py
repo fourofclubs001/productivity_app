@@ -159,3 +159,8 @@ class IntervalAlreadySyncedError(Exception):
     def __init__(self, interval_id: str) -> None:
         self.interval_id = interval_id
         super().__init__(f"Interval {interval_id!r} is already synced to Google Calendar")
+
+
+class GoogleSyncFailedError(Exception):
+    def __init__(self) -> None:
+        super().__init__("Could not reach Google Calendar to sync this event")
