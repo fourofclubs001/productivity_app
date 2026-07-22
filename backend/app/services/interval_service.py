@@ -128,6 +128,17 @@ class IntervalService:
                 payload.task_id, {"state": TaskState.sprint_backlog.value}
             )
 
+        # Best-effort go-forward sync: a Google outage or being disconnected
+        # must never block local scheduling, so a failed/skipped push just
+        # leaves google_event_id unset rather than raising.
+        google_event_id = None
+        if self._google is not None and await self._google.is_connected():
+            google_event_id = await self._google.push_interval(
+                task_name, payload.start, payload.end
+            )
+            if google_event_id is not None:
+                await self._intervals.set_google_event_id(interval_id, google_event_id)
+
         return IntervalOut(
             id=interval_id,
             task_id=payload.task_id,
@@ -135,7 +146,7 @@ class IntervalService:
             end=payload.end,
             week_start=week_start,
             task_name=task_name,
-            google_event_id=None,
+            google_event_id=google_event_id,
         )
 
     async def update_interval(self, interval_id: str, payload: IntervalUpdate) -> IntervalOut:
@@ -159,6 +170,18 @@ class IntervalService:
                 raise UnmetPrerequisiteError(data["task_id"], unmet)
 
         week_start = await self._intervals.update(interval_id, payload.start, payload.end)
+
+        # Propagate to the linked Google event too, if this interval was
+        # already synced (best-effort, same as create -- see there).
+        existing_google_event_id = data.get("google_event_id") or None
+        if existing_google_event_id and self._google is not None:
+            await self._google.update_interval(
+                existing_google_event_id,
+                data.get("task_name") or "",
+                payload.start,
+                payload.end,
+            )
+
         return IntervalOut(
             id=interval_id,
             task_id=data["task_id"],
@@ -166,7 +189,7 @@ class IntervalService:
             end=payload.end,
             week_start=week_start,
             task_name=data.get("task_name"),
-            google_event_id=data.get("google_event_id") or None,
+            google_event_id=existing_google_event_id,
         )
 
     async def push_to_google(self, interval_id: str) -> IntervalOut:
@@ -206,6 +229,10 @@ class IntervalService:
         data = await self._intervals.delete(interval_id)
         if data is None:
             raise IntervalNotFoundError(interval_id)
+
+        google_event_id = data.get("google_event_id") or None
+        if google_event_id and self._google is not None:
+            await self._google.delete_interval(google_event_id)
 
         task_id = data["task_id"]
         remaining = await self._intervals.count_for_task(task_id)

@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
 
 from app.repositories.interval_repository import IntervalRepository, interval_key
@@ -537,3 +538,57 @@ def test_coverage_hours_aggregates_across_leaf_descendants(client):
 def test_coverage_hours_missing_task_returns_404(client):
     response = client.get("/intervals/coverage/does-not-exist")
     assert response.status_code == 404
+
+
+def connect_google(client) -> None:
+    login = client.get("/auth/google/login", follow_redirects=False)
+    parsed_query = parse_qs(urlparse(login.headers["location"]).query)
+    query = {key: values[0] for key, values in parsed_query.items()}
+    callback = client.get(
+        "/auth/google/callback",
+        params={"code": query["code"], "state": query["state"]},
+        follow_redirects=False,
+    )
+    assert callback.status_code in (302, 307)
+
+
+def test_creating_an_interval_while_connected_syncs_it_to_google(client):
+    connect_google(client)
+    task = create_leaf(client)
+
+    interval = create_interval(client, task["id"], START, START + timedelta(hours=1))
+
+    assert interval["google_event_id"]
+    assert interval["google_event_id"].startswith("fake-event-")
+
+
+def test_creating_an_interval_while_disconnected_never_touches_google(client):
+    task = create_leaf(client)
+    interval = create_interval(client, task["id"], START, START + timedelta(hours=1))
+    assert interval["google_event_id"] is None
+
+
+def test_updating_a_synced_interval_keeps_its_google_event_id(client):
+    connect_google(client)
+    task = create_leaf(client)
+    interval = create_interval(client, task["id"], START, START + timedelta(hours=1))
+    original_event_id = interval["google_event_id"]
+    assert original_event_id
+
+    new_start = START + timedelta(hours=3)
+    response = client.patch(
+        f"/intervals/{interval['id']}",
+        json={"start": iso(new_start), "end": iso(new_start + timedelta(hours=1))},
+    )
+    assert response.status_code == 200
+    assert response.json()["google_event_id"] == original_event_id
+
+
+def test_deleting_a_synced_interval_succeeds(client):
+    connect_google(client)
+    task = create_leaf(client)
+    interval = create_interval(client, task["id"], START, START + timedelta(hours=1))
+    assert interval["google_event_id"]
+
+    response = client.delete(f"/intervals/{interval['id']}")
+    assert response.status_code == 204

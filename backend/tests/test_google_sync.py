@@ -40,10 +40,12 @@ def test_push_to_google_requires_a_connection(client):
 
 
 def test_push_to_google_happy_path(client):
-    connect_google(client)
+    # Interval predates the connection -- the case the manual push exists
+    # for (M37 covers the auto-synced-at-creation path separately).
     task = create_leaf(client)
     interval = create_interval(client, task["id"])
     assert interval["google_event_id"] is None
+    connect_google(client)
 
     response = client.post(f"/intervals/{interval['id']}/push-to-google")
     assert response.status_code == 200
@@ -57,9 +59,9 @@ def test_push_to_google_happy_path(client):
 
 
 def test_push_to_google_already_synced_is_rejected(client):
-    connect_google(client)
     task = create_leaf(client)
     interval = create_interval(client, task["id"])
+    connect_google(client)
 
     first = client.post(f"/intervals/{interval['id']}/push-to-google")
     assert first.status_code == 200

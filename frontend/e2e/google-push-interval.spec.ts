@@ -7,6 +7,13 @@ test('pushing a pre-existing interval to Google Calendar removes the option once
   page,
   request,
 }) => {
+  // Force a known disconnected starting state -- see google-connect.spec.ts's
+  // comment on why this can't rely on the default (single global toggle,
+  // Redis isn't flushed between specs). Must happen before creating the
+  // interval below too, or M37's auto-sync-on-create would sync it
+  // immediately, defeating the "predates the connection" setup.
+  await request.post(`${API_BASE}/auth/google/disconnect`)
+
   const taskName = `PreConnect ${Date.now()}`
   const task = await (
     await request.post(`${API_BASE}/tasks`, {

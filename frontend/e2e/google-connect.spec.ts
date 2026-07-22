@@ -1,6 +1,14 @@
 import { test, expect } from '@playwright/test'
 
-test('connect and disconnect Google Calendar via the fake adapter', async ({ page }) => {
+const API_BASE = 'http://localhost:8001'
+
+test('connect and disconnect Google Calendar via the fake adapter', async ({ page, request }) => {
+  // The connection is a single global toggle, not per-fixture-name isolated
+  // like tasks/intervals -- force a known disconnected starting state
+  // regardless of what an earlier spec in this same run left it as (global
+  // setup only flushes Redis once per whole run, not per spec).
+  await request.post(`${API_BASE}/auth/google/disconnect`)
+
   await page.goto('/')
 
   await expect(page.getByRole('link', { name: 'Connect Google Calendar' })).toBeVisible()
