@@ -1,7 +1,15 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from uuid import uuid4
 
-from app.models.task import PALETTE, TaskCreate, TaskOut, TaskState, TaskUpdate
+from app.models.task import (
+    PALETTE,
+    RecurrenceEndType,
+    RecurrenceUnit,
+    TaskCreate,
+    TaskOut,
+    TaskState,
+    TaskUpdate,
+)
 from app.repositories.task_repository import ORDER_STEP, TaskNode, TaskRepository
 from app.services.errors import (
     CycleError,
@@ -118,6 +126,8 @@ class TaskService:
         self, task_id: str, graph: dict[str, TaskNode], color_memo: dict[str, set[str]]
     ) -> TaskOut:
         node = graph[task_id]
+        is_routine = node.fields.get("is_routine") == "1"
+        days_of_week_raw = node.fields.get("recurrence_days_of_week", "")
         return TaskOut(
             id=task_id,
             name=node.fields.get("name", ""),
@@ -135,6 +145,29 @@ class TaskService:
             required_by_ids=sorted(node.required_by),
             estimated_hours=_estimated_hours(task_id, graph),
             ever_had_children=node.fields.get("ever_had_children") == "1",
+            is_routine=is_routine,
+            recurrence_interval=(
+                int(node.fields["recurrence_interval"]) if is_routine else None
+            ),
+            recurrence_unit=(
+                RecurrenceUnit(node.fields["recurrence_unit"]) if is_routine else None
+            ),
+            recurrence_days_of_week=(
+                [int(d) for d in days_of_week_raw.split(",") if d] if is_routine else []
+            ),
+            recurrence_end_type=(
+                RecurrenceEndType(node.fields["recurrence_end_type"]) if is_routine else None
+            ),
+            recurrence_end_date=(
+                date.fromisoformat(node.fields["recurrence_end_date"])
+                if is_routine and node.fields.get("recurrence_end_date")
+                else None
+            ),
+            recurrence_end_count=(
+                int(node.fields["recurrence_end_count"])
+                if is_routine and node.fields.get("recurrence_end_count")
+                else None
+            ),
         )
 
     async def create_task(self, payload: TaskCreate) -> TaskOut:

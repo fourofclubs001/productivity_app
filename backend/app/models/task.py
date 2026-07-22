@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field
@@ -26,6 +26,19 @@ class TaskState(str, Enum):
     done = "done"
 
 
+class RecurrenceUnit(str, Enum):
+    day = "day"
+    week = "week"
+    month = "month"
+    year = "year"
+
+
+class RecurrenceEndType(str, Enum):
+    never = "never"
+    on_date = "on_date"
+    after_count = "after_count"
+
+
 class TaskCreate(BaseModel):
     name: str = Field(min_length=1)
     definition_of_done: str = Field(min_length=1)
@@ -48,6 +61,24 @@ class AddParentRequest(BaseModel):
 
 class AddRequirementRequest(BaseModel):
     required_id: str
+
+
+class RoutineCreate(BaseModel):
+    name: str = Field(min_length=1)
+    definition_of_done: str = Field(min_length=1)
+    colors: list[str] = Field(default_factory=list)
+    # Template for every generated occurrence: date+time of the first one,
+    # duration derived from (end - start).
+    start: datetime
+    end: datetime
+    recurrence_interval: int = Field(ge=1)
+    recurrence_unit: RecurrenceUnit
+    # Only meaningful when recurrence_unit == week; empty means "the
+    # anchor's own weekday".
+    recurrence_days_of_week: list[int] = Field(default_factory=list)
+    recurrence_end_type: RecurrenceEndType
+    recurrence_end_date: date | None = None
+    recurrence_end_count: int | None = None
 
 
 class ReorderRequest(BaseModel):
@@ -82,3 +113,11 @@ class TaskOut(BaseModel):
     # opposed to a task that never had children at all). Keeps it reading
     # as a goal (is_leaf: false) rather than reverting to a leaf.
     ever_had_children: bool
+    # A routine task's recurrence rule -- None/empty for a non-routine task.
+    is_routine: bool
+    recurrence_interval: int | None = None
+    recurrence_unit: RecurrenceUnit | None = None
+    recurrence_days_of_week: list[int] = Field(default_factory=list)
+    recurrence_end_type: RecurrenceEndType | None = None
+    recurrence_end_date: date | None = None
+    recurrence_end_count: int | None = None

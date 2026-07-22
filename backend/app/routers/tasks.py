@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from redis.asyncio import Redis
 
-from app.dependencies import apply_rollover, get_task_service
+from app.dependencies import apply_rollover, apply_routine_catchup, get_task_service
 from app.models.task import (
     PALETTE,
     AddParentRequest,
@@ -30,7 +30,11 @@ from app.services.errors import (
 )
 from app.services.task_service import TaskService
 
-router = APIRouter(prefix="/tasks", tags=["tasks"], dependencies=[Depends(apply_rollover)])
+router = APIRouter(
+    prefix="/tasks",
+    tags=["tasks"],
+    dependencies=[Depends(apply_rollover), Depends(apply_routine_catchup)],
+)
 
 ServiceDep = Annotated[TaskService, Depends(get_task_service)]
 

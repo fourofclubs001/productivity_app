@@ -5,6 +5,7 @@ from redis.asyncio import Redis
 
 ALL_TASKS_KEY = "tasks:all"
 ROOTS_KEY = "tasks:roots"
+ROUTINES_KEY = "routines:all"
 ORDER_SEQ_KEY = "tasks:order_seq"
 ORDER_STEP = 1000
 
@@ -68,6 +69,12 @@ class TaskRepository:
     async def update_fields(self, task_id: str, fields: dict[str, Any]) -> None:
         if fields:
             await self._redis.hset(task_key(task_id), mapping=fields)
+
+    async def add_to_routines(self, task_id: str) -> None:
+        await self._redis.sadd(ROUTINES_KEY, task_id)
+
+    async def list_routine_ids(self) -> set[str]:
+        return await self._redis.smembers(ROUTINES_KEY)
 
     async def set_colors(self, task_id: str, colors: list[str]) -> None:
         key = colors_key(task_id)
@@ -133,6 +140,7 @@ class TaskRepository:
         )
         await self._redis.srem(ALL_TASKS_KEY, task_id)
         await self._redis.srem(ROOTS_KEY, task_id)
+        await self._redis.srem(ROUTINES_KEY, task_id)
 
     async def load_graph(self) -> dict[str, TaskNode]:
         task_ids = await self._redis.smembers(ALL_TASKS_KEY)

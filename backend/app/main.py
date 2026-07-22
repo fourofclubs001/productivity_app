@@ -4,7 +4,7 @@ from redis.exceptions import RedisError
 
 from app.config import settings
 from app.redis_client import get_redis_client
-from app.routers import evaluate, excuses, google, intervals, tasks, timer
+from app.routers import evaluate, excuses, google, intervals, routines, tasks, timer
 
 app = FastAPI(title="Productivity App API")
 
@@ -21,6 +21,7 @@ app.include_router(timer.router)
 app.include_router(evaluate.router)
 app.include_router(excuses.router)
 app.include_router(google.router)
+app.include_router(routines.router)
 
 
 @app.get("/health")
