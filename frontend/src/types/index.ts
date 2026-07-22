@@ -1,5 +1,8 @@
 export type TaskState = 'backlog' | 'sprint_backlog' | 'in_progress' | 'sprint_done' | 'done'
 
+export type RecurrenceUnit = 'day' | 'week' | 'month' | 'year'
+export type RecurrenceEndType = 'never' | 'on_date' | 'after_count'
+
 export interface Task {
   id: string
   name: string
@@ -17,6 +20,13 @@ export interface Task {
   required_by_ids: string[]
   estimated_hours: number | null
   ever_had_children: boolean
+  is_routine: boolean
+  recurrence_interval: number | null
+  recurrence_unit: RecurrenceUnit | null
+  recurrence_days_of_week: number[]
+  recurrence_end_type: RecurrenceEndType | null
+  recurrence_end_date: string | null
+  recurrence_end_count: number | null
 }
 
 export interface Interval {

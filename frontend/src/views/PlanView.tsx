@@ -2,15 +2,21 @@ import { useMemo, useState } from 'react'
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { useTasks } from '../api/tasks'
 import TaskTree from '../components/tree/TaskTree'
+import RoutinesList from '../components/tree/RoutinesList'
 import TaskDetailPanel from '../components/tree/TaskDetailPanel'
 import NewTaskDialog from '../components/tree/NewTaskDialog'
+import NewRoutineDialog from '../components/tree/NewRoutineDialog'
 import PlanCalendar from '../components/calendar/PlanCalendar'
 import { useResizableWidth } from '../lib/useResizableWidth'
+
+type LeftTab = 'tasks' | 'routines'
 
 export default function PlanView() {
   const { data: tasks, isLoading, isError, error } = useTasks()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [dialogParentId, setDialogParentId] = useState<string | null>()
+  const [leftTab, setLeftTab] = useState<LeftTab>('tasks')
+  const [showNewRoutine, setShowNewRoutine] = useState(false)
 
   const tasksById = useMemo(() => new Map((tasks ?? []).map((task) => [task.id, task])), [tasks])
   const selectedTask = selectedId ? tasksById.get(selectedId) : undefined
@@ -35,15 +41,47 @@ export default function PlanView() {
     <DndContext sensors={sensors}>
       <div className="flex h-[calc(100vh-49px)]">
         <div
-          className="relative shrink-0 border-r border-border"
+          className="relative flex shrink-0 flex-col border-r border-border"
           style={{ width: treePanel.width }}
         >
-          <TaskTree
-            tasks={tasks ?? []}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onOpenNewTask={setDialogParentId}
-          />
+          <div className="flex border-b border-border">
+            {(
+              [
+                ['tasks', 'Tasks'],
+                ['routines', 'Routines'],
+              ] as [LeftTab, string][]
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setLeftTab(key)}
+                className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors ${
+                  leftTab === key
+                    ? 'border-b-2 border-accent text-accent'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="min-h-0 flex-1">
+            {leftTab === 'tasks' ? (
+              <TaskTree
+                tasks={tasks ?? []}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                onOpenNewTask={setDialogParentId}
+              />
+            ) : (
+              <RoutinesList
+                tasks={tasks ?? []}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                onOpenNewRoutine={() => setShowNewRoutine(true)}
+              />
+            )}
+          </div>
           <div
             onMouseDown={treePanel.startResize}
             title="Drag to resize"
@@ -81,6 +119,15 @@ export default function PlanView() {
             onCreated={(task) => {
               setSelectedId(task.id)
               setDialogParentId(undefined)
+            }}
+          />
+        )}
+        {showNewRoutine && (
+          <NewRoutineDialog
+            onClose={() => setShowNewRoutine(false)}
+            onCreated={(task) => {
+              setSelectedId(task.id)
+              setShowNewRoutine(false)
             }}
           />
         )}

@@ -23,9 +23,11 @@ export default function TaskTree({
 
   const tasksById = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks])
   const rootIds = useMemo(() => {
+    // Routine tasks live only in the Routines tab (see RoutinesList.tsx),
+    // never duplicated into this tree.
     return computeRootIds(tasks).filter((id) => {
       const task = tasksById.get(id)
-      return task && !isHiddenFromPlan(task, decisions)
+      return task && !task.is_routine && !isHiddenFromPlan(task, decisions)
     })
   }, [tasks, tasksById, decisions])
 

@@ -361,80 +361,84 @@ export default function TaskDetailPanel({
         </div>
       )}
 
-      <div className="mt-6">
-        <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
-          Parents
-        </label>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {task.parent_ids.length === 0 && (
-            <span className="text-xs text-text-secondary">Top-level task</span>
-          )}
-          {task.parent_ids.map((parentId) => {
-            const parent = tasksById.get(parentId)
-            return (
-              <span
-                key={parentId}
-                className="flex items-center gap-1 rounded-full bg-surface-alt px-2 py-0.5 text-xs text-text-secondary"
-              >
-                {parent?.name ?? parentId}
-                <button
-                  type="button"
-                  onClick={() => removeParent.mutate({ id: task.id, parentId })}
-                  className="text-text-secondary hover:text-danger"
-                  title="Remove parent"
+      {!task.is_routine && (
+        <div className="mt-6">
+          <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
+            Parents
+          </label>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {task.parent_ids.length === 0 && (
+              <span className="text-xs text-text-secondary">Top-level task</span>
+            )}
+            {task.parent_ids.map((parentId) => {
+              const parent = tasksById.get(parentId)
+              return (
+                <span
+                  key={parentId}
+                  className="flex items-center gap-1 rounded-full bg-surface-alt px-2 py-0.5 text-xs text-text-secondary"
                 >
-                  ×
-                </button>
-              </span>
-            )
-          })}
+                  {parent?.name ?? parentId}
+                  <button
+                    type="button"
+                    onClick={() => removeParent.mutate({ id: task.id, parentId })}
+                    className="text-text-secondary hover:text-danger"
+                    title="Remove parent"
+                  >
+                    ×
+                  </button>
+                </span>
+              )
+            })}
+          </div>
+          {parentCandidates.length > 0 && (
+            <div className="mt-2 flex gap-2">
+              <select
+                aria-label="Add parent"
+                value={addParentId}
+                onChange={(event) => setAddParentId(event.target.value)}
+                className="flex-1 rounded border border-border bg-surface px-2 py-1 text-xs text-text-primary"
+              >
+                <option value="">Add parent…</option>
+                {parentCandidates.map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                title="Add parent"
+                disabled={!addParentId || addParent.isPending}
+                onClick={() => {
+                  addParent.mutate({ id: task.id, parentId: addParentId })
+                  setAddParentId('')
+                }}
+                className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-alt disabled:opacity-50"
+              >
+                Add
+              </button>
+            </div>
+          )}
         </div>
-        {parentCandidates.length > 0 && (
-          <div className="mt-2 flex gap-2">
-            <select
-              aria-label="Add parent"
-              value={addParentId}
-              onChange={(event) => setAddParentId(event.target.value)}
-              className="flex-1 rounded border border-border bg-surface px-2 py-1 text-xs text-text-primary"
-            >
-              <option value="">Add parent…</option>
-              {parentCandidates.map((candidate) => (
-                <option key={candidate.id} value={candidate.id}>
-                  {candidate.name}
-                </option>
-              ))}
-            </select>
+      )}
+
+      {!task.is_routine && (
+        <div className="mt-6">
+          <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
+            Add child task
+          </label>
+          <div className="mt-2 flex flex-wrap gap-2">
             <button
               type="button"
-              title="Add parent"
-              disabled={!addParentId || addParent.isPending}
-              onClick={() => {
-                addParent.mutate({ id: task.id, parentId: addParentId })
-                setAddParentId('')
-              }}
-              className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-alt disabled:opacity-50"
+              title="Create child task"
+              onClick={() => onAddChild(task.id)}
+              className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-alt hover:text-text-primary"
             >
-              Add
+              + Child task
             </button>
           </div>
-        )}
-      </div>
-
-      <div className="mt-6">
-        <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
-          Add child task
-        </label>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <button
-            type="button"
-            title="Create child task"
-            onClick={() => onAddChild(task.id)}
-            className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-alt hover:text-text-primary"
-          >
-            + Child task
-          </button>
         </div>
-      </div>
+      )}
 
       <div className="mt-6">
         <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">

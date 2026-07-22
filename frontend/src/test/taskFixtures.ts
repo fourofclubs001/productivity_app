@@ -18,6 +18,13 @@ export function makeTask(overrides: Partial<Task> = {}): Task {
     required_by_ids: [],
     estimated_hours: null,
     ever_had_children: false,
+    is_routine: false,
+    recurrence_interval: null,
+    recurrence_unit: null,
+    recurrence_days_of_week: [],
+    recurrence_end_type: null,
+    recurrence_end_date: null,
+    recurrence_end_count: null,
     ...overrides,
   }
 }
