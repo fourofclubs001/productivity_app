@@ -16,6 +16,12 @@ vi.mock('./api/intervals', () => ({
   useDeleteInterval: () => ({ mutate: vi.fn() }),
 }))
 
+vi.mock('./api/google', () => ({
+  useGoogleConnectionStatus: () => ({ data: { connected: false } }),
+  useDisconnectGoogle: () => ({ mutate: vi.fn() }),
+  googleLoginUrl: () => 'http://localhost:8000/auth/google/login',
+}))
+
 describe('App', () => {
   it('renders the three view tabs and defaults to Plan', () => {
     render(<App />)

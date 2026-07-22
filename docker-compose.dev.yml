@@ -18,6 +18,9 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379/0
       - CORS_ORIGINS=["http://localhost:5174"]
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_REDIRECT_URI=http://localhost:8001/auth/google/callback
     ports:
       - "8001:8000"
     depends_on:

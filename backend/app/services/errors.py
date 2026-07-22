@@ -143,3 +143,19 @@ class ExcuseNotFoundError(Exception):
 class FutureGapExcuseError(Exception):
     def __init__(self) -> None:
         super().__init__("A future gap can't be explained -- it hasn't happened yet")
+
+
+class GoogleAuthError(Exception):
+    def __init__(self) -> None:
+        super().__init__("Google OAuth state is invalid or has expired")
+
+
+class GoogleNotConnectedError(Exception):
+    def __init__(self) -> None:
+        super().__init__("Google Calendar is not connected")
+
+
+class IntervalAlreadySyncedError(Exception):
+    def __init__(self, interval_id: str) -> None:
+        self.interval_id = interval_id
+        super().__init__(f"Interval {interval_id!r} is already synced to Google Calendar")

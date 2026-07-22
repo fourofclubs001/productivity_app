@@ -3,13 +3,21 @@ from typing import Annotated
 from fastapi import Depends
 from redis.asyncio import Redis
 
+from app.config import settings
 from app.redis_client import get_redis
 from app.repositories.entry_repository import EntryRepository
 from app.repositories.excuse_repository import ExcuseRepository
+from app.repositories.google_repository import GoogleRepository
 from app.repositories.interval_repository import IntervalRepository
 from app.repositories.task_repository import TaskRepository
 from app.services.evaluate_service import EvaluateService
 from app.services.excuse_service import ExcuseService
+from app.services.google_auth_service import GoogleAuthService
+from app.services.google_oauth_client import (
+    FakeGoogleOAuthClient,
+    GoogleOAuthClient,
+    HttpxGoogleOAuthClient,
+)
 from app.services.interval_service import IntervalService
 from app.services.rollover_service import RolloverService
 from app.services.task_service import TaskService
@@ -46,3 +54,19 @@ async def apply_rollover(
     rollover: Annotated[RolloverService, Depends(get_rollover_service)],
 ) -> None:
     await rollover.ensure_applied()
+
+
+def get_google_oauth_client() -> GoogleOAuthClient:
+    # Falls back to the no-network fake whenever real credentials aren't
+    # configured (the default in dev/CI), so the whole connect flow stays
+    # fully testable without ever reaching Google -- see FakeGoogleOAuthClient.
+    if settings.google_client_id and settings.google_client_secret:
+        return HttpxGoogleOAuthClient(settings.google_client_id, settings.google_client_secret)
+    return FakeGoogleOAuthClient()
+
+
+def get_google_auth_service(
+    redis: Annotated[Redis, Depends(get_redis)],
+    oauth_client: Annotated[GoogleOAuthClient, Depends(get_google_oauth_client)],
+) -> GoogleAuthService:
+    return GoogleAuthService(GoogleRepository(redis), oauth_client, settings.google_redirect_uri)
