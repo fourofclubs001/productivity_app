@@ -4,24 +4,33 @@ Working notes for picking this project back up in a future session. Not user-fac
 docs (see `README.md` for that) — this is "what's true right now and how we work
 here."
 
-## Where things stand (as of M40, post-v04)
+## Where things stand (as of M49, post-v05)
 
 The app is fully built and working: Plan / Execute / Evaluate views, FastAPI +
 Redis backend, React + Tailwind frontend, Google Workspace/Calendar-styled light
 theme. v00 (8 items), v01 (30 items, M1–M12), v02 (19 items, M13–M23), v03
-(11 items, M24–M34, plus one post-v03 ad hoc fix), and v04 (4 items, M35–M39:
+(11 items, M24–M34, plus one post-v03 ad hoc fix), v04 (4 items, M35–M39:
 Google Calendar sync + routine/recurring tasks, plus one post-v04 ad hoc fix,
-M40: pulling Google events back into Plan/Execute) are all fully implemented,
-committed, and pushed. **Deployed to prod as of 2026-07-23** — `docker compose
-up --build` was run against `docker-compose.yml` with the real Google OAuth
-Client ID/Secret already present in the root `.env`, so prod now runs the full
-v04/M40 code with live Google Calendar sync enabled, not just the fake
-adapter. The dev stack has had real Google credentials configured for a while
-(the user completed the OAuth Cloud Console setup and connected it live) —
-the automated test suite still always runs against the no-credentials fake
-adapter regardless.
-No `prompts/app_improvements_vNN.md` is currently pending — the next session
-should wait for a new one to be dropped in, per the workflow below.
+M40: pulling Google events back into Plan/Execute), and v05 (11 items,
+M41–M49: timer stop UX, two real bug fixes, the "routine"→"recurrent task"
+rename, recurrent-task groups + drag-and-drop, and drag-to-create on the Plan
+calendar) are all fully implemented, committed, and pushed.
+
+**Prod status, mid-pass:** M45's rename + its Redis data migration (real
+prod recurrent-task data) were deployed to prod partway through the v05
+session (`docker compose up --build`, then
+`docker compose exec backend python -m scripts.migrate_routine_to_recurrent_task`,
+dry-run first) — prod runs the M45 rename, but **M46–M49 (groups,
+drag-and-drop, drag-to-create) have not been redeployed to prod yet**, only
+verified against dev. Rebuild prod (`docker compose up --build` against
+`docker-compose.yml`) to bring it fully current with the v05 pass — no
+further migration needed for M46–M49, they only add new fields/endpoints,
+nothing pre-existing needs renaming.
+
+No `prompts/app_improvements_vNN.md` is currently pending for a *new* pass —
+`prompts/app_improvements_v06.md` was dropped in during the v05 session but
+not yet read/interpreted; that's the next thing to pick up, per the workflow
+below.
 
 ### v02 milestones (M13–M23, one commit each, all pushed)
 
@@ -400,6 +409,106 @@ setup needed for those. To verify against your *actual* Google Calendar:
    `docker compose -f docker-compose.dev.yml up --build`) so the new env
    vars take effect, then use the nav bar's "Connect Google Calendar".
 
+### v05 milestones (M41–M49, one commit each, all pushed)
+
+Full design rationale is in `prompts/interpreted_app_improvements_v05.md`.
+
+- **M41** (`a54fe5d`) — item 1: the timer's stop confirmation gets a third
+  option. Clicking "Stop" now opens the confirm dialog *before* stopping
+  anything (previously it stopped immediately, then asked about marking
+  done) — "Yes" marks done and stops, "No, stop the timer" stops without
+  marking done, "Cancel" leaves the timer running untouched. New
+  `StopTimerConfirmModal.tsx` keeps this 3-button, timer-specific flow
+  separate from `DoneConfirmModal.tsx`'s plain 2-button "mark done" dialog
+  (still used as-is by `TaskDetailPanel`'s own "Mark sprint done" button).
+- **M42** (`8bb8dc2`) — item 3 bug fix: deleting a task didn't sync its
+  future intervals' deletion to Google Calendar. Root cause:
+  `routers/tasks.py`'s `delete_task` pruned future intervals via a raw
+  `IntervalRepository.delete()` call, bypassing
+  `IntervalService.delete_interval()` — the only place that actually does
+  the Google-side delete (confirmed: deleting an interval *directly*, e.g.
+  via the calendar chip's right-click, already synced correctly). Fixed by
+  routing the cascade through `IntervalService` instead.
+- **M43** (`b39600d`) — item 2 investigation: "every 2 weeks on Friday until
+  Dec 31 only ever produces 2 occurrences." No prior test exercised
+  `recurrence_interval > 1` through `ensure_applied()` across multiple
+  calls. Added an integration test driving a biweekly rule through many
+  irregular `now` advances spanning 100+ simulated days — it **passed
+  against the existing code with no fix needed**: the multi-call catch-up
+  mechanism is correct. No functional defect found; likely a UX-observation
+  gap (Plan only shows the current week by default, and nothing surfaces
+  "generated through when"), not a generation stall.
+- **M44** (`0e310e7`) — item 11 investigation + fix: "selecting Monday while
+  today is Thursday, I cannot create the task." Confirmed via a live repro
+  against the dev stack that creation never actually fails — the backend
+  already resolves to the closest future matching weekday correctly. The
+  real gap: the current week's Plan calendar shows nothing for it (first
+  occurrence lands next week), reading as "nothing happened." New
+  `lib/recurrenceResolve.ts` mirrors the backend's weekly resolution
+  client-side; the New recurrent task dialog now shows a "First occurrence:
+  &lt;date&gt;" preview so success is confirmed rather than inferred.
+- **M45** (`f2f2c32`) — item 5: full rename, "routine" → "recurrent task",
+  across backend and frontend (`RoutineService`→`RecurrentTaskService`,
+  `is_routine`→`is_recurrent_task`, `routines:all`→`recurrent_tasks:all`,
+  `/routines`→`/recurrent-tasks`, `NewRoutineDialog`→
+  `NewRecurrentTaskDialog`, `RoutinesList`→`RecurrentTasksList`, the
+  "Routines" tab label → "Recurrent tasks", every test/fixture referencing
+  the old names). New `backend/scripts/` package (no prior precedent in
+  this repo) holds a one-time, idempotent, `--dry-run`-capable migration
+  script (`migrate_routine_to_recurrent_task.py`) that renames the Redis
+  hash fields and set key in place. **Run against prod mid-session**
+  (dry-run → inspect → real run), preserving all 9 real recurrent tasks
+  that existed there — see "Prod status, mid-pass" above.
+- **M46** (`5dcb444`) — item 8: picking a first-occurrence start past the
+  current end now auto-snaps end's date+time to match start, instead of a
+  blocking red "End must be after start" warning.
+- **M47** (`4469ca7`) — item 7: recurrent-task groups. A new organizational
+  hierarchy, separate from the main task tree — a group is name-only (no
+  schedule), recurrent tasks/groups nest under groups via a new
+  `recurrent_parent_id` field with its own `recurrent_order` sequence
+  (deliberately never sharing state with the main tree's `order`/
+  `ORDER_STEP`). New `POST /recurrent-tasks/groups`,
+  `DELETE /recurrent-tasks/groups/{id}?delete_children=bool` (cascades
+  through nested groups/tasks, or reparents direct children up to the
+  deleted group's own parent — "ungroup"). `RecurrentTasksList.tsx`
+  rewritten from a flat list into a real tree (indent + expand/collapse);
+  the "+" button opens a chooser between "Recurrent task" and "Recurrent
+  group"; a new `GroupDeleteDialog` offers Cancel/Ungroup/Delete-children-too
+  — never a silent default. No drag-and-drop yet in this milestone —
+  nesting could only be set up directly via the API.
+- **M48** (`d8c361f`) — item 10: drag-and-drop within the Recurrent tasks
+  tab. Mirrors the main tree's dnd-kit pattern (`PointerSensor`, per-row
+  `useDraggable`+`useDroppable`, `useDndMonitor` → pure drop-resolution
+  helper) but scoped to a **second, independent `DndContext`** wrapping
+  just the Recurrent tasks panel — dnd-kit scopes drop targets to a
+  `DndContext`'s own children, so this hierarchy's drags can never interact
+  with the main tree's or the Plan calendar's. New
+  `resolveRecurrentDropAction()` (`lib/recurrentTaskTree.ts`) enforces the
+  item-10 constraint: only a recurrent *group* can be a reparent target —
+  dropping onto a plain task always falls back to a sibling reorder,
+  regardless of where in the row the pointer lands.
+  `recurrentDescendantIds()` blocks a group from being reparented into its
+  own subtree. New `PATCH /recurrent-tasks/{id}/parent` and `.../order`
+  (same midpoint-insertion scheme as the main tree's `reorder_task`, against
+  `recurrent_order`). Also fixed a gap from M47: `recurrent_order` was only
+  ever set on groups at creation, never on plain recurrent tasks, and
+  wasn't exposed on `TaskOut` at all — corrected here.
+- **M49** (`3dbbb59`) — item 9: drag-to-create a new event on the Plan
+  calendar. `selectable` was `false` everywhere; enabled react-big-calendar's
+  native `selectable`+`onSelectSlot` (confirmed no conflict with the two
+  existing drag systems — dnd-kit task-row-drag only ever activates from a
+  `useDraggable` source, and the hand-rolled chip-reschedule listener
+  already gates on `[data-interval-id]`, so both structurally ignore empty
+  grid space already — verified by running the full existing drag-spec
+  suite against the now-`selectable` calendar before building further). A
+  new chooser (`NewEventChooserDialog`) offers recurring-new (reuses
+  `NewRecurrentTaskDialog`, now taking an optional `initialRange`),
+  not-recurring-new (new `QuickCreateTaskDialog`: name+DoD only, two plain
+  client-side calls — create task then create interval, no new combined
+  backend endpoint), or existing-task (new `ScheduleExistingTaskDialog`,
+  reusing `TaskPicker` + `useCreateInterval` directly). **This completes
+  the v05 pass.**
+
 ## The workflow established for this project
 
 This has repeated three times now (initial build, v00, v01) and is worth reusing:
@@ -427,15 +536,17 @@ This has repeated three times now (initial build, v00, v01) and is worth reusing
 
 ## Known limitations (deliberately deferred, not bugs)
 
-- **Editing an existing routine's recurrence rule** (v04, M38/M39) — not
-  implemented. The New Routine dialog only covers creation; changing a
-  routine's repeat interval/days/end condition after the fact isn't
-  possible yet (delete and recreate is the only workaround). Flagged as a
-  natural follow-up in the v04 plan, not built since the interpreted
-  improvements list only asked for creation.
-- **Deleting or editing one routine-generated occurrence only affects that
-  one interval** (v04, M38) — no Google-Calendar-style "this event / this
-  and following / all events" semantics. Deliberately out of scope for v04.
+- **Editing an existing recurrent task's recurrence rule** (v04, M38/M39;
+  renamed from "routine" in v05 M45) — not implemented. The New recurrent
+  task dialog only covers creation; changing a recurrent task's repeat
+  interval/days/end condition after the fact isn't possible yet (delete and
+  recreate is the only workaround). Flagged as a natural follow-up in the
+  v04 plan, not built since the interpreted improvements list only asked
+  for creation. Still not built as of v05.
+- **Deleting or editing one recurrent-task-generated occurrence only
+  affects that one interval** (v04, M38) — no Google-Calendar-style "this
+  event / this and following / all events" semantics. Deliberately out of
+  scope for v04, still not built as of v05.
 - **Google Calendar sync** (v04 M35–M37, plus post-v04 M40) — real OAuth2
   connect/disconnect, manual/automatic push of Plan intervals, and pulling
   Google's own events back into Plan/Execute (read-only, not editable, not
@@ -480,6 +591,16 @@ This has repeated three times now (initial build, v00, v01) and is worth reusing
   "...Cancel...") ambiguously matched a same-named button elsewhere in the
   DOM once enough tasks piled up; fixed case-by-case by renaming the fixture
   data, not by addressing the underlying no-flush-between-specs cause.
+  **Recurred again during the v05 pass** (M41, M42): a fixture task named
+  "Timer cancel …" collided with the new timer-stop dialog's own "Cancel"
+  button, and a task named "DeleteCascade …" collided with a context menu's
+  "Delete" button — same fix each time (rename the fixture, e.g. to "Timer
+  abort …"/"TaskCascadeSync …"). Also hit a genuine cross-file ordering bug
+  in M49: a new spec file (`drag-to-create.spec.ts`) sorting alphabetically
+  before `recurrent-tasks.spec.ts` and creating a recurrent task broke that
+  file's "no recurrent tasks yet" empty-state assertion when the full suite
+  ran together (fixed by dropping that assertion from the e2e spec — it's
+  already covered by a unit test — rather than fighting cross-file order).
 
 ## Environment notes
 
@@ -543,6 +664,23 @@ This has repeated three times now (initial build, v00, v01) and is worth reusing
   setup health-checks `/health` on port 8001 and flushes the dev Redis) and run
   single-worker — the backend's active-timer is one global Redis key, so parallel
   timer specs would interfere.
+- **Gotcha hit during the v05 pass:** the root `.env`'s real Google OAuth
+  credentials get picked up by **both** compose files (`docker-compose.yml`
+  and `docker-compose.dev.yml` both do `${GOOGLE_CLIENT_ID:-}` substitution),
+  so once real credentials exist for prod, rebuilding *dev* with the default
+  `.env` in place also switches dev to the **real** Google adapter — breaking
+  every Google-related Playwright spec, since they assume the deterministic
+  fake adapter (clicking "Connect Google Calendar" would otherwise redirect
+  to real `accounts.google.com`, which can't complete automatically). Fix:
+  rebuild dev with those two vars explicitly blanked for that invocation —
+  `GOOGLE_CLIENT_ID= GOOGLE_CLIENT_SECRET= docker compose -f
+  docker-compose.dev.yml up --build -d` — which overrides the `.env` file's
+  values (shell env takes precedence over `.env` in Compose's variable
+  substitution) without touching the `.env` file itself or prod. Verify via
+  `curl -s http://localhost:8001/auth/google/login` — a `Location` pointing
+  at `accounts.google.com` means real credentials leaked in; a `Location`
+  pointing back at `localhost:8001/auth/google/callback?code=fake-google-code`
+  means the fake adapter is active as expected.
 
 ## Quick command reference
 
@@ -564,12 +702,13 @@ docker compose -f docker-compose.dev.yml up --build     # dev: isolated data, po
 
 ## Next possible steps
 
-- No `prompts/app_improvements_vNN.md` is currently pending. When the next one
-  is dropped in, follow the workflow above (interpret, clarify, commit, plan,
-  implement).
-- **v04 was deployed to prod on 2026-07-23** (`docker compose up --build`
-  against `docker-compose.yml`, real Google OAuth credentials already in the
-  root `.env`) — no longer a pending step.
+- **`prompts/app_improvements_v06.md` was dropped in during the v05 session
+  but not yet read or interpreted** — that's the next thing to do, following
+  the workflow above (interpret, clarify, commit, plan, implement).
+- **M46–M49 (v05's second half) haven't been deployed to prod yet** — only
+  M45's rename made it to prod so far (mid-v05-session). Rebuild prod
+  (`docker compose up --build` against `docker-compose.yml`) once ready; no
+  further data migration needed for M46–M49.
 - Consider actually fixing the M18 dnd-kit scrolled-container drag bug (currently
   only worked around in tests) if it turns out to bite a real user.
 - Revisit the UTC-vs-local-timezone limitation if week/day boundaries ever look
@@ -577,7 +716,10 @@ docker compose -f docker-compose.dev.yml up --build     # dev: isolated data, po
 - Revisit the tree auto-expand-on-add-child gap if it becomes annoying.
 - Consider a per-spec (not per-run) Redis flush for the Playwright suite if the
   crowding-related flakiness noted above gets worse as more specs are added
-  (it has: recurred in both the v03 and v04 passes across several specs,
-  always resolved by an isolated re-run).
-- Editing an existing routine's recurrence rule (v04 limitation above) if it
-  turns out to be annoying in practice.
+  (it has: recurred in the v03, v04, *and now v05* passes across several
+  specs, always resolved by an isolated re-run).
+- Editing an existing recurrent task's recurrence rule (v04/v05 limitation
+  above) if it turns out to be annoying in practice.
+- Recurrent-task groups (v05 M47) currently have no way to set up nesting at
+  *creation* time (only via drag-and-drop, M48, after the fact) — revisit if
+  that turns out to be an annoying two-step dance in practice.
