@@ -12,12 +12,14 @@ theme. v00 (8 items), v01 (30 items, M1–M12), v02 (19 items, M13–M23), v03
 (11 items, M24–M34, plus one post-v03 ad hoc fix), and v04 (4 items, M35–M39:
 Google Calendar sync + routine/recurring tasks, plus one post-v04 ad hoc fix,
 M40: pulling Google events back into Plan/Execute) are all fully implemented,
-committed, and pushed. **Not yet deployed to prod** — v04/M40 needs a real
-Google OAuth Client ID/Secret in a root `.env` before prod is worth rebuilding
-(see "Google Calendar setup" below). The dev stack now has real Google
-credentials configured (the user completed the OAuth Cloud Console setup and
-connected it live) — the automated test suite still always runs against the
-no-credentials fake adapter regardless.
+committed, and pushed. **Deployed to prod as of 2026-07-23** — `docker compose
+up --build` was run against `docker-compose.yml` with the real Google OAuth
+Client ID/Secret already present in the root `.env`, so prod now runs the full
+v04/M40 code with live Google Calendar sync enabled, not just the fake
+adapter. The dev stack has had real Google credentials configured for a while
+(the user completed the OAuth Cloud Console setup and connected it live) —
+the automated test suite still always runs against the no-credentials fake
+adapter regardless.
 No `prompts/app_improvements_vNN.md` is currently pending — the next session
 should wait for a new one to be dropped in, per the workflow below.
 
@@ -565,11 +567,9 @@ docker compose -f docker-compose.dev.yml up --build     # dev: isolated data, po
 - No `prompts/app_improvements_vNN.md` is currently pending. When the next one
   is dropped in, follow the workflow above (interpret, clarify, commit, plan,
   implement).
-- **v04 hasn't been deployed to prod yet** (`docker compose up --build` against
-  `docker-compose.yml`) — do that once you're ready, and drop real Google OAuth
-  credentials into a root `.env` first if real Calendar sync is wanted there
-  (see "Google Calendar setup" above; the app works fine on the fake adapter
-  with no credentials too, sync just silently no-ops).
+- **v04 was deployed to prod on 2026-07-23** (`docker compose up --build`
+  against `docker-compose.yml`, real Google OAuth credentials already in the
+  root `.env`) — no longer a pending step.
 - Consider actually fixing the M18 dnd-kit scrolled-container drag bug (currently
   only worked around in tests) if it turns out to bite a real user.
 - Revisit the UTC-vs-local-timezone limitation if week/day boundaries ever look
