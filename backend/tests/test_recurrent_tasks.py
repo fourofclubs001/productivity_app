@@ -12,7 +12,7 @@ from app.services.google_calendar_client import FakeGoogleCalendarClient
 from app.services.google_oauth_client import FakeGoogleOAuthClient
 from app.services.google_sync_service import GoogleSyncService
 from app.services.interval_service import IntervalService
-from app.services.routine_service import RoutineService, occurrence_dates
+from app.services.recurrent_task_service import RecurrentTaskService, occurrence_dates
 from app.services.task_service import TaskService
 
 
@@ -22,16 +22,18 @@ def services(redis_client):
     interval_repo = IntervalRepository(redis_client)
     task_service = TaskService(task_repo)
     interval_service = IntervalService(interval_repo, task_repo, task_service)
-    routine_service = RoutineService(redis_client, task_repo, task_service, interval_service)
+    recurrent_task_service = RecurrentTaskService(
+        redis_client, task_repo, task_service, interval_service
+    )
     return {
         "task_repo": task_repo,
         "tasks": task_service,
         "intervals": interval_service,
-        "routines": routine_service,
+        "recurrent_tasks": recurrent_task_service,
     }
 
 
-async def seed_routine(
+async def seed_recurrent_task(
     services,
     anchor: date,
     unit: RecurrenceUnit,
@@ -40,14 +42,14 @@ async def seed_routine(
     end_type: RecurrenceEndType = RecurrenceEndType.never,
     end_date: date | None = None,
     end_count: int | None = None,
-    name: str = "Routine",
+    name: str = "Recurrent task",
 ) -> str:
-    """Seeds a routine task's hash fields directly, bypassing
-    RoutineService.create_routine's real-`datetime.now(UTC)`-bound first
-    generation call -- lets tests pick arbitrary anchors (including ones
-    that would be "in the past" relative to real wall-clock time) and drive
-    everything through explicit `now`/`ensure_applied(now=...)` values
-    instead, mirroring test_rollover.py's `schedule()` helper.
+    """Seeds a recurrent task's hash fields directly, bypassing
+    RecurrentTaskService.create_recurrent_task's real-`datetime.now(UTC)`-
+    bound first generation call -- lets tests pick arbitrary anchors
+    (including ones that would be "in the past" relative to real wall-clock
+    time) and drive everything through explicit `now`/`ensure_applied(now=...)`
+    values instead, mirroring test_rollover.py's `schedule()` helper.
     """
     task_repo = services["task_repo"]
     task_id = str(uuid4())
@@ -58,22 +60,22 @@ async def seed_routine(
         "state": TaskState.backlog.value,
         "created_at": datetime.now(UTC).isoformat(),
         "order": str(await task_repo.next_order()),
-        "is_routine": "1",
-        "routine_anchor_date": anchor.isoformat(),
-        "routine_start_time": time(9, 0).isoformat(),
-        "routine_duration_minutes": "60",
+        "is_recurrent_task": "1",
+        "recurrent_task_anchor_date": anchor.isoformat(),
+        "recurrent_task_start_time": time(9, 0).isoformat(),
+        "recurrent_task_duration_minutes": "60",
         "recurrence_interval": str(interval),
         "recurrence_unit": unit.value,
         "recurrence_days_of_week": ",".join(str(d) for d in (days_of_week or [])),
         "recurrence_end_type": end_type.value,
-        "routine_generated_until": (anchor - timedelta(days=1)).isoformat(),
+        "recurrent_task_generated_until": (anchor - timedelta(days=1)).isoformat(),
     }
     if end_date is not None:
         fields["recurrence_end_date"] = end_date.isoformat()
     if end_count is not None:
         fields["recurrence_end_count"] = str(end_count)
     await task_repo.create(task_id, fields)
-    await task_repo.add_to_routines(task_id)
+    await task_repo.add_to_recurrent_tasks(task_id)
     return task_id
 
 
@@ -203,7 +205,7 @@ def test_ends_after_count_respects_occurrences_already_past_start_from():
 
 
 # ---------------------------------------------------------------------------
-# RoutineService.ensure_applied: integration tests through fakeredis.
+# RecurrentTaskService.ensure_applied: integration tests through fakeredis.
 #
 # Generation reuses IntervalService.create_interval for real (so M37's
 # Google auto-sync applies for free -- see the test below), which enforces
@@ -222,10 +224,10 @@ def _future_anchor(days_ahead: int) -> date:
 
 async def test_ensure_applied_generates_intervals_within_the_window(services):
     anchor = _future_anchor(7)
-    task_id = await seed_routine(services, anchor, RecurrenceUnit.day)
+    task_id = await seed_recurrent_task(services, anchor, RecurrenceUnit.day)
 
     now = datetime.combine(anchor, time(8, 0), tzinfo=UTC)
-    await services["routines"].ensure_applied(now=now)
+    await services["recurrent_tasks"].ensure_applied(now=now)
 
     intervals = await services["intervals"].list_for_task(task_id)
     assert len(intervals) == 29  # anchor through anchor+28 inclusive, daily
@@ -237,11 +239,11 @@ async def test_ensure_applied_generates_intervals_within_the_window(services):
 
 async def test_ensure_applied_is_idempotent(services):
     anchor = _future_anchor(7)
-    task_id = await seed_routine(services, anchor, RecurrenceUnit.day)
+    task_id = await seed_recurrent_task(services, anchor, RecurrenceUnit.day)
 
     now = datetime.combine(anchor, time(8, 0), tzinfo=UTC)
-    await services["routines"].ensure_applied(now=now)
-    await services["routines"].ensure_applied(now=now)
+    await services["recurrent_tasks"].ensure_applied(now=now)
+    await services["recurrent_tasks"].ensure_applied(now=now)
 
     intervals = await services["intervals"].list_for_task(task_id)
     assert len(intervals) == 29
@@ -249,15 +251,17 @@ async def test_ensure_applied_is_idempotent(services):
 
 async def test_ensure_applied_extends_the_window_on_a_later_call(services):
     anchor = _future_anchor(7)
-    task_id = await seed_routine(services, anchor, RecurrenceUnit.day)
+    task_id = await seed_recurrent_task(services, anchor, RecurrenceUnit.day)
 
-    await services["routines"].ensure_applied(
+    await services["recurrent_tasks"].ensure_applied(
         now=datetime.combine(anchor, time(8, 0), tzinfo=UTC)
     )
     # A week later, the window should extend further out without duplicating
     # what's already been generated.
     later = anchor + timedelta(days=7)
-    await services["routines"].ensure_applied(now=datetime.combine(later, time(8, 0), tzinfo=UTC))
+    await services["recurrent_tasks"].ensure_applied(
+        now=datetime.combine(later, time(8, 0), tzinfo=UTC)
+    )
 
     intervals = await services["intervals"].list_for_task(task_id)
     assert len(intervals) == 36  # anchor through (anchor+7)+28 inclusive
@@ -286,7 +290,7 @@ async def test_biweekly_recurrence_keeps_generating_across_many_catchup_calls(se
     """
     anchor = _next_weekday(_future_anchor(7), weekday=4)  # a future Friday
     end_date = anchor + timedelta(days=200)
-    task_id = await seed_routine(
+    task_id = await seed_recurrent_task(
         services,
         anchor,
         RecurrenceUnit.week,
@@ -304,7 +308,7 @@ async def test_biweekly_recurrence_keeps_generating_across_many_catchup_calls(se
     for offset in day_offsets:
         cumulative += offset
         now = datetime.combine(anchor + timedelta(days=cumulative), time(8, 0), tzinfo=UTC)
-        await services["routines"].ensure_applied(now=now)
+        await services["recurrent_tasks"].ensure_applied(now=now)
 
     final_now = datetime.combine(anchor + timedelta(days=cumulative), time(8, 0), tzinfo=UTC)
     window_end = final_now.date() + timedelta(days=28)
@@ -332,21 +336,21 @@ async def test_biweekly_recurrence_keeps_generating_across_many_catchup_calls(se
 
 async def test_sprint_done_resets_to_backlog_once_an_occurrence_concludes(services):
     anchor = _future_anchor(7)
-    task_id = await seed_routine(services, anchor, RecurrenceUnit.day)
+    task_id = await seed_recurrent_task(services, anchor, RecurrenceUnit.day)
 
-    await services["routines"].ensure_applied(
+    await services["recurrent_tasks"].ensure_applied(
         now=datetime.combine(anchor, time(8, 0), tzinfo=UTC)
     )
     await services["task_repo"].update_fields(task_id, {"state": TaskState.sprint_done.value})
 
     # Still within the first occurrence's window -- not concluded yet.
-    await services["routines"].ensure_applied(
+    await services["recurrent_tasks"].ensure_applied(
         now=datetime.combine(anchor, time(9, 30), tzinfo=UTC)
     )
     assert (await services["tasks"].get_task(task_id)).state == TaskState.sprint_done
 
     # Past the first occurrence's end (09:00-10:00) -- resets automatically.
-    await services["routines"].ensure_applied(
+    await services["recurrent_tasks"].ensure_applied(
         now=datetime.combine(anchor, time(10, 30), tzinfo=UTC)
     )
     assert (await services["tasks"].get_task(task_id)).state == TaskState.backlog
@@ -354,9 +358,9 @@ async def test_sprint_done_resets_to_backlog_once_an_occurrence_concludes(servic
 
 async def test_non_finished_state_is_left_alone_by_the_reset_check(services):
     anchor = _future_anchor(7)
-    task_id = await seed_routine(services, anchor, RecurrenceUnit.day)
+    task_id = await seed_recurrent_task(services, anchor, RecurrenceUnit.day)
 
-    await services["routines"].ensure_applied(
+    await services["recurrent_tasks"].ensure_applied(
         now=datetime.combine(anchor, time(12, 0), tzinfo=UTC)
     )
     # Scheduling a leaf task's first interval flips it to sprint_backlog --
@@ -378,10 +382,12 @@ async def test_generated_intervals_sync_to_google_when_connected(redis_client, s
     interval_service = IntervalService(
         IntervalRepository(redis_client), task_repo, services["tasks"], google_sync
     )
-    routine_service = RoutineService(redis_client, task_repo, services["tasks"], interval_service)
+    recurrent_task_service = RecurrentTaskService(
+        redis_client, task_repo, services["tasks"], interval_service
+    )
 
     anchor = _future_anchor(7)
-    task_id = await seed_routine(
+    task_id = await seed_recurrent_task(
         services,
         anchor,
         RecurrenceUnit.day,
@@ -389,7 +395,9 @@ async def test_generated_intervals_sync_to_google_when_connected(redis_client, s
         end_count=1,
     )
 
-    await routine_service.ensure_applied(now=datetime.combine(anchor, time(8, 0), tzinfo=UTC))
+    await recurrent_task_service.ensure_applied(
+        now=datetime.combine(anchor, time(8, 0), tzinfo=UTC)
+    )
 
     intervals = await interval_service.list_for_task(task_id)
     assert len(intervals) == 1
@@ -398,16 +406,16 @@ async def test_generated_intervals_sync_to_google_when_connected(redis_client, s
 
 
 # ---------------------------------------------------------------------------
-# POST /routines: router-level integration test.
+# POST /recurrent-tasks: router-level integration test.
 # ---------------------------------------------------------------------------
 
 
-def test_create_routine_endpoint_generates_its_first_occurrence(client):
+def test_create_recurrent_task_endpoint_generates_its_first_occurrence(client):
     start = datetime.combine(_future_anchor(7), time(9, 0), tzinfo=UTC)
     end = start + timedelta(hours=1)
 
     response = client.post(
-        "/routines",
+        "/recurrent-tasks",
         json={
             "name": "Water plants",
             "definition_of_done": "Soil is moist",
@@ -420,7 +428,7 @@ def test_create_routine_endpoint_generates_its_first_occurrence(client):
     )
     assert response.status_code == 201
     body = response.json()
-    assert body["is_routine"] is True
+    assert body["is_recurrent_task"] is True
     assert body["is_leaf"] is True
     assert body["recurrence_unit"] == "day"
 

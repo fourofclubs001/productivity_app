@@ -25,8 +25,8 @@ from app.services.google_oauth_client import (
 )
 from app.services.google_sync_service import GoogleSyncService
 from app.services.interval_service import IntervalService
+from app.services.recurrent_task_service import RecurrentTaskService
 from app.services.rollover_service import RolloverService
-from app.services.routine_service import RoutineService
 from app.services.task_service import TaskService
 from app.services.timer_service import TimerService
 
@@ -95,19 +95,19 @@ async def apply_rollover(
     await rollover.ensure_applied()
 
 
-def get_routine_service(
+def get_recurrent_task_service(
     redis: Annotated[Redis, Depends(get_redis)],
     google: Annotated[GoogleSyncService, Depends(get_google_sync_service)],
-) -> RoutineService:
+) -> RecurrentTaskService:
     task_repo = TaskRepository(redis)
     task_service = TaskService(task_repo)
     interval_service = IntervalService(
         IntervalRepository(redis), task_repo, task_service, google
     )
-    return RoutineService(redis, task_repo, task_service, interval_service)
+    return RecurrentTaskService(redis, task_repo, task_service, interval_service)
 
 
-async def apply_routine_catchup(
-    routines: Annotated[RoutineService, Depends(get_routine_service)],
+async def apply_recurrent_task_catchup(
+    recurrent_tasks: Annotated[RecurrentTaskService, Depends(get_recurrent_task_service)],
 ) -> None:
-    await routines.ensure_applied()
+    await recurrent_tasks.ensure_applied()

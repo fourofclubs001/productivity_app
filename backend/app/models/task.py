@@ -63,7 +63,7 @@ class AddRequirementRequest(BaseModel):
     required_id: str
 
 
-class RoutineCreate(BaseModel):
+class RecurrentTaskCreate(BaseModel):
     name: str = Field(min_length=1)
     definition_of_done: str = Field(min_length=1)
     colors: list[str] = Field(default_factory=list)
@@ -113,8 +113,8 @@ class TaskOut(BaseModel):
     # opposed to a task that never had children at all). Keeps it reading
     # as a goal (is_leaf: false) rather than reverting to a leaf.
     ever_had_children: bool
-    # A routine task's recurrence rule -- None/empty for a non-routine task.
-    is_routine: bool
+    # A recurrent task's recurrence rule -- None/empty for a non-recurrent task.
+    is_recurrent_task: bool
     recurrence_interval: int | None = None
     recurrence_unit: RecurrenceUnit | None = None
     recurrence_days_of_week: list[int] = Field(default_factory=list)

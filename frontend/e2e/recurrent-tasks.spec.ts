@@ -1,47 +1,47 @@
 import { test, expect } from '@playwright/test'
 
-test('creating a daily routine auto-schedules its first occurrence without any manual drag', async ({
+test('creating a daily recurrent task auto-schedules its first occurrence without any manual drag', async ({
   page,
 }) => {
-  const routineName = `Water plants ${Date.now()}`
+  const taskName = `Water plants ${Date.now()}`
 
   await page.goto('/')
 
-  await page.getByRole('button', { name: 'Routines' }).click()
-  await expect(page.getByText(/no routines yet/i)).toBeVisible()
+  await page.getByRole('button', { name: 'Recurrent tasks' }).click()
+  await expect(page.getByText(/no recurrent tasks yet/i)).toBeVisible()
 
-  await page.getByTitle('New routine').click()
-  await expect(page.getByRole('heading', { name: 'New routine' })).toBeVisible()
+  await page.getByTitle('New recurrent task').click()
+  await expect(page.getByRole('heading', { name: 'New recurrent task' })).toBeVisible()
 
-  await page.getByLabel('Name').fill(routineName)
+  await page.getByLabel('Name').fill(taskName)
   await page.getByLabel('Definition of done').fill('Soil is moist')
   await page.getByLabel('Repeat unit').selectOption('day')
   await page.getByRole('button', { name: 'Create' }).click()
 
-  // The dialog closes and the new routine shows up in the Routines list,
-  // selected.
-  await expect(page.getByRole('heading', { name: 'New routine' })).not.toBeVisible()
+  // The dialog closes and the new recurrent task shows up in the Recurrent
+  // tasks list, selected.
+  await expect(page.getByRole('heading', { name: 'New recurrent task' })).not.toBeVisible()
   await expect(
-    page.getByTestId('routines-list').getByText(routineName, { exact: true }),
+    page.getByTestId('recurrent-tasks-list').getByText(taskName, { exact: true }),
   ).toBeVisible()
-  await expect(page.getByLabel('Task name')).toHaveValue(routineName)
+  await expect(page.getByLabel('Task name')).toHaveValue(taskName)
 
-  // Its first occurrence was generated server-side (RoutineService.
+  // Its first occurrence was generated server-side (RecurrentTaskService.
   // ensure_applied, M38) as a side effect of creation -- no drag, no
   // "Add to calendar" click, just a chip appearing on the Plan calendar
-  // once the create-routine mutation invalidates the intervals query.
-  // (A daily routine can produce more than one visible chip within the
+  // once the create mutation invalidates the intervals query. (A daily
+  // recurrent task can produce more than one visible chip within the
   // currently-displayed week -- one per remaining day -- so just check
   // that at least one shows up, not an exact count.)
-  await expect(page.locator('.rbc-event', { hasText: routineName }).first()).toBeVisible()
+  await expect(page.locator('.rbc-event', { hasText: taskName }).first()).toBeVisible()
 
-  // Switching back to the Tasks tab never shows the routine -- it lives
-  // only in the Routines tab.
+  // Switching back to the Tasks tab never shows it -- it lives only in the
+  // Recurrent tasks tab.
   await page.getByRole('button', { name: 'Tasks', exact: true }).click()
-  await expect(page.getByTestId('task-tree').getByText(routineName)).not.toBeVisible()
+  await expect(page.getByTestId('task-tree').getByText(taskName)).not.toBeVisible()
 })
 
-test('selecting a day-of-week other than today still creates the routine, previewing the real first occurrence', async ({
+test('selecting a day-of-week other than today still creates the recurrent task, previewing the real first occurrence', async ({
   page,
 }) => {
   // v05 item 11 repro: picking a weekly day-of-week that doesn't match
@@ -65,13 +65,13 @@ test('selecting a day-of-week other than today still creates the routine, previe
   const targetIsoWeekday = (todayIsoWeekday + 3) % 7 // always different from today
   const targetLabel = dayLabels[targetIsoWeekday]
 
-  const routineName = `Weekday resolve ${Date.now()}`
+  const taskName = `Weekday resolve ${Date.now()}`
 
   await page.goto('/')
-  await page.getByRole('button', { name: 'Routines' }).click()
-  await page.getByTitle('New routine').click()
+  await page.getByRole('button', { name: 'Recurrent tasks' }).click()
+  await page.getByTitle('New recurrent task').click()
 
-  await page.getByLabel('Name').fill(routineName)
+  await page.getByLabel('Name').fill(taskName)
   await page.getByLabel('Definition of done').fill('done')
   await page.getByLabel('Repeat unit').selectOption('week')
   await page.locator('button[aria-pressed]').nth(targetIsoWeekday).click()
@@ -82,19 +82,21 @@ test('selecting a day-of-week other than today still creates the routine, previe
 
   await page.getByRole('button', { name: 'Create' }).click()
 
-  await expect(page.getByRole('heading', { name: 'New routine' })).not.toBeVisible()
+  await expect(page.getByRole('heading', { name: 'New recurrent task' })).not.toBeVisible()
   await expect(
-    page.getByTestId('routines-list').getByText(routineName, { exact: true }),
+    page.getByTestId('recurrent-tasks-list').getByText(taskName, { exact: true }),
   ).toBeVisible()
 })
 
-test('deleting a routine removes it via the same right-click flow as a task', async ({ page }) => {
-  const routineName = `Standup ${Date.now()}`
+test('deleting a recurrent task removes it via the same right-click flow as a task', async ({
+  page,
+}) => {
+  const taskName = `Standup ${Date.now()}`
 
   await page.goto('/')
-  await page.getByRole('button', { name: 'Routines' }).click()
-  await page.getByTitle('New routine').click()
-  await page.getByLabel('Name').fill(routineName)
+  await page.getByRole('button', { name: 'Recurrent tasks' }).click()
+  await page.getByTitle('New recurrent task').click()
+  await page.getByLabel('Name').fill(taskName)
   await page.getByLabel('Definition of done').fill('Attended')
   await page.getByLabel('Repeat unit').selectOption('day')
   await page.getByRole('button', { name: 'Create' }).click()
@@ -102,7 +104,7 @@ test('deleting a routine removes it via the same right-click flow as a task', as
   // exact: true so this never also matches the ConfirmDialog's longer
   // "Delete "<name>" permanently?" sentence below (which contains the same
   // name as a substring).
-  const row = page.getByTestId('routines-list').getByText(routineName, { exact: true })
+  const row = page.getByTestId('recurrent-tasks-list').getByText(taskName, { exact: true })
   await expect(row).toBeVisible()
 
   await row.click({ button: 'right' })

@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from redis.asyncio import Redis
 
 from app.dependencies import (
+    apply_recurrent_task_catchup,
     apply_rollover,
-    apply_routine_catchup,
     get_interval_service,
     get_task_service,
 )
@@ -38,7 +38,7 @@ from app.services.task_service import TaskService
 router = APIRouter(
     prefix="/tasks",
     tags=["tasks"],
-    dependencies=[Depends(apply_rollover), Depends(apply_routine_catchup)],
+    dependencies=[Depends(apply_rollover), Depends(apply_recurrent_task_catchup)],
 )
 
 ServiceDep = Annotated[TaskService, Depends(get_task_service)]

@@ -22,7 +22,7 @@ test('Evaluate Metrics subtab: granularity switch and task filter', async ({ pag
   await page.getByTestId('task-picker-options').getByRole('button', { name: taskAName, exact: true }).click()
   await page.getByRole('button', { name: 'Start' }).click()
   await page.getByRole('button', { name: 'Stop' }).click()
-  await page.getByRole('button', { name: 'No, keep in progress' }).click()
+  await page.getByRole('button', { name: 'No, stop the timer' }).click()
 
   await page.getByRole('button', { name: 'Evaluate' }).click()
   await page.getByRole('button', { name: 'Metrics', exact: true }).click()

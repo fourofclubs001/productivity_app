@@ -24,7 +24,7 @@ const MAX_WEEKS_TO_SCAN = 104 // 2 years -- generous upper bound, never expected
  * anchor date whose own weekday isn't among the selected days_of_week (or
  * whose week is skipped by the interval) doesn't produce a first occurrence
  * on the anchor date itself -- it resolves to the closest matching day at or
- * after the anchor. Surfaced in the UI so creating a routine on, say, a
+ * after the anchor. Surfaced in the UI so creating a recurrent task on, say, a
  * Thursday with only "Monday" selected shows the real first-occurrence date
  * (next Monday) instead of leaving the user to infer it from an empty
  * current-week calendar view (see v05 item 11).

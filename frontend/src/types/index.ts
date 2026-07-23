@@ -20,7 +20,7 @@ export interface Task {
   required_by_ids: string[]
   estimated_hours: number | null
   ever_had_children: boolean
-  is_routine: boolean
+  is_recurrent_task: boolean
   recurrence_interval: number | null
   recurrence_unit: RecurrenceUnit | null
   recurrence_days_of_week: number[]

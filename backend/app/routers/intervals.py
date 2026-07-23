@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.dependencies import apply_rollover, apply_routine_catchup, get_interval_service
+from app.dependencies import apply_recurrent_task_catchup, apply_rollover, get_interval_service
 from app.models.interval import IntervalCreate, IntervalOut, IntervalUpdate
 from app.services.errors import (
     GoogleNotConnectedError,
@@ -22,7 +22,7 @@ from app.services.interval_service import IntervalService
 router = APIRouter(
     prefix="/intervals",
     tags=["intervals"],
-    dependencies=[Depends(apply_rollover), Depends(apply_routine_catchup)],
+    dependencies=[Depends(apply_rollover), Depends(apply_recurrent_task_catchup)],
 )
 
 ServiceDep = Annotated[IntervalService, Depends(get_interval_service)]

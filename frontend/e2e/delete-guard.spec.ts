@@ -47,7 +47,7 @@ test('blocks deleting a task while its timer is running', async ({ page }) => {
   // Stop the timer, then deletion should succeed.
   await page.getByRole('button', { name: 'Execute' }).click()
   await page.getByRole('button', { name: 'Stop' }).click()
-  await page.getByRole('button', { name: 'No, keep in progress' }).click()
+  await page.getByRole('button', { name: 'No, stop the timer' }).click()
 
   await page.getByRole('button', { name: 'Plan' }).click()
   await tree().getByText(taskName).click()
@@ -91,7 +91,7 @@ test('deleting a task keeps its tracked-time chip name on Execute and Evaluate',
   await page.getByRole('button', { name: 'Start' }).click()
   await expect(page.getByText('Tracking')).toBeVisible()
   await page.getByRole('button', { name: 'Stop' }).click()
-  await page.getByRole('button', { name: 'No, keep in progress' }).click()
+  await page.getByRole('button', { name: 'No, stop the timer' }).click()
 
   await expect(page.locator('.rbc-event', { hasText: taskName })).toBeVisible()
 

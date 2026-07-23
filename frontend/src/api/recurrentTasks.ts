@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from './client'
 import type { RecurrenceEndType, RecurrenceUnit, Task } from '../types'
 
-export interface CreateRoutineInput {
+export interface CreateRecurrentTaskInput {
   name: string
   definition_of_done: string
   colors: string[]
@@ -16,15 +16,15 @@ export interface CreateRoutineInput {
   recurrence_end_count?: number
 }
 
-const routinesApi = {
-  create: (input: CreateRoutineInput) =>
-    apiFetch<Task>('/routines', { method: 'POST', body: JSON.stringify(input) }),
+const recurrentTasksApi = {
+  create: (input: CreateRecurrentTaskInput) =>
+    apiFetch<Task>('/recurrent-tasks', { method: 'POST', body: JSON.stringify(input) }),
 }
 
-export function useCreateRoutine() {
+export function useCreateRecurrentTask() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: routinesApi.create,
+    mutationFn: recurrentTasksApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
       queryClient.invalidateQueries({ queryKey: ['intervals'] })

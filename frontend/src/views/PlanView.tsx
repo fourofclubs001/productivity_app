@@ -2,21 +2,21 @@ import { useMemo, useState } from 'react'
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { useTasks } from '../api/tasks'
 import TaskTree from '../components/tree/TaskTree'
-import RoutinesList from '../components/tree/RoutinesList'
+import RecurrentTasksList from '../components/tree/RecurrentTasksList'
 import TaskDetailPanel from '../components/tree/TaskDetailPanel'
 import NewTaskDialog from '../components/tree/NewTaskDialog'
-import NewRoutineDialog from '../components/tree/NewRoutineDialog'
+import NewRecurrentTaskDialog from '../components/tree/NewRecurrentTaskDialog'
 import PlanCalendar from '../components/calendar/PlanCalendar'
 import { useResizableWidth } from '../lib/useResizableWidth'
 
-type LeftTab = 'tasks' | 'routines'
+type LeftTab = 'tasks' | 'recurrent-tasks'
 
 export default function PlanView() {
   const { data: tasks, isLoading, isError, error } = useTasks()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [dialogParentId, setDialogParentId] = useState<string | null>()
   const [leftTab, setLeftTab] = useState<LeftTab>('tasks')
-  const [showNewRoutine, setShowNewRoutine] = useState(false)
+  const [showNewRecurrentTask, setShowNewRecurrentTask] = useState(false)
 
   const tasksById = useMemo(() => new Map((tasks ?? []).map((task) => [task.id, task])), [tasks])
   const selectedTask = selectedId ? tasksById.get(selectedId) : undefined
@@ -48,7 +48,7 @@ export default function PlanView() {
             {(
               [
                 ['tasks', 'Tasks'],
-                ['routines', 'Routines'],
+                ['recurrent-tasks', 'Recurrent tasks'],
               ] as [LeftTab, string][]
             ).map(([key, label]) => (
               <button
@@ -74,11 +74,11 @@ export default function PlanView() {
                 onOpenNewTask={setDialogParentId}
               />
             ) : (
-              <RoutinesList
+              <RecurrentTasksList
                 tasks={tasks ?? []}
                 selectedId={selectedId}
                 onSelect={setSelectedId}
-                onOpenNewRoutine={() => setShowNewRoutine(true)}
+                onOpenNewRecurrentTask={() => setShowNewRecurrentTask(true)}
               />
             )}
           </div>
@@ -122,12 +122,12 @@ export default function PlanView() {
             }}
           />
         )}
-        {showNewRoutine && (
-          <NewRoutineDialog
-            onClose={() => setShowNewRoutine(false)}
+        {showNewRecurrentTask && (
+          <NewRecurrentTaskDialog
+            onClose={() => setShowNewRecurrentTask(false)}
             onCreated={(task) => {
               setSelectedId(task.id)
-              setShowNewRoutine(false)
+              setShowNewRecurrentTask(false)
             }}
           />
         )}

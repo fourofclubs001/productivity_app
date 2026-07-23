@@ -5,7 +5,7 @@ from redis.asyncio import Redis
 
 ALL_TASKS_KEY = "tasks:all"
 ROOTS_KEY = "tasks:roots"
-ROUTINES_KEY = "routines:all"
+RECURRENT_TASKS_KEY = "recurrent_tasks:all"
 ORDER_SEQ_KEY = "tasks:order_seq"
 ORDER_STEP = 1000
 
@@ -70,11 +70,11 @@ class TaskRepository:
         if fields:
             await self._redis.hset(task_key(task_id), mapping=fields)
 
-    async def add_to_routines(self, task_id: str) -> None:
-        await self._redis.sadd(ROUTINES_KEY, task_id)
+    async def add_to_recurrent_tasks(self, task_id: str) -> None:
+        await self._redis.sadd(RECURRENT_TASKS_KEY, task_id)
 
-    async def list_routine_ids(self) -> set[str]:
-        return await self._redis.smembers(ROUTINES_KEY)
+    async def list_recurrent_task_ids(self) -> set[str]:
+        return await self._redis.smembers(RECURRENT_TASKS_KEY)
 
     async def set_colors(self, task_id: str, colors: list[str]) -> None:
         key = colors_key(task_id)
@@ -140,7 +140,7 @@ class TaskRepository:
         )
         await self._redis.srem(ALL_TASKS_KEY, task_id)
         await self._redis.srem(ROOTS_KEY, task_id)
-        await self._redis.srem(ROUTINES_KEY, task_id)
+        await self._redis.srem(RECURRENT_TASKS_KEY, task_id)
 
     async def load_graph(self) -> dict[str, TaskNode]:
         task_ids = await self._redis.smembers(ALL_TASKS_KEY)

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
 import type { Task } from '../../types'
-import { useCreateRoutine } from '../../api/routines'
+import { useCreateRecurrentTask } from '../../api/recurrentTasks'
 import { usePalette } from '../../api/tasks'
 import { resolveFirstOccurrenceDate } from '../../lib/recurrenceResolve'
 import IntervalTimeFields, {
@@ -15,7 +15,7 @@ import RecurrenceRuleFields, {
   type RecurrenceRuleValue,
 } from './RecurrenceRuleFields'
 
-export default function NewRoutineDialog({
+export default function NewRecurrentTaskDialog({
   onClose,
   onCreated,
 }: {
@@ -28,7 +28,7 @@ export default function NewRoutineDialog({
   const [timeValue, setTimeValue] = useState<IntervalTimeValue>(defaultTimeValue)
   const [recurrence, setRecurrence] = useState<RecurrenceRuleValue>(defaultRecurrenceRuleValue)
   const { data: palette = [] } = usePalette()
-  const createRoutine = useCreateRoutine()
+  const createRecurrentTask = useCreateRecurrentTask()
 
   const { start, end } = intervalTimeToDates(timeValue)
   // A weekly rule with no day selected defaults server-side to the first
@@ -54,7 +54,7 @@ export default function NewRoutineDialog({
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
     if (!canSubmit) return
-    createRoutine.mutate(
+    createRecurrentTask.mutate(
       {
         name: name.trim(),
         definition_of_done: definitionOfDone.trim(),
@@ -80,7 +80,7 @@ export default function NewRoutineDialog({
         onSubmit={handleSubmit}
         className="max-h-[90vh] w-96 overflow-y-auto rounded-lg border border-border bg-surface p-4 shadow-xl"
       >
-        <h2 className="mb-3 text-sm font-semibold text-text-primary">New routine</h2>
+        <h2 className="mb-3 text-sm font-semibold text-text-primary">New recurrent task</h2>
         <label className="mb-2 block text-xs text-text-secondary">
           Name
           <input
@@ -133,14 +133,14 @@ export default function NewRoutineDialog({
           </button>
           <button
             type="submit"
-            disabled={!canSubmit || createRoutine.isPending}
+            disabled={!canSubmit || createRecurrentTask.isPending}
             className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
           >
             Create
           </button>
         </div>
-        {createRoutine.isError && (
-          <p className="mt-2 text-xs text-danger">{(createRoutine.error as Error).message}</p>
+        {createRecurrentTask.isError && (
+          <p className="mt-2 text-xs text-danger">{(createRecurrentTask.error as Error).message}</p>
         )}
       </form>
     </div>

@@ -361,7 +361,7 @@ export default function TaskDetailPanel({
         </div>
       )}
 
-      {!task.is_routine && (
+      {!task.is_recurrent_task && (
         <div className="mt-6">
           <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
             Parents
@@ -422,7 +422,7 @@ export default function TaskDetailPanel({
         </div>
       )}
 
-      {!task.is_routine && (
+      {!task.is_recurrent_task && (
         <div className="mt-6">
           <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
             Add child task

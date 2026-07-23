@@ -10,7 +10,7 @@ from app.routers import (
     google,
     google_events,
     intervals,
-    routines,
+    recurrent_tasks,
     tasks,
     timer,
 )
@@ -31,7 +31,7 @@ app.include_router(evaluate.router)
 app.include_router(excuses.router)
 app.include_router(google.router)
 app.include_router(google_events.router)
-app.include_router(routines.router)
+app.include_router(recurrent_tasks.router)
 
 
 @app.get("/health")

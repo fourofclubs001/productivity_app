@@ -124,7 +124,7 @@ test('ctrl+z is scoped per view: switching views changes what gets undone', asyn
     .click()
   await page.getByRole('button', { name: 'Start' }).click()
   await page.getByRole('button', { name: 'Stop' }).click()
-  await page.getByRole('button', { name: 'Yes, done' }).click()
+  await page.getByRole('button', { name: 'Yes', exact: true }).click()
   // Wait for the mark-done mutation (and its pushUndo) to actually settle
   // before pressing ctrl+z, rather than racing it.
   await expect(page.getByText(/stopped/i)).not.toBeVisible()

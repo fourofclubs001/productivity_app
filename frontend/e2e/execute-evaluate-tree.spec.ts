@@ -36,7 +36,7 @@ test('Execute picker and Evaluate lists mirror the Plan panel tree shape', async
   await expect(trigger).toHaveText(childName)
   await page.getByRole('button', { name: 'Start' }).click()
   await page.getByRole('button', { name: 'Stop' }).click()
-  await page.getByRole('button', { name: 'No, keep in progress' }).click()
+  await page.getByRole('button', { name: 'No, stop the timer' }).click()
 
   // --- Evaluate Metrics: items 26/28 ---
   await page.getByRole('button', { name: 'Evaluate' }).click()

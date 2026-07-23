@@ -8,7 +8,7 @@ from app.models.task import (
     PALETTE,
     RecurrenceEndType,
     RecurrenceUnit,
-    RoutineCreate,
+    RecurrentTaskCreate,
     TaskOut,
     TaskState,
 )
@@ -118,7 +118,7 @@ def occurrence_dates(
     return dates
 
 
-class RoutineService:
+class RecurrentTaskService:
     def __init__(
         self,
         redis: Redis,
@@ -131,7 +131,7 @@ class RoutineService:
         self._task_service = task_service
         self._intervals = interval_service
 
-    async def create_routine(self, payload: RoutineCreate) -> TaskOut:
+    async def create_recurrent_task(self, payload: RecurrentTaskCreate) -> TaskOut:
         invalid = sorted(set(payload.colors) - set(PALETTE))
         if invalid:
             raise InvalidColorError(invalid)
@@ -148,10 +148,10 @@ class RoutineService:
             "state": TaskState.backlog.value,
             "created_at": now.isoformat(),
             "order": str(await self._tasks.next_order()),
-            "is_routine": "1",
-            "routine_anchor_date": anchor.isoformat(),
-            "routine_start_time": payload.start.time().isoformat(),
-            "routine_duration_minutes": str(duration_minutes),
+            "is_recurrent_task": "1",
+            "recurrent_task_anchor_date": anchor.isoformat(),
+            "recurrent_task_start_time": payload.start.time().isoformat(),
+            "recurrent_task_duration_minutes": str(duration_minutes),
             "recurrence_interval": str(payload.recurrence_interval),
             "recurrence_unit": payload.recurrence_unit.value,
             "recurrence_days_of_week": ",".join(
@@ -160,7 +160,7 @@ class RoutineService:
             "recurrence_end_type": payload.recurrence_end_type.value,
             # One day before the anchor, so the first ensure_applied() call
             # (below) materializes starting from the anchor itself.
-            "routine_generated_until": (anchor - timedelta(days=1)).isoformat(),
+            "recurrent_task_generated_until": (anchor - timedelta(days=1)).isoformat(),
         }
         if payload.recurrence_end_date is not None:
             fields["recurrence_end_date"] = payload.recurrence_end_date.isoformat()
@@ -168,7 +168,7 @@ class RoutineService:
             fields["recurrence_end_count"] = str(payload.recurrence_end_count)
 
         await self._tasks.create(task_id, fields)
-        await self._tasks.add_to_routines(task_id)
+        await self._tasks.add_to_recurrent_tasks(task_id)
         if payload.colors:
             await self._tasks.set_colors(task_id, payload.colors)
 
@@ -179,7 +179,7 @@ class RoutineService:
         now = now or datetime.now(UTC)
         window_end = now.date() + timedelta(days=GENERATION_WINDOW_DAYS)
 
-        for task_id in await self._tasks.list_routine_ids():
+        for task_id in await self._tasks.list_recurrent_task_ids():
             node = await self._tasks.load_node(task_id)
             if node is None:
                 continue
@@ -189,9 +189,11 @@ class RoutineService:
     async def _generate_occurrences(
         self, task_id: str, fields: dict, window_end: date
     ) -> None:
-        anchor = date.fromisoformat(fields["routine_anchor_date"])
+        anchor = date.fromisoformat(fields["recurrent_task_anchor_date"])
         generated_until = date.fromisoformat(
-            fields.get("routine_generated_until", (anchor - timedelta(days=1)).isoformat())
+            fields.get(
+                "recurrent_task_generated_until", (anchor - timedelta(days=1)).isoformat()
+            )
         )
         if generated_until >= window_end:
             return
@@ -222,8 +224,8 @@ class RoutineService:
             window_end,
         )
 
-        start_time = time.fromisoformat(fields["routine_start_time"])
-        duration = timedelta(minutes=int(fields["routine_duration_minutes"]))
+        start_time = time.fromisoformat(fields["recurrent_task_start_time"])
+        duration = timedelta(minutes=int(fields["recurrent_task_duration_minutes"]))
 
         for occurrence_date in dates:
             start_dt = datetime.combine(occurrence_date, start_time, tzinfo=UTC)
@@ -234,13 +236,13 @@ class RoutineService:
                 )
             except (PastIntervalError, TaskNotLeafError, UnmetPrerequisiteError):
                 # A same-instant-as-creation occurrence can already be
-                # "past" by the time this runs; a routine task is always a
+                # "past" by the time this runs; a recurrent task is always a
                 # leaf with no prerequisites, so the other two are just
                 # defensive -- never let one bad occurrence abort the rest.
                 continue
 
         await self._tasks.update_fields(
-            task_id, {"routine_generated_until": window_end.isoformat()}
+            task_id, {"recurrent_task_generated_until": window_end.isoformat()}
         )
 
     async def _maybe_reset_finished(self, task_id: str, fields: dict, now: datetime) -> None:
