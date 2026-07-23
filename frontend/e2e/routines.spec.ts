@@ -41,6 +41,53 @@ test('creating a daily routine auto-schedules its first occurrence without any m
   await expect(page.getByTestId('task-tree').getByText(routineName)).not.toBeVisible()
 })
 
+test('selecting a day-of-week other than today still creates the routine, previewing the real first occurrence', async ({
+  page,
+}) => {
+  // v05 item 11 repro: picking a weekly day-of-week that doesn't match
+  // today (e.g. "Monday" while today is Thursday) used to leave the user
+  // with no visible confirmation anything happened -- creation actually
+  // always succeeded server-side, resolving to the closest future matching
+  // day, but the current week's Plan calendar shows nothing for it, which
+  // reads as "I can't create the task." The new "First occurrence" preview
+  // fixes the visibility gap; this asserts both the preview and that
+  // creation is never blocked, for a day guaranteed different from today.
+  const dayLabels = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ]
+  const todayIsoWeekday = (new Date().getDay() + 6) % 7
+  const targetIsoWeekday = (todayIsoWeekday + 3) % 7 // always different from today
+  const targetLabel = dayLabels[targetIsoWeekday]
+
+  const routineName = `Weekday resolve ${Date.now()}`
+
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Routines' }).click()
+  await page.getByTitle('New routine').click()
+
+  await page.getByLabel('Name').fill(routineName)
+  await page.getByLabel('Definition of done').fill('done')
+  await page.getByLabel('Repeat unit').selectOption('week')
+  await page.locator('button[aria-pressed]').nth(targetIsoWeekday).click()
+
+  await expect(
+    page.getByText(new RegExp(`First occurrence:.*${targetLabel}`)),
+  ).toBeVisible()
+
+  await page.getByRole('button', { name: 'Create' }).click()
+
+  await expect(page.getByRole('heading', { name: 'New routine' })).not.toBeVisible()
+  await expect(
+    page.getByTestId('routines-list').getByText(routineName, { exact: true }),
+  ).toBeVisible()
+})
+
 test('deleting a routine removes it via the same right-click flow as a task', async ({ page }) => {
   const routineName = `Standup ${Date.now()}`
 

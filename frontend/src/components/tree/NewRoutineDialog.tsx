@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { format } from 'date-fns'
 import type { Task } from '../../types'
 import { useCreateRoutine } from '../../api/routines'
 import { usePalette } from '../../api/tasks'
+import { resolveFirstOccurrenceDate } from '../../lib/recurrenceResolve'
 import IntervalTimeFields, {
   defaultTimeValue,
   intervalTimeToDates,
@@ -32,6 +34,18 @@ export default function NewRoutineDialog({
   // A weekly rule with no day selected defaults server-side to the first
   // occurrence's own weekday, so an empty selection is valid, not blocked.
   const canSubmit = name.trim().length > 0 && definitionOfDone.trim().length > 0 && end > start
+  // The chosen start date doesn't have to be a day the recurrence actually
+  // falls on (e.g. picking only "Monday" while start is left on today,
+  // a Thursday) -- creation still succeeds and resolves to the closest
+  // matching day, but with no visible chip on the current week's calendar
+  // that can look like nothing happened. Show what will actually be
+  // scheduled so success is confirmed rather than inferred (v05 item 11).
+  const resolvedFirstOccurrence = resolveFirstOccurrenceDate(
+    start,
+    recurrence.interval,
+    recurrence.unit,
+    recurrence.daysOfWeek,
+  )
 
   function toggleColor(color: string) {
     setColors((prev) => (prev.includes(color) ? prev.filter((c) => c !== color) : [...prev, color]))
@@ -103,6 +117,11 @@ export default function NewRoutineDialog({
             Custom recurrence
           </h3>
           <RecurrenceRuleFields value={recurrence} onChange={setRecurrence} />
+          {end > start && (
+            <p className="mt-2 text-xs text-text-secondary">
+              First occurrence: <strong>{format(resolvedFirstOccurrence, 'EEEE, MMM d, yyyy')}</strong>
+            </p>
+          )}
         </div>
         <div className="flex justify-end gap-2">
           <button
