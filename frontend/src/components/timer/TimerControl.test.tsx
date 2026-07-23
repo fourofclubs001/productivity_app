@@ -103,35 +103,49 @@ describe('TimerControl (active)', () => {
     })
   })
 
-  it('stops the timer immediately on click, before any mark-done choice', () => {
+  it('clicking Stop opens a confirm dialog before stopping anything', () => {
     const task = makeTask({ id: 'leaf', name: 'Leaf task', is_leaf: true })
     renderTimerControl([task])
 
     expect(screen.getByText('Leaf task')).toBeInTheDocument()
     fireEvent.click(screen.getByText('Stop'))
 
-    // The stop call itself takes no arguments - it isn't gated on the done choice.
-    expect(stopMutate).toHaveBeenCalledWith(undefined, expect.anything())
-    expect(screen.getByText(/stopped/i)).toBeInTheDocument()
+    expect(stopMutate).not.toHaveBeenCalled()
+    expect(screen.getByText('Is the definition of done fulfilled?')).toBeInTheDocument()
   })
 
-  it('marking done after stop calls the dedicated mark-done endpoint', () => {
+  it('Cancel leaves the timer running with no API call', () => {
     const task = makeTask({ id: 'leaf', name: 'Leaf task', is_leaf: true })
     renderTimerControl([task])
 
     fireEvent.click(screen.getByText('Stop'))
-    fireEvent.click(screen.getByText('Yes, done'))
+    fireEvent.click(screen.getByText('Cancel'))
 
+    expect(stopMutate).not.toHaveBeenCalled()
+    expect(markDoneMutate).not.toHaveBeenCalled()
+    expect(screen.getByText('Leaf task')).toBeInTheDocument()
+    expect(screen.getByText('Stop')).toBeInTheDocument()
+  })
+
+  it('Yes stops the timer and calls the dedicated mark-done endpoint', () => {
+    const task = makeTask({ id: 'leaf', name: 'Leaf task', is_leaf: true })
+    renderTimerControl([task])
+
+    fireEvent.click(screen.getByText('Stop'))
+    fireEvent.click(screen.getByText('Yes'))
+
+    expect(stopMutate).toHaveBeenCalledWith(undefined, expect.anything())
     expect(markDoneMutate).toHaveBeenCalledWith('leaf', expect.anything())
   })
 
-  it('choosing not to mark done makes no API call', () => {
+  it('"No, stop the timer" stops without marking done', () => {
     const task = makeTask({ id: 'leaf', name: 'Leaf task', is_leaf: true })
     renderTimerControl([task])
 
     fireEvent.click(screen.getByText('Stop'))
-    fireEvent.click(screen.getByText('No, keep in progress'))
+    fireEvent.click(screen.getByText('No, stop the timer'))
 
+    expect(stopMutate).toHaveBeenCalledWith(undefined, expect.anything())
     expect(markDoneMutate).not.toHaveBeenCalled()
   })
 
@@ -140,7 +154,7 @@ describe('TimerControl (active)', () => {
     renderTimerControl([task])
 
     fireEvent.click(screen.getByText('Stop'))
-    fireEvent.click(screen.getByText('Yes, done'))
+    fireEvent.click(screen.getByText('Yes'))
 
     fireEvent.keyDown(window, { key: 'z', ctrlKey: true })
 

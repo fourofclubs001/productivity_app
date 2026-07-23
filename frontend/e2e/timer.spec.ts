@@ -13,7 +13,9 @@ async function selectExecuteTask(page: Page, taskName: string) {
   await pickerOptions(page).getByRole('button', { name: taskName, exact: true }).click()
 }
 
-test('stops immediately on click and only marks done via explicit choice', async ({ page }) => {
+test('Stop opens a confirm dialog before stopping anything, then Yes marks done', async ({
+  page,
+}) => {
   const taskName = `Timer flow ${Date.now()}`
 
   await page.goto('/')
@@ -29,17 +31,47 @@ test('stops immediately on click and only marks done via explicit choice', async
   await expect(page.getByText('Tracking')).toBeVisible()
 
   await page.getByRole('button', { name: 'Stop' }).click()
-  // The clock is frozen immediately: the "Stopped" prompt appears right away,
-  // not gated behind a done/not-done choice.
-  await expect(page.getByText(/stopped/i)).toBeVisible()
-  await expect(page.getByText('Tracking')).not.toBeVisible()
+  // Clicking Stop only opens the confirm dialog -- the timer is still
+  // "Tracking" until an explicit choice is made.
+  await expect(page.getByText('Is the definition of done fulfilled?')).toBeVisible()
+  await expect(page.getByText('Tracking')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Yes, done' }).click()
-  await expect(page.getByText(/stopped/i)).not.toBeVisible()
+  await page.getByRole('button', { name: 'Yes', exact: true }).click()
+  await expect(page.getByText('Is the definition of done fulfilled?')).not.toBeVisible()
 
   // Once sprint_done, the task is no longer offered in the timer picker.
   await pickerTrigger(page).click()
   await expect(pickerOptions(page).getByRole('button', { name: taskName, exact: true })).not.toBeVisible()
+})
+
+test('Cancel leaves the timer running untouched', async ({ page }) => {
+  // Deliberately avoid the substring "Cancel" in the fixture name -- it
+  // would collide with the modal's own "Cancel" button in accessible-name
+  // matching once the active entry's calendar chip renders the task name
+  // (see PROJECT_STATUS.md's documented fixture-naming gotcha).
+  const taskName = `Timer abort ${Date.now()}`
+
+  await page.goto('/')
+  await page.getByTitle('New task').click()
+  await page.getByLabel('Name', { exact: true }).fill(taskName)
+  await page.getByLabel('Definition of done').fill('done')
+  await page.getByRole('button', { name: 'Create' }).click()
+
+  await page.getByRole('button', { name: 'Execute' }).click()
+  await selectExecuteTask(page, taskName)
+  await page.getByRole('button', { name: 'Start' }).click()
+  await page.getByRole('button', { name: 'Stop' }).click()
+  await page.getByRole('button', { name: 'Cancel' }).click()
+
+  // Dialog gone, timer still tracking the same task, no stop/mark-done call happened.
+  await expect(page.getByText('Is the definition of done fulfilled?')).not.toBeVisible()
+  await expect(page.getByText('Tracking')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Stop' })).toBeVisible()
+
+  // The active timer is a single global key (not per-test isolated) -- stop
+  // it for real before the test ends so it doesn't leak into later tests.
+  await page.getByRole('button', { name: 'Stop' }).click()
+  await page.getByRole('button', { name: 'No, stop the timer' }).click()
 })
 
 test('ctrl+z after marking done reverts the task back to in_progress', async ({ page }) => {
@@ -55,8 +87,8 @@ test('ctrl+z after marking done reverts the task back to in_progress', async ({ 
   await selectExecuteTask(page, taskName)
   await page.getByRole('button', { name: 'Start' }).click()
   await page.getByRole('button', { name: 'Stop' }).click()
-  await page.getByRole('button', { name: 'Yes, done' }).click()
-  await expect(page.getByText(/stopped/i)).not.toBeVisible()
+  await page.getByRole('button', { name: 'Yes', exact: true }).click()
+  await expect(page.getByText('Is the definition of done fulfilled?')).not.toBeVisible()
 
   await pickerTrigger(page).click()
   await expect(pickerOptions(page).getByRole('button', { name: taskName, exact: true })).not.toBeVisible()
@@ -99,7 +131,9 @@ test('starting a timer on a task with an unmet prerequisite is rejected with a d
   await expect(page.getByText('Tracking')).not.toBeVisible()
 })
 
-test('stopping without marking done keeps the task selectable again', async ({ page }) => {
+test('"No, stop the timer" stops without marking done, task selectable again', async ({
+  page,
+}) => {
   const taskName = `Timer resume ${Date.now()}`
 
   await page.goto('/')
@@ -112,10 +146,11 @@ test('stopping without marking done keeps the task selectable again', async ({ p
   await selectExecuteTask(page, taskName)
   await page.getByRole('button', { name: 'Start' }).click()
   await page.getByRole('button', { name: 'Stop' }).click()
-  await page.getByRole('button', { name: 'No, keep in progress' }).click()
+  await page.getByRole('button', { name: 'No, stop the timer' }).click()
+  await expect(page.getByText('Is the definition of done fulfilled?')).not.toBeVisible()
+  await expect(page.getByText('Tracking')).not.toBeVisible()
 
-  // Still in_progress, so it remains the picker's selection and is still
-  // offered as an option when reopened.
+  // Still in_progress, so it remains offered as an option when reopened.
   await pickerTrigger(page).click()
   await expect(pickerOptions(page).getByRole('button', { name: taskName, exact: true })).toBeVisible()
 })

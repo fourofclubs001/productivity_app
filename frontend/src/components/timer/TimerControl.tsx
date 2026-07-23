@@ -10,7 +10,7 @@ import {
 import { makeRevertDoneEntry } from '../../lib/taskDoneUndoEntries'
 import { useUndo } from '../../undo/UndoProvider'
 import AlertDialog from '../common/AlertDialog'
-import DoneConfirmModal from './DoneConfirmModal'
+import StopTimerConfirmModal from './StopTimerConfirmModal'
 import TaskPicker from './TaskPicker'
 
 function formatElapsed(ms: number): string {
@@ -21,7 +21,7 @@ function formatElapsed(ms: number): string {
   return [hours, minutes, seconds].map((n) => String(n).padStart(2, '0')).join(':')
 }
 
-interface JustStopped {
+interface ConfirmingStop {
   taskId: string
   taskName: string
   definitionOfDone: string
@@ -37,7 +37,7 @@ export default function TimerControl({ tasks }: { tasks: Task[] }) {
   const { pushUndo } = useUndo()
   const [selectedTaskId, setSelectedTaskId] = useState('')
   const [elapsedMs, setElapsedMs] = useState(0)
-  const [justStopped, setJustStopped] = useState<JustStopped | null>(null)
+  const [confirmingStop, setConfirmingStop] = useState<ConfirmingStop | null>(null)
   const [alertMessage, setAlertMessage] = useState<string | null>(null)
 
   useEffect(() => {
@@ -57,36 +57,48 @@ export default function TimerControl({ tasks }: { tasks: Task[] }) {
 
   function handleStop() {
     if (!active) return
-    const taskId = active.task_id
-    const taskName = activeTask?.name ?? taskId
-    const definitionOfDone = activeTask?.definition_of_done ?? ''
-    const frozenElapsedMs = elapsedMs
-    stopTimer.mutate(undefined, {
-      onSuccess: () =>
-        setJustStopped({ taskId, taskName, definitionOfDone, elapsedMs: frozenElapsedMs }),
+    setConfirmingStop({
+      taskId: active.task_id,
+      taskName: activeTask?.name ?? active.task_id,
+      definitionOfDone: activeTask?.definition_of_done ?? '',
+      elapsedMs,
     })
   }
 
-  if (justStopped) {
+  // Checked ahead of `active`: once Yes/No-stop-the-timer fires
+  // `stopTimer.mutate`, the active-timer query gets invalidated and `active`
+  // flips to null well before the follow-up `markDone` call (if any)
+  // resolves -- keying this branch on `confirmingStop` instead keeps the
+  // dialog (and a frozen elapsed reading) on screen for that whole window,
+  // rather than having it vanish mid-flight when `active` disappears.
+  if (confirmingStop) {
     return (
       <div className="flex flex-wrap items-center gap-4 border-b border-border p-4">
         <span className="text-sm text-text-secondary">
-          Stopped <strong className="text-text-primary">{justStopped.taskName}</strong>
+          {active ? 'Tracking' : 'Stopped'}{' '}
+          <strong className="text-text-primary">{confirmingStop.taskName}</strong>
         </span>
         <span className="font-mono text-lg text-text-primary">
-          {formatElapsed(justStopped.elapsedMs)}
+          {formatElapsed(active ? elapsedMs : confirmingStop.elapsedMs)}
         </span>
-        <DoneConfirmModal
-          taskName={justStopped.taskName}
-          definitionOfDone={justStopped.definitionOfDone}
-          isPending={markDone.isPending}
-          onDismiss={() => setJustStopped(null)}
-          onConfirm={() => {
-            const { taskId } = justStopped
-            markDone.mutate(taskId, {
+        <StopTimerConfirmModal
+          taskName={confirmingStop.taskName}
+          definitionOfDone={confirmingStop.definitionOfDone}
+          isPending={stopTimer.isPending || markDone.isPending}
+          onCancel={() => setConfirmingStop(null)}
+          onStopOnly={() => {
+            stopTimer.mutate(undefined, { onSuccess: () => setConfirmingStop(null) })
+          }}
+          onMarkDone={() => {
+            const { taskId } = confirmingStop
+            stopTimer.mutate(undefined, {
               onSuccess: () => {
-                pushUndo(makeRevertDoneEntry(taskId, doneMutators))
-                setJustStopped(null)
+                markDone.mutate(taskId, {
+                  onSuccess: () => {
+                    pushUndo(makeRevertDoneEntry(taskId, doneMutators))
+                    setConfirmingStop(null)
+                  },
+                })
               },
             })
           }}
