@@ -41,6 +41,10 @@ import CalendarTimezoneLabel from './CalendarTimezoneLabel'
 import ContextMenu from './ContextMenu'
 import AlertDialog from '../common/AlertDialog'
 import EditIntervalTimeModal from './EditIntervalTimeModal'
+import NewEventChooserDialog from './NewEventChooserDialog'
+import QuickCreateTaskDialog from './QuickCreateTaskDialog'
+import ScheduleExistingTaskDialog from './ScheduleExistingTaskDialog'
+import NewRecurrentTaskDialog from '../tree/NewRecurrentTaskDialog'
 
 interface CalendarEvent {
   id: string
@@ -91,6 +95,14 @@ export default function PlanCalendar({
   const [draggingEventId, setDraggingEventId] = useState<string | null>(null)
   const dragCandidateRef = useRef<{ id: string; x: number; y: number } | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
+  // Drag-select on empty calendar space (item 9): a picked range awaits a
+  // "recurring / not / existing" choice, then routes to the matching
+  // creation flow, all keyed off the same pendingRange.
+  const [pendingRange, setPendingRange] = useState<{ start: Date; end: Date } | null>(null)
+  const [creationMode, setCreationMode] = useState<
+    'choosing' | 'recurring' | 'plain' | 'existing' | null
+  >(null)
+  const tasks = useMemo(() => Array.from(tasksById.values()), [tasksById])
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 30_000)
@@ -398,7 +410,11 @@ export default function PlanCalendar({
           date={weekAnchor}
           onNavigate={() => {}}
           toolbar={false}
-          selectable={false}
+          selectable
+          onSelectSlot={(slotInfo: { start: Date | string; end: Date | string }) => {
+            setPendingRange({ start: new Date(slotInfo.start), end: new Date(slotInfo.end) })
+            setCreationMode('choosing')
+          }}
           resizable
           draggableAccessor={(event: CalendarEvent) => !event.isMultiDaySegment && !event.isExternal}
           resizableAccessor={(event: CalendarEvent) =>
@@ -494,6 +510,60 @@ export default function PlanCalendar({
         <EditIntervalTimeModal
           interval={editingInterval}
           onClose={() => setEditingInterval(null)}
+        />
+      )}
+
+      {pendingRange && creationMode === 'choosing' && (
+        <NewEventChooserDialog
+          range={pendingRange}
+          onClose={() => {
+            setPendingRange(null)
+            setCreationMode(null)
+          }}
+          onChooseRecurringNew={() => setCreationMode('recurring')}
+          onChooseNotRecurringNew={() => setCreationMode('plain')}
+          onChooseExisting={() => setCreationMode('existing')}
+        />
+      )}
+      {pendingRange && creationMode === 'recurring' && (
+        <NewRecurrentTaskDialog
+          initialRange={pendingRange}
+          onClose={() => {
+            setPendingRange(null)
+            setCreationMode(null)
+          }}
+          onCreated={(task) => {
+            setPendingRange(null)
+            setCreationMode(null)
+            onOpenTask(task.id)
+          }}
+        />
+      )}
+      {pendingRange && creationMode === 'plain' && (
+        <QuickCreateTaskDialog
+          range={pendingRange}
+          onClose={() => {
+            setPendingRange(null)
+            setCreationMode(null)
+          }}
+          onCreated={() => {
+            setPendingRange(null)
+            setCreationMode(null)
+          }}
+        />
+      )}
+      {pendingRange && creationMode === 'existing' && (
+        <ScheduleExistingTaskDialog
+          tasks={tasks}
+          range={pendingRange}
+          onClose={() => {
+            setPendingRange(null)
+            setCreationMode(null)
+          }}
+          onScheduled={() => {
+            setPendingRange(null)
+            setCreationMode(null)
+          }}
         />
       )}
     </div>

@@ -17,8 +17,12 @@ test('creating a daily recurrent task auto-schedules its first occurrence withou
 
   await page.goto('/')
 
+  // Not asserting the "no recurrent tasks yet" empty state here -- this
+  // suite doesn't flush Redis between spec files within a single run, and
+  // another spec (e.g. drag-to-create.spec.ts) may have already created
+  // one before this file runs. That empty-state UI is already covered by
+  // RecurrentTasksList.test.tsx's dedicated unit test.
   await page.getByRole('button', { name: 'Recurrent tasks' }).click()
-  await expect(page.getByText(/no recurrent tasks yet/i)).toBeVisible()
 
   await openNewRecurrentTaskDialog(page)
   await expect(page.getByRole('heading', { name: 'New recurrent task' })).toBeVisible()

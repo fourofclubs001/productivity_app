@@ -15,17 +15,32 @@ import RecurrenceRuleFields, {
   type RecurrenceRuleValue,
 } from './RecurrenceRuleFields'
 
+function rangeToTimeValue(start: Date, end: Date): IntervalTimeValue {
+  return {
+    startDate: format(start, 'yyyy-MM-dd'),
+    startTime: format(start, 'HH:mm'),
+    endDate: format(end, 'yyyy-MM-dd'),
+    endTime: format(end, 'HH:mm'),
+  }
+}
+
 export default function NewRecurrentTaskDialog({
   onClose,
   onCreated,
+  initialRange,
 }: {
   onClose: () => void
   onCreated: (task: Task) => void
+  // Pre-fills the first-occurrence fields from a Plan-calendar drag-select
+  // (v05 item 9) instead of defaultTimeValue()'s "next hour, today".
+  initialRange?: { start: Date; end: Date }
 }) {
   const [name, setName] = useState('')
   const [definitionOfDone, setDefinitionOfDone] = useState('')
   const [colors, setColors] = useState<string[]>([])
-  const [timeValue, setTimeValue] = useState<IntervalTimeValue>(defaultTimeValue)
+  const [timeValue, setTimeValue] = useState<IntervalTimeValue>(() =>
+    initialRange ? rangeToTimeValue(initialRange.start, initialRange.end) : defaultTimeValue(),
+  )
   const [recurrence, setRecurrence] = useState<RecurrenceRuleValue>(defaultRecurrenceRuleValue)
   const { data: palette = [] } = usePalette()
   const createRecurrentTask = useCreateRecurrentTask()
