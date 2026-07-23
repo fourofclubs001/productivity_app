@@ -41,6 +41,31 @@ test('creating a daily recurrent task auto-schedules its first occurrence withou
   await expect(page.getByTestId('task-tree').getByText(taskName)).not.toBeVisible()
 })
 
+test('picking a start after the current end auto-adjusts the end instead of blocking with a warning', async ({
+  page,
+}) => {
+  const taskName = `AutoAdjustEnd ${Date.now()}`
+
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Recurrent tasks' }).click()
+  await page.getByTitle('New recurrent task').click()
+
+  await page.getByLabel('Name').fill(taskName)
+  await page.getByLabel('Definition of done').fill('done')
+
+  // Only the date moves -- comparing against the start *hour* (left
+  // untouched) rather than a hardcoded value keeps this deterministic
+  // regardless of whatever real wall-clock time the suite happens to run at.
+  const startHourBefore = await page.getByLabel('Start hour').inputValue()
+  const endDateBefore = await page.getByLabel('End date').inputValue()
+  await page.getByLabel('Start date').fill('2027-01-15')
+
+  await expect(page.getByLabel('End date')).not.toHaveValue(endDateBefore)
+  await expect(page.getByLabel('End date')).toHaveValue('2027-01-15')
+  await expect(page.getByLabel('End hour')).toHaveValue(startHourBefore)
+  await expect(page.getByText(/end must be after start/i)).not.toBeVisible()
+})
+
 test('selecting a day-of-week other than today still creates the recurrent task, previewing the real first occurrence', async ({
   page,
 }) => {

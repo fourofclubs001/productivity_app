@@ -51,6 +51,20 @@ export default function NewRecurrentTaskDialog({
     setColors((prev) => (prev.includes(color) ? prev.filter((c) => c !== color) : [...prev, color]))
   }
 
+  // Rather than blocking submission with a red "End must be after start"
+  // warning, snap the end date+time to match the new start whenever a
+  // start change would otherwise put it at or past the current end (v05
+  // item 8) -- the field values stay valid without the user having to fix
+  // them up manually.
+  function handleTimeChange(next: IntervalTimeValue) {
+    const { start: nextStart, end: nextEnd } = intervalTimeToDates(next)
+    if (nextStart >= nextEnd) {
+      setTimeValue({ ...next, endDate: next.startDate, endTime: next.startTime })
+    } else {
+      setTimeValue(next)
+    }
+  }
+
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
     if (!canSubmit) return
@@ -108,9 +122,8 @@ export default function NewRecurrentTaskDialog({
         <div className="mb-3">
           <span className="block text-xs text-text-secondary">First occurrence</span>
           <div className="mt-1">
-            <IntervalTimeFields value={timeValue} onChange={setTimeValue} />
+            <IntervalTimeFields value={timeValue} onChange={handleTimeChange} />
           </div>
-          {!(end > start) && <p className="mt-1 text-xs text-danger">End must be after start.</p>}
         </div>
         <div className="mb-4 border-t border-border pt-3">
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
