@@ -266,6 +266,70 @@ async def test_ensure_applied_extends_the_window_on_a_later_call(services):
     )
 
 
+def _next_weekday(start: date, weekday: int) -> date:
+    days_ahead = (weekday - start.weekday()) % 7
+    return start + timedelta(days=days_ahead)
+
+
+async def test_biweekly_recurrence_keeps_generating_across_many_catchup_calls(services):
+    """Regression test for v05 item 2: 'every 2 weeks on Friday until Dec
+    31' was reported to only ever produce two occurrences total, never more,
+    even once real elapsed time should have rolled the generation window
+    forward past several more Fridays. No prior test exercised
+    recurrence_interval > 1 through ensure_applied() across multiple calls
+    (the only multi-call catch-up test used a daily interval=1 rule) --
+    this drives a biweekly Friday rule through many irregular,
+    non-cycle-aligned `now` advances and asserts the materialized
+    occurrences always match what a single one-shot call over the same
+    final window would produce, i.e. multi-call catch-up must never
+    permanently lose/skip an occurrence a one-shot call would have made.
+    """
+    anchor = _next_weekday(_future_anchor(7), weekday=4)  # a future Friday
+    end_date = anchor + timedelta(days=200)
+    task_id = await seed_routine(
+        services,
+        anchor,
+        RecurrenceUnit.week,
+        interval=2,
+        days_of_week=[4],
+        end_type=RecurrenceEndType.on_date,
+        end_date=end_date,
+    )
+
+    # Irregular, not-cycle-aligned advances (not clean multiples of 7 or the
+    # 28-day generation window) spanning well over 100 days of simulated
+    # real elapsed time and several recurrence periods.
+    day_offsets = [0, 9, 6, 11, 23, 5, 40, 2]
+    cumulative = 0
+    for offset in day_offsets:
+        cumulative += offset
+        now = datetime.combine(anchor + timedelta(days=cumulative), time(8, 0), tzinfo=UTC)
+        await services["routines"].ensure_applied(now=now)
+
+    final_now = datetime.combine(anchor + timedelta(days=cumulative), time(8, 0), tzinfo=UTC)
+    window_end = final_now.date() + timedelta(days=28)
+
+    expected_dates = occurrence_dates(
+        anchor,
+        anchor,
+        2,
+        RecurrenceUnit.week,
+        [4],
+        RecurrenceEndType.on_date,
+        end_date,
+        None,
+        window_end,
+    )
+
+    intervals = await services["intervals"].list_for_task(task_id)
+    actual_dates = sorted(i.start.date() for i in intervals)
+
+    assert actual_dates == expected_dates
+    # Sanity: a biweekly rule over 100+ days must produce well more than 2
+    # occurrences -- pins the exact symptom reported, not just "some" bug.
+    assert len(actual_dates) > 2
+
+
 async def test_sprint_done_resets_to_backlog_once_an_occurrence_concludes(services):
     anchor = _future_anchor(7)
     task_id = await seed_routine(services, anchor, RecurrenceUnit.day)
