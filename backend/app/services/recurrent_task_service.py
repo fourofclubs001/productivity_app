@@ -13,16 +13,25 @@ from app.models.task import (
     TaskOut,
     TaskState,
 )
-from app.repositories.task_repository import TaskRepository
+from app.repositories.task_repository import ORDER_STEP, TaskNode, TaskRepository
 from app.services.errors import (
     InvalidColorError,
+    InvalidRecurrentParentError,
     PastIntervalError,
     RecurrentGroupNotFoundError,
+    TaskNotFoundError,
     TaskNotLeafError,
     UnmetPrerequisiteError,
 )
 from app.services.interval_service import IntervalService
 from app.services.task_service import TaskService
+
+
+def _recurrent_order_of(node: TaskNode) -> float:
+    try:
+        return float(node.fields.get("recurrent_order", 0))
+    except (TypeError, ValueError):
+        return 0.0
 
 # How far ahead occurrences are lazily generated, extended on every call
 # (mirrors RolloverService's "catch up on read" idiom -- this app has no
@@ -151,6 +160,7 @@ class RecurrentTaskService:
             "created_at": now.isoformat(),
             "order": str(await self._tasks.next_order()),
             "is_recurrent_task": "1",
+            "recurrent_order": str(await self._tasks.next_recurrent_order()),
             "recurrent_task_anchor_date": anchor.isoformat(),
             "recurrent_task_start_time": payload.start.time().isoformat(),
             "recurrent_task_duration_minutes": str(duration_minutes),
@@ -310,3 +320,116 @@ class RecurrentTaskService:
             if node is not None and node.fields.get("recurrent_parent_id") == parent_id:
                 children.append(candidate_id)
         return children
+
+    async def _load_all_recurrent_nodes(self) -> dict[str, TaskNode]:
+        task_ids = await self._tasks.list_recurrent_task_ids()
+        group_ids = await self._tasks.list_recurrent_group_ids()
+        nodes: dict[str, TaskNode] = {}
+        for item_id in task_ids | group_ids:
+            node = await self._tasks.load_node(item_id)
+            if node is not None:
+                nodes[item_id] = node
+        return nodes
+
+    async def _is_recurrent_descendant(self, candidate_id: str, ancestor_id: str) -> bool:
+        """True if candidate_id is ancestor_id itself, or nested somewhere
+        inside its subtree (walking up candidate_id's own parent chain).
+        """
+        current: str | None = candidate_id
+        visited: set[str] = set()
+        while current is not None:
+            if current == ancestor_id:
+                return True
+            if current in visited:
+                break
+            visited.add(current)
+            node = await self._tasks.load_node(current)
+            current = node.fields.get("recurrent_parent_id") or None if node else None
+        return False
+
+    async def move_recurrent_item(self, item_id: str, parent_id: str | None) -> TaskOut:
+        """Reparents item_id under parent_id (or to root if None), within
+        the recurrent-task-group hierarchy only. Only a recurrent group may
+        ever be a parent here -- a plain recurrent task can't have children,
+        so item_id becoming a *child* of another plain task is always
+        rejected regardless of which one is dragged onto which (item 10).
+        """
+        item_node = await self._tasks.load_node(item_id)
+        if item_node is None:
+            raise TaskNotFoundError(item_id)
+
+        if parent_id is not None:
+            if parent_id == item_id:
+                raise InvalidRecurrentParentError(parent_id)
+            parent_node = await self._tasks.load_node(parent_id)
+            if parent_node is None or parent_node.fields.get("is_recurrent_group") != "1":
+                raise InvalidRecurrentParentError(parent_id)
+            # A group can't be moved into its own descendant -- that would
+            # create a cycle. A plain task never has descendants, so this
+            # check is a no-op (and harmless) for that case.
+            if await self._is_recurrent_descendant(parent_id, item_id):
+                raise InvalidRecurrentParentError(parent_id)
+
+        await self._tasks.set_recurrent_parent(item_id, parent_id)
+        return await self._task_service.get_task(item_id)
+
+    async def reorder_recurrent_item(
+        self,
+        item_id: str,
+        after_id: str | None,
+        before_id: str | None,
+        order: float | None = None,
+    ) -> TaskOut:
+        """Same midpoint-insertion scheme as TaskService.reorder_task, but
+        against the recurrent hierarchy's own `recurrent_order` sequence --
+        deliberately never sharing state with the main tree's `order` (see
+        RECURRENT_ORDER_SEQ_KEY's docstring).
+        """
+        if order is not None:
+            if not await self._tasks.exists(item_id):
+                raise TaskNotFoundError(item_id)
+            await self._tasks.update_fields(item_id, {"recurrent_order": str(order)})
+            return await self._task_service.get_task(item_id)
+
+        nodes = await self._load_all_recurrent_nodes()
+        if item_id not in nodes:
+            raise TaskNotFoundError(item_id)
+        if after_id is not None and after_id not in nodes:
+            raise TaskNotFoundError(after_id)
+        if before_id is not None and before_id not in nodes:
+            raise TaskNotFoundError(before_id)
+
+        after_order = _recurrent_order_of(nodes[after_id]) if after_id is not None else None
+        before_order = _recurrent_order_of(nodes[before_id]) if before_id is not None else None
+
+        if after_order is not None and before_order is not None:
+            candidate = (after_order + before_order) / 2
+            exhausted = candidate <= after_order or candidate >= before_order
+        elif after_order is not None:
+            candidate = after_order + ORDER_STEP
+            exhausted = False
+        elif before_order is not None:
+            candidate = before_order - ORDER_STEP
+            exhausted = False
+        else:
+            candidate = 0.0
+            exhausted = False
+
+        if exhausted:
+            await self._rebalance_recurrent_order(nodes, item_id, after_id)
+        else:
+            await self._tasks.update_fields(item_id, {"recurrent_order": str(candidate)})
+
+        return await self._task_service.get_task(item_id)
+
+    async def _rebalance_recurrent_order(
+        self, nodes: dict[str, TaskNode], item_id: str, after_id: str | None
+    ) -> None:
+        ordered_ids = sorted(
+            (tid for tid in nodes if tid != item_id),
+            key=lambda tid: (_recurrent_order_of(nodes[tid]), tid),
+        )
+        insert_at = 0 if after_id is None else ordered_ids.index(after_id) + 1
+        ordered_ids.insert(insert_at, item_id)
+        for index, tid in enumerate(ordered_ids):
+            await self._tasks.update_fields(tid, {"recurrent_order": str(index * ORDER_STEP)})

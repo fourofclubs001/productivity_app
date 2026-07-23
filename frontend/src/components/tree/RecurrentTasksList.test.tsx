@@ -18,6 +18,8 @@ vi.mock('../../api/tasks', () => ({
 vi.mock('../../api/recurrentTasks', () => ({
   useCreateRecurrentGroup: () => ({ mutate: createGroupMutate, isPending: false, isError: false }),
   useDeleteRecurrentGroup: () => ({ mutate: deleteGroupMutate, isPending: false }),
+  useMoveRecurrentItem: () => ({ mutate: vi.fn() }),
+  useReorderRecurrentItem: () => ({ mutate: vi.fn() }),
 }))
 
 beforeEach(() => {

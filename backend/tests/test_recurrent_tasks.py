@@ -538,3 +538,103 @@ async def test_delete_recurrent_group_ungroups_children_to_its_own_parent(client
 
     survivor = client.get(f"/tasks/{child_task['id']}").json()
     assert survivor["recurrent_parent_id"] == grandparent["id"]
+
+
+# ---------------------------------------------------------------------------
+# Drag-and-drop backing endpoints (item 10): PATCH .../parent and .../order.
+# ---------------------------------------------------------------------------
+
+
+def test_move_recurrent_task_into_a_group(client):
+    group = create_recurrent_group(client, "Chores")
+    task = create_recurrent_task(client, "Water plants")
+
+    response = client.patch(
+        f"/recurrent-tasks/{task['id']}/parent", json={"parent_id": group["id"]}
+    )
+    assert response.status_code == 200
+    assert response.json()["recurrent_parent_id"] == group["id"]
+
+
+def test_move_recurrent_task_back_to_root(client, redis_client):
+    group = create_recurrent_group(client, "Chores")
+    task = create_recurrent_task(client, "Water plants")
+    client.patch(f"/recurrent-tasks/{task['id']}/parent", json={"parent_id": group["id"]})
+
+    response = client.patch(f"/recurrent-tasks/{task['id']}/parent", json={"parent_id": None})
+    assert response.status_code == 200
+    assert response.json()["recurrent_parent_id"] is None
+
+
+def test_move_group_into_another_group(client):
+    parent_group = create_recurrent_group(client, "Parent")
+    child_group = create_recurrent_group(client, "Child")
+
+    response = client.patch(
+        f"/recurrent-tasks/{child_group['id']}/parent", json={"parent_id": parent_group["id"]}
+    )
+    assert response.status_code == 200
+    assert response.json()["recurrent_parent_id"] == parent_group["id"]
+
+
+def test_moving_a_task_onto_another_task_is_rejected(client):
+    """Constraint (v05 item 10): a plain recurrent task can never become the
+    parent of another recurrent task -- only a group can be a parent.
+    """
+    task_a = create_recurrent_task(client, "Task A")
+    task_b = create_recurrent_task(client, "Task B")
+
+    response = client.patch(
+        f"/recurrent-tasks/{task_b['id']}/parent", json={"parent_id": task_a["id"]}
+    )
+    assert response.status_code == 400
+
+
+def test_moving_a_group_into_its_own_descendant_is_rejected(client):
+    parent_group = create_recurrent_group(client, "Parent")
+    child_group = create_recurrent_group(client, "Child")
+    client.patch(
+        f"/recurrent-tasks/{child_group['id']}/parent", json={"parent_id": parent_group["id"]}
+    )
+
+    # Moving the parent into its own child would create a cycle.
+    response = client.patch(
+        f"/recurrent-tasks/{parent_group['id']}/parent", json={"parent_id": child_group["id"]}
+    )
+    assert response.status_code == 400
+
+
+def test_moving_a_group_into_a_nonexistent_parent_is_rejected(client):
+    group = create_recurrent_group(client, "Chores")
+    response = client.patch(
+        f"/recurrent-tasks/{group['id']}/parent", json={"parent_id": "does-not-exist"}
+    )
+    assert response.status_code == 400
+
+
+def test_reorder_recurrent_items_midpoint_and_exact_order(client):
+    a = create_recurrent_group(client, "A")
+    b = create_recurrent_group(client, "B")
+    c = create_recurrent_group(client, "C")
+
+    response = client.patch(
+        f"/recurrent-tasks/{c['id']}/order",
+        json={"after_id": a["id"], "before_id": b["id"]},
+    )
+    assert response.status_code == 200
+    a_order = client.get(f"/tasks/{a['id']}").json()["recurrent_order"]
+    b_order = client.get(f"/tasks/{b['id']}").json()["recurrent_order"]
+    c_order = response.json()["recurrent_order"]
+    assert a_order < c_order < b_order
+
+    # Restoring an exact prior value (undo-style) bypasses the midpoint math.
+    restore = client.patch(f"/recurrent-tasks/{c['id']}/order", json={"order": 42.5})
+    assert restore.status_code == 200
+    assert restore.json()["recurrent_order"] == 42.5
+
+
+def test_reorder_missing_recurrent_item_is_404(client):
+    response = client.patch(
+        "/recurrent-tasks/does-not-exist/order", json={"after_id": None, "before_id": None}
+    )
+    assert response.status_code == 404

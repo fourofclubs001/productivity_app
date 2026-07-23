@@ -29,6 +29,16 @@ const recurrentTasksApi = {
     apiFetch<void>(`/recurrent-tasks/groups/${id}?delete_children=${deleteChildren}`, {
       method: 'DELETE',
     }),
+  move: (id: string, parentId: string | null) =>
+    apiFetch<Task>(`/recurrent-tasks/${id}/parent`, {
+      method: 'PATCH',
+      body: JSON.stringify({ parent_id: parentId }),
+    }),
+  reorder: (id: string, afterId: string | null, beforeId: string | null, order?: number) =>
+    apiFetch<Task>(`/recurrent-tasks/${id}/order`, {
+      method: 'PATCH',
+      body: JSON.stringify({ after_id: afterId, before_id: beforeId, order }),
+    }),
 }
 
 export function useCreateRecurrentTask() {
@@ -61,5 +71,32 @@ export function useDeleteRecurrentGroup() {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
       queryClient.invalidateQueries({ queryKey: ['intervals'] })
     },
+  })
+}
+
+export function useMoveRecurrentItem() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, parentId }: { id: string; parentId: string | null }) =>
+      recurrentTasksApi.move(id, parentId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+  })
+}
+
+export function useReorderRecurrentItem() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      afterId,
+      beforeId,
+      order,
+    }: {
+      id: string
+      afterId: string | null
+      beforeId: string | null
+      order?: number
+    }) => recurrentTasksApi.reorder(id, afterId, beforeId, order),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
   })
 }

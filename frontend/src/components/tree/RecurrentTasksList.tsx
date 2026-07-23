@@ -1,8 +1,22 @@
 import { useState } from 'react'
+import {
+  DndContext,
+  PointerSensor,
+  useDndMonitor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
 import type { Task } from '../../types'
 import { useDeleteTask } from '../../api/tasks'
-import { useDeleteRecurrentGroup } from '../../api/recurrentTasks'
-import { buildRecurrentTree, type RecurrentNode } from '../../lib/recurrentTaskTree'
+import {
+  useDeleteRecurrentGroup,
+  useMoveRecurrentItem,
+  useReorderRecurrentItem,
+} from '../../api/recurrentTasks'
+import { buildRecurrentTree, resolveRecurrentDropAction, type RecurrentNode } from '../../lib/recurrentTaskTree'
 import AlertDialog from '../common/AlertDialog'
 import ConfirmDialog from '../common/ConfirmDialog'
 import ContextMenu from '../calendar/ContextMenu'
@@ -38,14 +52,25 @@ function RecurrentItemRow({
   const [confirmingGroupDelete, setConfirmingGroupDelete] = useState(false)
   const [alertMessage, setAlertMessage] = useState<string | null>(null)
 
+  const { attributes, listeners, setNodeRef: setDraggableRef, isDragging } = useDraggable({
+    id: task.id,
+  })
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id: task.id })
+
   return (
     <div>
       <div
+        ref={(el) => {
+          setDraggableRef(el)
+          setDroppableRef(el)
+        }}
+        {...listeners}
+        {...attributes}
         className={`flex cursor-pointer items-center gap-1.5 rounded px-1 py-1 text-sm ${
           !isGroup && selectedId === task.id
             ? 'bg-accent-soft text-accent'
             : 'text-text-primary hover:bg-surface-hover'
-        }`}
+        } ${isDragging ? 'opacity-40' : ''} ${isOver ? 'outline outline-2 outline-accent' : ''}`}
         style={{ paddingLeft: 4 + depth * 16 }}
         onClick={() => (isGroup ? onToggleExpand(task.id) : onSelect(task.id))}
         onContextMenu={(event) => {
@@ -138,6 +163,62 @@ function RecurrentItemRow({
   )
 }
 
+function RecurrentTasksTree({
+  tasks,
+  tree,
+  expanded,
+  onToggleExpand,
+  selectedId,
+  onSelect,
+}: {
+  tasks: Task[]
+  tree: RecurrentNode[]
+  expanded: Set<string>
+  onToggleExpand: (id: string) => void
+  selectedId: string | null
+  onSelect: (id: string) => void
+}) {
+  const moveItem = useMoveRecurrentItem()
+  const reorderItem = useReorderRecurrentItem()
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over) return
+    const activeId = String(active.id)
+    const overId = String(over.id)
+    const activeRect = active.rect.current.translated
+    if (!activeRect) return
+    const relativeY = (activeRect.top + activeRect.height / 2 - over.rect.top) / over.rect.height
+
+    const action = resolveRecurrentDropAction(activeId, overId, relativeY, tasks)
+    if (!action) return
+
+    if (action.kind === 'reorder') {
+      reorderItem.mutate({ id: activeId, afterId: action.afterId, beforeId: action.beforeId })
+    } else {
+      moveItem.mutate({ id: activeId, parentId: action.parentId })
+    }
+  }
+
+  useDndMonitor({ onDragEnd: handleDragEnd })
+
+  return (
+    <>
+      {tree.map((node) => (
+        <RecurrentItemRow
+          key={node.task.id}
+          node={node}
+          depth={0}
+          expanded={expanded}
+          onToggleExpand={onToggleExpand}
+          selectedId={selectedId}
+          onSelect={onSelect}
+        />
+      ))}
+    </>
+  )
+}
+
 export default function RecurrentTasksList({
   tasks,
   selectedId,
@@ -152,6 +233,13 @@ export default function RecurrentTasksList({
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [showChooser, setShowChooser] = useState(false)
   const [showNewGroup, setShowNewGroup] = useState(false)
+  // A second, independent DndContext scoped to just this panel -- dnd-kit
+  // scopes drop targets to a DndContext's own children, which trivially
+  // keeps this hierarchy's drags from ever interacting with the main task
+  // tree's or the Plan calendar's, sharing the same PointerSensor tuning
+  // (8px activation, matching PlanView.tsx) rather than relying on filter
+  // logic to keep them apart (item 10).
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
   const tree = buildRecurrentTree(tasks)
 
@@ -185,17 +273,16 @@ export default function RecurrentTasksList({
             No recurrent tasks yet. Click + to create a repeating task.
           </p>
         )}
-        {tree.map((node) => (
-          <RecurrentItemRow
-            key={node.task.id}
-            node={node}
-            depth={0}
+        <DndContext sensors={sensors}>
+          <RecurrentTasksTree
+            tasks={tasks}
+            tree={tree}
             expanded={expanded}
             onToggleExpand={toggleExpand}
             selectedId={selectedId}
             onSelect={onSelect}
           />
-        ))}
+        </DndContext>
       </div>
       {showChooser && (
         <NewRecurrentItemChooserDialog

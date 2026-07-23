@@ -29,6 +29,7 @@ export interface Task {
   recurrence_end_count: number | null
   is_recurrent_group: boolean
   recurrent_parent_id: string | null
+  recurrent_order: number | null
 }
 
 export interface Interval {

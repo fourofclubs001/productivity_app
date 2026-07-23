@@ -88,6 +88,17 @@ class RecurrentGroupCreate(BaseModel):
     name: str = Field(min_length=1)
 
 
+class RecurrentReorderRequest(BaseModel):
+    after_id: str | None = None
+    before_id: str | None = None
+    order: float | None = None
+
+
+class RecurrentReparentRequest(BaseModel):
+    # None means "move to root" -- no recurrent parent.
+    parent_id: str | None = None
+
+
 class ReorderRequest(BaseModel):
     after_id: str | None = None
     before_id: str | None = None
@@ -132,3 +143,7 @@ class TaskOut(BaseModel):
     # parent_ids/children_ids above, scoped only to recurrent tasks/groups.
     is_recurrent_group: bool = False
     recurrent_parent_id: str | None = None
+    # Sibling ordering within the recurrent-task-group hierarchy -- a
+    # separate sequence from `order` above (see RECURRENT_ORDER_SEQ_KEY),
+    # None only for legacy recurrent tasks that predate this field.
+    recurrent_order: float | None = None

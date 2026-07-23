@@ -170,3 +170,12 @@ class RecurrentGroupNotFoundError(Exception):
     def __init__(self, group_id: str) -> None:
         self.group_id = group_id
         super().__init__(f"Recurrent group {group_id!r} not found")
+
+
+class InvalidRecurrentParentError(Exception):
+    def __init__(self, parent_id: str | None) -> None:
+        self.parent_id = parent_id
+        super().__init__(
+            f"{parent_id!r} cannot be used as a recurrent parent -- it must be an existing "
+            "recurrent group, not itself, and not one of this item's own descendants"
+        )

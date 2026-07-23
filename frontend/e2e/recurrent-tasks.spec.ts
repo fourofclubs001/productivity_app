@@ -169,8 +169,9 @@ test('recurrent groups: create, nest via re-visible expand, and delete with ungr
   const list = page.getByTestId('recurrent-tasks-list')
   await expect(list.getByText(groupName, { exact: true })).toBeVisible()
 
-  // Create a plain recurrent task alongside it (both start ungrouped --
-  // nesting only happens via drag-and-drop, item 10, not yet built).
+  // Create a plain recurrent task alongside it -- both start ungrouped;
+  // nesting them together is exercised by drag-and-drop in a separate test
+  // below (item 10).
   await openNewRecurrentTaskDialog(page)
   await page.getByLabel('Name').fill(taskName)
   await page.getByLabel('Definition of done').fill('done')
@@ -187,4 +188,116 @@ test('recurrent groups: create, nest via re-visible expand, and delete with ungr
   await expect(page.getByText(/Choose what happens to anything inside it/)).toBeVisible()
   await page.getByRole('button', { name: 'Delete children too' }).click()
   await expect(list.getByText(groupName, { exact: true })).not.toBeVisible()
+})
+
+test('dragging a recurrent task onto a group nests it (item 10)', async ({ page, request }) => {
+  const suffix = Date.now()
+  const groupName = `DragGroup ${suffix}`
+  const taskName = `DragTask ${suffix}`
+
+  const group = await (
+    await request.post('http://localhost:8001/recurrent-tasks/groups', {
+      data: { name: groupName },
+    })
+  ).json()
+  const start = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+  const end = new Date(start.getTime() + 60 * 60 * 1000)
+  const task = await (
+    await request.post('http://localhost:8001/recurrent-tasks', {
+      data: {
+        name: taskName,
+        definition_of_done: 'done',
+        start: start.toISOString(),
+        end: end.toISOString(),
+        recurrence_interval: 1,
+        recurrence_unit: 'day',
+        recurrence_end_type: 'never',
+      },
+    })
+  ).json()
+  expect(group.id).toBeTruthy()
+  expect(task.id).toBeTruthy()
+
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Recurrent tasks' }).click()
+
+  const list = page.getByTestId('recurrent-tasks-list')
+  const groupRow = list.getByText(groupName, { exact: true })
+  const taskRow = list.getByText(taskName, { exact: true })
+  await expect(groupRow).toBeVisible()
+  await expect(taskRow).toBeVisible()
+
+  const groupBox = await groupRow.boundingBox()
+  const taskBox = await taskRow.boundingBox()
+  if (!groupBox || !taskBox) throw new Error('rows not found')
+
+  await page.mouse.move(taskBox.x + taskBox.width / 2, taskBox.y + taskBox.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(groupBox.x + groupBox.width / 2, groupBox.y + groupBox.height / 2, {
+    steps: 10,
+  })
+  await page.mouse.up()
+
+  // The task moved under the group -- collapsed by default, so it
+  // disappears until the group is expanded.
+  await expect(taskRow).not.toBeVisible()
+  await groupRow.click()
+  await expect(taskRow).toBeVisible()
+})
+
+test('dragging a recurrent task onto another recurrent task never reparents it', async ({
+  page,
+  request,
+}) => {
+  const suffix = Date.now()
+  const nameA = `NoReparentA ${suffix}`
+  const nameB = `NoReparentB ${suffix}`
+
+  async function createPlainRecurrentTask(name: string) {
+    const start = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    const end = new Date(start.getTime() + 60 * 60 * 1000)
+    const response = await request.post('http://localhost:8001/recurrent-tasks', {
+      data: {
+        name,
+        definition_of_done: 'done',
+        start: start.toISOString(),
+        end: end.toISOString(),
+        recurrence_interval: 1,
+        recurrence_unit: 'day',
+        recurrence_end_type: 'never',
+      },
+    })
+    return response.json()
+  }
+
+  const taskA = await createPlainRecurrentTask(nameA)
+  const taskB = await createPlainRecurrentTask(nameB)
+  expect(taskA.id).toBeTruthy()
+  expect(taskB.id).toBeTruthy()
+
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Recurrent tasks' }).click()
+
+  const list = page.getByTestId('recurrent-tasks-list')
+  const rowA = list.getByText(nameA, { exact: true })
+  const rowB = list.getByText(nameB, { exact: true })
+  await expect(rowA).toBeVisible()
+  await expect(rowB).toBeVisible()
+
+  const boxA = await rowA.boundingBox()
+  const boxB = await rowB.boundingBox()
+  if (!boxA || !boxB) throw new Error('rows not found')
+
+  // Drop dead-center on B -- would be a reparent onto a group, but B is a
+  // plain task, so this must fall back to a sibling reorder instead.
+  await page.mouse.move(boxA.x + boxA.width / 2, boxA.y + boxA.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(boxB.x + boxB.width / 2, boxB.y + boxB.height / 2, { steps: 10 })
+  await page.mouse.up()
+
+  // Both still visible as top-level siblings -- neither disappeared into
+  // the other (which would happen if A had become B's child, collapsed by
+  // default).
+  await expect(rowA).toBeVisible()
+  await expect(rowB).toBeVisible()
 })
