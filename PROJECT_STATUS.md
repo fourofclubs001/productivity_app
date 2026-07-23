@@ -16,16 +16,15 @@ M41–M49: timer stop UX, two real bug fixes, the "routine"→"recurrent task"
 rename, recurrent-task groups + drag-and-drop, and drag-to-create on the Plan
 calendar) are all fully implemented, committed, and pushed.
 
-**Prod status, mid-pass:** M45's rename + its Redis data migration (real
-prod recurrent-task data) were deployed to prod partway through the v05
-session (`docker compose up --build`, then
-`docker compose exec backend python -m scripts.migrate_routine_to_recurrent_task`,
-dry-run first) — prod runs the M45 rename, but **M46–M49 (groups,
-drag-and-drop, drag-to-create) have not been redeployed to prod yet**, only
-verified against dev. Rebuild prod (`docker compose up --build` against
-`docker-compose.yml`) to bring it fully current with the v05 pass — no
-further migration needed for M46–M49, they only add new fields/endpoints,
-nothing pre-existing needs renaming.
+**Deployed to prod as of 2026-07-23** — M45's rename + its Redis data
+migration ran against prod partway through the v05 session (dry-run first,
+then for real, preserving all 9 real recurrent tasks), and prod was rebuilt
+again (`docker compose up --build`) at the end of the session to bring
+M46–M49 (groups, drag-and-drop, drag-to-create) live too. No further
+migration was needed for M46–M49 — they only added new fields/endpoints,
+nothing pre-existing needed renaming. Verified post-deploy: `/health` ok,
+frontend 200, the new `/recurrent-tasks/groups` endpoint live, and all 9 of
+the user's real recurrent tasks still intact.
 
 No `prompts/app_improvements_vNN.md` is currently pending for a *new* pass —
 `prompts/app_improvements_v06.md` was dropped in during the v05 session but
@@ -705,10 +704,6 @@ docker compose -f docker-compose.dev.yml up --build     # dev: isolated data, po
 - **`prompts/app_improvements_v06.md` was dropped in during the v05 session
   but not yet read or interpreted** — that's the next thing to do, following
   the workflow above (interpret, clarify, commit, plan, implement).
-- **M46–M49 (v05's second half) haven't been deployed to prod yet** — only
-  M45's rename made it to prod so far (mid-v05-session). Rebuild prod
-  (`docker compose up --build` against `docker-compose.yml`) once ready; no
-  further data migration needed for M46–M49.
 - Consider actually fixing the M18 dnd-kit scrolled-container drag bug (currently
   only worked around in tests) if it turns out to bite a real user.
 - Revisit the UTC-vs-local-timezone limitation if week/day boundaries ever look
