@@ -165,6 +165,8 @@ class TaskService:
                 if is_recurrent_task and node.fields.get("recurrence_end_date")
                 else None
             ),
+            is_recurrent_group=node.fields.get("is_recurrent_group") == "1",
+            recurrent_parent_id=node.fields.get("recurrent_parent_id") or None,
             recurrence_end_count=(
                 int(node.fields["recurrence_end_count"])
                 if is_recurrent_task and node.fields.get("recurrence_end_count")

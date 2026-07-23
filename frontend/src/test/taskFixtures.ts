@@ -25,6 +25,8 @@ export function makeTask(overrides: Partial<Task> = {}): Task {
     recurrence_end_type: null,
     recurrence_end_date: null,
     recurrence_end_count: null,
+    is_recurrent_group: false,
+    recurrent_parent_id: null,
     ...overrides,
   }
 }

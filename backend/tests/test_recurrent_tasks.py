@@ -437,3 +437,104 @@ def test_create_recurrent_task_endpoint_generates_its_first_occurrence(client):
     intervals = client.get(f"/intervals/by-task/{body['id']}").json()
     starts = {datetime.fromisoformat(interval["start"]) for interval in intervals}
     assert start in starts
+
+
+# ---------------------------------------------------------------------------
+# Recurrent-task groups (item 7): router-level integration tests. Nesting
+# has no creation-time API yet (only drag-and-drop, item 10, will set it) --
+# these tests seed `recurrent_parent_id` directly via Redis to simulate an
+# already-nested structure, mirroring how M48's drag feature will leave data.
+# ---------------------------------------------------------------------------
+
+
+def create_recurrent_group(client, name: str) -> dict:
+    response = client.post("/recurrent-tasks/groups", json={"name": name})
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def create_recurrent_task(client, name: str) -> dict:
+    start = datetime.combine(_future_anchor(7), time(9, 0), tzinfo=UTC)
+    end = start + timedelta(hours=1)
+    response = client.post(
+        "/recurrent-tasks",
+        json={
+            "name": name,
+            "definition_of_done": "d",
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            "recurrence_interval": 1,
+            "recurrence_unit": "day",
+            "recurrence_end_type": "never",
+        },
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+async def set_recurrent_parent(redis_client, child_id: str, parent_id: str) -> None:
+    await redis_client.hset(f"task:{child_id}", "recurrent_parent_id", parent_id)
+
+
+def test_create_recurrent_group_endpoint(client):
+    group = create_recurrent_group(client, "Chores")
+    assert group["is_recurrent_group"] is True
+    assert group["is_recurrent_task"] is False
+    assert group["recurrent_parent_id"] is None
+
+
+def test_delete_recurrent_group_with_no_children_just_deletes_it(client):
+    group = create_recurrent_group(client, "Empty group")
+    response = client.delete(f"/recurrent-tasks/groups/{group['id']}")
+    assert response.status_code == 204
+    assert client.get(f"/tasks/{group['id']}").status_code == 404
+
+
+def test_delete_missing_recurrent_group_is_404(client):
+    response = client.delete("/recurrent-tasks/groups/does-not-exist")
+    assert response.status_code == 404
+
+
+async def test_delete_recurrent_group_cascade_deletes_children(client, redis_client):
+    group = create_recurrent_group(client, "Chores")
+    child_task = create_recurrent_task(client, "Water plants")
+    child_group = create_recurrent_group(client, "Subgroup")
+    grandchild_task = create_recurrent_task(client, "Grandchild task")
+    await set_recurrent_parent(redis_client, child_task["id"], group["id"])
+    await set_recurrent_parent(redis_client, child_group["id"], group["id"])
+    await set_recurrent_parent(redis_client, grandchild_task["id"], child_group["id"])
+
+    response = client.delete(f"/recurrent-tasks/groups/{group['id']}?delete_children=true")
+    assert response.status_code == 204
+
+    assert client.get(f"/tasks/{group['id']}").status_code == 404
+    assert client.get(f"/tasks/{child_task['id']}").status_code == 404
+    assert client.get(f"/tasks/{child_group['id']}").status_code == 404
+    assert client.get(f"/tasks/{grandchild_task['id']}").status_code == 404
+
+
+async def test_delete_recurrent_group_ungroups_children_to_root(client, redis_client):
+    group = create_recurrent_group(client, "Chores")
+    child_task = create_recurrent_task(client, "Water plants")
+    await set_recurrent_parent(redis_client, child_task["id"], group["id"])
+
+    response = client.delete(f"/recurrent-tasks/groups/{group['id']}?delete_children=false")
+    assert response.status_code == 204
+
+    assert client.get(f"/tasks/{group['id']}").status_code == 404
+    survivor = client.get(f"/tasks/{child_task['id']}").json()
+    assert survivor["recurrent_parent_id"] is None
+
+
+async def test_delete_recurrent_group_ungroups_children_to_its_own_parent(client, redis_client):
+    grandparent = create_recurrent_group(client, "Grandparent")
+    parent = create_recurrent_group(client, "Parent")
+    child_task = create_recurrent_task(client, "Water plants")
+    await set_recurrent_parent(redis_client, parent["id"], grandparent["id"])
+    await set_recurrent_parent(redis_client, child_task["id"], parent["id"])
+
+    response = client.delete(f"/recurrent-tasks/groups/{parent['id']}?delete_children=false")
+    assert response.status_code == 204
+
+    survivor = client.get(f"/tasks/{child_task['id']}").json()
+    assert survivor["recurrent_parent_id"] == grandparent["id"]

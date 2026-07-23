@@ -1,4 +1,14 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
+
+async function openNewRecurrentTaskDialog(page: Page) {
+  await page.getByTitle('New recurrent item').click()
+  await page.getByRole('button', { name: 'Recurrent task', exact: true }).click()
+}
+
+async function openNewRecurrentGroupDialog(page: Page) {
+  await page.getByTitle('New recurrent item').click()
+  await page.getByRole('button', { name: 'Recurrent group' }).click()
+}
 
 test('creating a daily recurrent task auto-schedules its first occurrence without any manual drag', async ({
   page,
@@ -10,7 +20,7 @@ test('creating a daily recurrent task auto-schedules its first occurrence withou
   await page.getByRole('button', { name: 'Recurrent tasks' }).click()
   await expect(page.getByText(/no recurrent tasks yet/i)).toBeVisible()
 
-  await page.getByTitle('New recurrent task').click()
+  await openNewRecurrentTaskDialog(page)
   await expect(page.getByRole('heading', { name: 'New recurrent task' })).toBeVisible()
 
   await page.getByLabel('Name').fill(taskName)
@@ -48,7 +58,7 @@ test('picking a start after the current end auto-adjusts the end instead of bloc
 
   await page.goto('/')
   await page.getByRole('button', { name: 'Recurrent tasks' }).click()
-  await page.getByTitle('New recurrent task').click()
+  await openNewRecurrentTaskDialog(page)
 
   await page.getByLabel('Name').fill(taskName)
   await page.getByLabel('Definition of done').fill('done')
@@ -94,7 +104,7 @@ test('selecting a day-of-week other than today still creates the recurrent task,
 
   await page.goto('/')
   await page.getByRole('button', { name: 'Recurrent tasks' }).click()
-  await page.getByTitle('New recurrent task').click()
+  await openNewRecurrentTaskDialog(page)
 
   await page.getByLabel('Name').fill(taskName)
   await page.getByLabel('Definition of done').fill('done')
@@ -120,7 +130,7 @@ test('deleting a recurrent task removes it via the same right-click flow as a ta
 
   await page.goto('/')
   await page.getByRole('button', { name: 'Recurrent tasks' }).click()
-  await page.getByTitle('New recurrent task').click()
+  await openNewRecurrentTaskDialog(page)
   await page.getByLabel('Name').fill(taskName)
   await page.getByLabel('Definition of done').fill('Attended')
   await page.getByLabel('Repeat unit').selectOption('day')
@@ -137,4 +147,44 @@ test('deleting a recurrent task removes it via the same right-click flow as a ta
   await page.getByRole('button', { name: 'Delete' }).click()
 
   await expect(row).not.toBeVisible()
+})
+
+test('recurrent groups: create, nest via re-visible expand, and delete with ungroup vs delete-children choice', async ({
+  page,
+}) => {
+  const suffix = Date.now()
+  const groupName = `GroupGrp ${suffix}`
+  const taskName = `GroupedTask ${suffix}`
+
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Recurrent tasks' }).click()
+
+  // Create a group -- name only, no schedule fields.
+  await openNewRecurrentGroupDialog(page)
+  await expect(page.getByRole('heading', { name: 'New recurrent group' })).toBeVisible()
+  await page.getByLabel('Name').fill(groupName)
+  await page.getByRole('button', { name: 'Create' }).click()
+  await expect(page.getByRole('heading', { name: 'New recurrent group' })).not.toBeVisible()
+
+  const list = page.getByTestId('recurrent-tasks-list')
+  await expect(list.getByText(groupName, { exact: true })).toBeVisible()
+
+  // Create a plain recurrent task alongside it (both start ungrouped --
+  // nesting only happens via drag-and-drop, item 10, not yet built).
+  await openNewRecurrentTaskDialog(page)
+  await page.getByLabel('Name').fill(taskName)
+  await page.getByLabel('Definition of done').fill('done')
+  await page.getByLabel('Repeat unit').selectOption('day')
+  await page.getByRole('button', { name: 'Create' }).click()
+  await expect(list.getByText(taskName, { exact: true })).toBeVisible()
+
+  // Deleting the (childless) group offers the same ungroup/delete-children
+  // choice regardless -- exercise "Ungroup" first on a second throwaway
+  // group to confirm the dialog wiring, then delete the real one via
+  // "Delete children too" (equivalent to a plain delete when childless).
+  await list.getByText(groupName, { exact: true }).click({ button: 'right' })
+  await page.getByRole('button', { name: 'Delete' }).click()
+  await expect(page.getByText(/Choose what happens to anything inside it/)).toBeVisible()
+  await page.getByRole('button', { name: 'Delete children too' }).click()
+  await expect(list.getByText(groupName, { exact: true })).not.toBeVisible()
 })

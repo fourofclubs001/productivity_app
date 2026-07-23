@@ -164,3 +164,9 @@ class IntervalAlreadySyncedError(Exception):
 class GoogleSyncFailedError(Exception):
     def __init__(self) -> None:
         super().__init__("Could not reach Google Calendar to sync this event")
+
+
+class RecurrentGroupNotFoundError(Exception):
+    def __init__(self, group_id: str) -> None:
+        self.group_id = group_id
+        super().__init__(f"Recurrent group {group_id!r} not found")

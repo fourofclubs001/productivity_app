@@ -6,7 +6,9 @@ from redis.asyncio import Redis
 ALL_TASKS_KEY = "tasks:all"
 ROOTS_KEY = "tasks:roots"
 RECURRENT_TASKS_KEY = "recurrent_tasks:all"
+RECURRENT_GROUPS_KEY = "recurrent_groups:all"
 ORDER_SEQ_KEY = "tasks:order_seq"
+RECURRENT_ORDER_SEQ_KEY = "recurrent_tasks:order_seq"
 ORDER_STEP = 1000
 
 
@@ -76,6 +78,27 @@ class TaskRepository:
     async def list_recurrent_task_ids(self) -> set[str]:
         return await self._redis.smembers(RECURRENT_TASKS_KEY)
 
+    async def add_to_recurrent_groups(self, task_id: str) -> None:
+        await self._redis.sadd(RECURRENT_GROUPS_KEY, task_id)
+
+    async def list_recurrent_group_ids(self) -> set[str]:
+        return await self._redis.smembers(RECURRENT_GROUPS_KEY)
+
+    async def next_recurrent_order(self) -> float:
+        """Same monotonic-sequence scheme as next_order(), but a fully
+        separate counter -- the recurrent-task-group hierarchy (item 7) is
+        its own tree, so its ordering must never share state with (and
+        thus never be perturbed by) the main task tree's `order`/
+        `_rebalance_order()`.
+        """
+        return float(await self._redis.incrby(RECURRENT_ORDER_SEQ_KEY, ORDER_STEP))
+
+    async def set_recurrent_parent(self, task_id: str, parent_id: str | None) -> None:
+        if parent_id:
+            await self._redis.hset(task_key(task_id), "recurrent_parent_id", parent_id)
+        else:
+            await self._redis.hdel(task_key(task_id), "recurrent_parent_id")
+
     async def set_colors(self, task_id: str, colors: list[str]) -> None:
         key = colors_key(task_id)
         await self._redis.delete(key)
@@ -141,6 +164,7 @@ class TaskRepository:
         await self._redis.srem(ALL_TASKS_KEY, task_id)
         await self._redis.srem(ROOTS_KEY, task_id)
         await self._redis.srem(RECURRENT_TASKS_KEY, task_id)
+        await self._redis.srem(RECURRENT_GROUPS_KEY, task_id)
 
     async def load_graph(self) -> dict[str, TaskNode]:
         task_ids = await self._redis.smembers(ALL_TASKS_KEY)

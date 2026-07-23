@@ -81,6 +81,13 @@ class RecurrentTaskCreate(BaseModel):
     recurrence_end_count: int | None = None
 
 
+class RecurrentGroupCreate(BaseModel):
+    # Purely organizational -- no schedule, no recurrence, just a name
+    # recurrent tasks/groups can be nested under (item 7). Always created at
+    # root level; nesting happens via drag-and-drop (item 10) after creation.
+    name: str = Field(min_length=1)
+
+
 class ReorderRequest(BaseModel):
     after_id: str | None = None
     before_id: str | None = None
@@ -121,3 +128,7 @@ class TaskOut(BaseModel):
     recurrence_end_type: RecurrenceEndType | None = None
     recurrence_end_date: date | None = None
     recurrence_end_count: int | None = None
+    # Recurrent-task-group hierarchy (item 7) -- a wholly separate tree from
+    # parent_ids/children_ids above, scoped only to recurrent tasks/groups.
+    is_recurrent_group: bool = False
+    recurrent_parent_id: str | None = None

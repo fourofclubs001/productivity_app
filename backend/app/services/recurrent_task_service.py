@@ -8,6 +8,7 @@ from app.models.task import (
     PALETTE,
     RecurrenceEndType,
     RecurrenceUnit,
+    RecurrentGroupCreate,
     RecurrentTaskCreate,
     TaskOut,
     TaskState,
@@ -16,6 +17,7 @@ from app.repositories.task_repository import TaskRepository
 from app.services.errors import (
     InvalidColorError,
     PastIntervalError,
+    RecurrentGroupNotFoundError,
     TaskNotLeafError,
     UnmetPrerequisiteError,
 )
@@ -257,3 +259,54 @@ class RecurrentTaskService:
         )
         if has_a_concluded_occurrence:
             await self._tasks.update_fields(task_id, {"state": TaskState.backlog.value})
+
+    async def create_recurrent_group(self, payload: RecurrentGroupCreate) -> TaskOut:
+        task_id = str(uuid4())
+        now = datetime.now(UTC)
+        fields = {
+            "name": payload.name,
+            "description": "",
+            "definition_of_done": "",
+            "state": TaskState.backlog.value,
+            "created_at": now.isoformat(),
+            "order": str(await self._tasks.next_order()),
+            "is_recurrent_group": "1",
+            "recurrent_order": str(await self._tasks.next_recurrent_order()),
+        }
+        await self._tasks.create(task_id, fields)
+        await self._tasks.add_to_recurrent_groups(task_id)
+        return await self._task_service.get_task(task_id)
+
+    async def delete_recurrent_group(self, group_id: str, delete_children: bool) -> None:
+        node = await self._tasks.load_node(group_id)
+        if node is None or node.fields.get("is_recurrent_group") != "1":
+            raise RecurrentGroupNotFoundError(group_id)
+
+        child_ids = await self._recurrent_children_of(group_id)
+        if delete_children:
+            for child_id in child_ids:
+                child_node = await self._tasks.load_node(child_id)
+                if child_node is not None and child_node.fields.get("is_recurrent_group") == "1":
+                    # Recurse before deleting this child group itself, so its
+                    # own descendants are cleaned up too.
+                    await self.delete_recurrent_group(child_id, delete_children=True)
+                else:
+                    await self._tasks.delete(child_id)
+        else:
+            # Ungroup: reparent direct children up to this group's own
+            # parent (or to root if it had none), rather than deleting them.
+            grandparent_id = node.fields.get("recurrent_parent_id") or None
+            for child_id in child_ids:
+                await self._tasks.set_recurrent_parent(child_id, grandparent_id)
+
+        await self._tasks.delete(group_id)
+
+    async def _recurrent_children_of(self, parent_id: str) -> list[str]:
+        task_ids = await self._tasks.list_recurrent_task_ids()
+        group_ids = await self._tasks.list_recurrent_group_ids()
+        children: list[str] = []
+        for candidate_id in task_ids | group_ids:
+            node = await self._tasks.load_node(candidate_id)
+            if node is not None and node.fields.get("recurrent_parent_id") == parent_id:
+                children.append(candidate_id)
+        return children
