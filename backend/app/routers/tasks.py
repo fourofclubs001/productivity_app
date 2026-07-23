@@ -4,7 +4,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from redis.asyncio import Redis
 
-from app.dependencies import apply_rollover, apply_routine_catchup, get_task_service
+from app.dependencies import (
+    apply_rollover,
+    apply_routine_catchup,
+    get_interval_service,
+    get_task_service,
+)
 from app.models.task import (
     PALETTE,
     AddParentRequest,
@@ -16,7 +21,6 @@ from app.models.task import (
 )
 from app.redis_client import get_redis
 from app.repositories.entry_repository import EntryRepository
-from app.repositories.interval_repository import IntervalRepository
 from app.services.errors import (
     CycleError,
     InvalidColorError,
@@ -28,6 +32,7 @@ from app.services.errors import (
     TaskNotFoundError,
     TaskNotLeafError,
 )
+from app.services.interval_service import IntervalService
 from app.services.task_service import TaskService
 
 router = APIRouter(
@@ -79,7 +84,10 @@ async def update_task(task_id: str, payload: TaskUpdate, service: ServiceDep) ->
 
 @router.delete("/{task_id}", status_code=204)
 async def delete_task(
-    task_id: str, service: ServiceDep, redis: Annotated[Redis, Depends(get_redis)]
+    task_id: str,
+    service: ServiceDep,
+    redis: Annotated[Redis, Depends(get_redis)],
+    interval_service: Annotated[IntervalService, Depends(get_interval_service)],
 ) -> None:
     entry_repo = EntryRepository(redis)
     active_id = await entry_repo.get_active_id()
@@ -91,22 +99,21 @@ async def delete_task(
                 detail="This task's timer is currently running — stop it before deleting the task.",
             )
 
+    # A deleted task's future plan no longer makes sense; drop its
+    # not-yet-started reserved intervals before the task itself is gone, so
+    # each delete still goes through IntervalService.delete_interval (Google
+    # sync, not the bare repository) while the task still exists to load.
+    # Past (and in-progress) intervals are left alone as historical record.
+    now = datetime.now(UTC)
+    for interval in await interval_service.list_for_task(task_id):
+        start = interval.start if interval.start.tzinfo else interval.start.replace(tzinfo=UTC)
+        if start > now:
+            await interval_service.delete_interval(interval.id)
+
     try:
         await service.delete_task(task_id)
     except TaskNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-    # A deleted task's future plan no longer makes sense; drop its
-    # not-yet-started reserved intervals. Past (and in-progress) intervals
-    # are left alone as historical record.
-    interval_repo = IntervalRepository(redis)
-    now = datetime.now(UTC)
-    for interval in await interval_repo.list_for_task(task_id):
-        start = datetime.fromisoformat(interval["start"])
-        if start.tzinfo is None:
-            start = start.replace(tzinfo=UTC)
-        if start > now:
-            await interval_repo.delete(interval["id"])
 
 
 @router.post("/{task_id}/parents", response_model=TaskOut)

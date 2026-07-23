@@ -2,7 +2,10 @@ from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
 
+from app.dependencies import get_google_calendar_client
+from app.main import app
 from app.repositories.interval_repository import IntervalRepository, interval_key
+from app.services.google_calendar_client import FakeGoogleCalendarClient
 
 
 def _next_monday(weeks_ahead: int) -> datetime:
@@ -550,6 +553,36 @@ def connect_google(client) -> None:
         follow_redirects=False,
     )
     assert callback.status_code in (302, 307)
+
+
+def test_deleting_a_task_deletes_its_future_intervals_from_google(client):
+    # Regression test for the bug where a task-delete's future-interval
+    # cleanup bypassed IntervalService.delete_interval() (and therefore
+    # never called the Google-delete side effect), via a raw repository
+    # delete instead -- see PROJECT_STATUS.md / v05 item 3.
+    class SpyGoogleCalendarClient(FakeGoogleCalendarClient):
+        def __init__(self):
+            super().__init__()
+            self.deleted_event_ids: list[str] = []
+
+        async def delete_event(self, access_token: str, event_id: str) -> None:
+            self.deleted_event_ids.append(event_id)
+
+    spy = SpyGoogleCalendarClient()
+    app.dependency_overrides[get_google_calendar_client] = lambda: spy
+    try:
+        connect_google(client)
+        task = create_leaf(client)
+        # Connected, so M37's auto-sync-on-creation pushes this interval to
+        # Google immediately, giving it a google_event_id.
+        interval = create_interval(client, task["id"], START, START + timedelta(hours=1))
+        assert interval["google_event_id"]
+
+        client.delete(f"/tasks/{task['id']}")
+
+        assert spy.deleted_event_ids == [interval["google_event_id"]]
+    finally:
+        del app.dependency_overrides[get_google_calendar_client]
 
 
 def test_creating_an_interval_while_connected_syncs_it_to_google(client):

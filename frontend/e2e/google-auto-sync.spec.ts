@@ -54,3 +54,44 @@ test('a newly scheduled interval auto-syncs to Google once connected, and deleti
   await expect(event).not.toBeVisible()
   await expect(page.getByRole('button', { name: 'OK' })).not.toBeVisible()
 })
+
+test('deleting a task with a Google-synced future interval succeeds with no error', async ({
+  page,
+  request,
+}) => {
+  // M42 regression: deleting the *task* (not the interval directly) used to
+  // prune its future intervals via a raw repository delete that bypassed
+  // the Google-sync path entirely -- this exercises that cascade against
+  // the real running backend (the fake adapter's delete_event is a no-op,
+  // so the actual sync-happened assertion lives in the backend pytest spy
+  // test; this just confirms the wiring doesn't 500 / hang end-to-end).
+  await request.post(`${API_BASE}/auth/google/disconnect`)
+
+  // Avoid the substring "Delete" in the fixture name -- it would collide
+  // with the "Delete" button's accessible-name matching (see
+  // PROJECT_STATUS.md's documented fixture-naming gotcha).
+  const task = await createTask(request, `TaskCascadeSync ${Date.now()}`)
+
+  await page.goto('/')
+  await page.getByRole('link', { name: 'Connect Google Calendar' }).click()
+  await expect(page.getByRole('button', { name: 'Google Calendar connected' })).toBeVisible()
+
+  await dragTaskOntoCalendar(page, task.name)
+  const event = page.locator('.rbc-event', { hasText: task.name })
+  await expect(event).toBeVisible()
+
+  await expect
+    .poll(async () => {
+      const intervals = await (await request.get(`${API_BASE}/intervals/by-task/${task.id}`)).json()
+      return intervals[0]?.google_event_id ?? null
+    })
+    .toEqual(expect.stringContaining('fake-event-'))
+
+  const row = page.getByTestId('task-tree').locator('.group', { hasText: task.name })
+  await row.click({ button: 'right' })
+  await page.getByRole('button', { name: 'Delete' }).click()
+  await page.getByRole('button', { name: 'Delete' }).click()
+
+  await expect(event).not.toBeVisible()
+  await expect(page.getByRole('button', { name: 'OK' })).not.toBeVisible()
+})
