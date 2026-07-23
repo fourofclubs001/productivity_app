@@ -1,0 +1,11 @@
+- when stoping the time tacker the dialog options must be: yes, "no, stop the timer", "cancel"
+- bug: when adding recurrent task, once every 2 weeks on friday until december 31st, the task is added only two times at the current friday and the following corresponding friday.
+- when I delete an event from the app it must be deleted from the google calendar too
+- when selecting the interval for recurrent tasks, I should be able to remove the default "1" and write another number with the keyboard.
+- at the code and the frontend can you reference the recurrent tasks as recurrent tasks instead of "routine"
+- at the calendars, next to the past/next week buttons, add a today button on their right to view the current week. If I'm far aways I must be able to touch that bottom to quickly get to the current week view.
+- at routine task tab, when pressing plus, a dialog must appear to choose between creating a routine or a routine group. In case of routine group, the task only need to specify the name. Then the routine tasks can be added as child of the routine group tasks. A routine group tasks can be added as child of another routine group task. This serve for routine task organization purposes.
+- at recurrent tasks, when selecting a first occurrence intial date after the end date, the end date should automatically change to the same date as the selected initial date instead of showing a read warning.The same should happend with the time.
+- when clicking and draging on the plan view calendar, a gosht empty event should appear indicating only the time interval being selected. When the drag finishes, a dialog must open asking if the task being created is recurrent or not. Then the corresponding dialog must open
+- at routines tab I must be able to drag and drop recurrent task, but with out making one child of another. The parent relation on the routines tabs can only happend between recurrent task with recurrent group and recurrent group with recurrent group.
+- at recurrent task creation, when selecting monday (current day being thursday), I cannot create the task. Make it possible to create the task, begining in the closest selected day in the future.
