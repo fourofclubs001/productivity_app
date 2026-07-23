@@ -4,17 +4,20 @@ Working notes for picking this project back up in a future session. Not user-fac
 docs (see `README.md` for that) — this is "what's true right now and how we work
 here."
 
-## Where things stand (as of commit `17b7cd7`, v04 pass complete)
+## Where things stand (as of M40, post-v04)
 
 The app is fully built and working: Plan / Execute / Evaluate views, FastAPI +
 Redis backend, React + Tailwind frontend, Google Workspace/Calendar-styled light
 theme. v00 (8 items), v01 (30 items, M1–M12), v02 (19 items, M13–M23), v03
 (11 items, M24–M34, plus one post-v03 ad hoc fix), and v04 (4 items, M35–M39:
-Google Calendar sync + routine/recurring tasks) are all fully implemented,
-committed, and pushed. **Not yet deployed to prod** as of `17b7cd7` — v04 needs
-a real Google OAuth Client ID/Secret in a root `.env` before prod is worth
-rebuilding (see "Google Calendar setup" below); the dev stack has been running
-throughout on the no-credentials fake adapter.
+Google Calendar sync + routine/recurring tasks, plus one post-v04 ad hoc fix,
+M40: pulling Google events back into Plan/Execute) are all fully implemented,
+committed, and pushed. **Not yet deployed to prod** — v04/M40 needs a real
+Google OAuth Client ID/Secret in a root `.env` before prod is worth rebuilding
+(see "Google Calendar setup" below). The dev stack now has real Google
+credentials configured (the user completed the OAuth Cloud Console setup and
+connected it live) — the automated test suite still always runs against the
+no-credentials fake adapter regardless.
 No `prompts/app_improvements_vNN.md` is currently pending — the next session
 should wait for a new one to be dropped in, per the workflow below.
 
@@ -337,6 +340,43 @@ in `prompts/interpreted_app_improvements_v04.md`.
   main tree — never reparented in or out). 8 new vitest cases (170→178).
   **This completes the v04 pass.**
 
+### Post-v04 ad hoc fix: pull Google Calendar events into Plan/Execute (M40)
+
+- `app_improvements_v04.md` item 1 actually asked for two things: the
+  "Connect Google Calendar" button, *and* "the google calendar events will
+  be visible on the app calendar views." `interpreted_app_improvements_v04.md`
+  only carried the button half forward — the pull-back half was silently
+  dropped during interpretation and never built, until the user hit it
+  directly (connected, then couldn't see their real Google events on Plan).
+- New `GoogleCalendarClient.list_events` (Protocol + `Httpx`/`Fake` impls,
+  alongside the existing create/update/delete) fetches events in a
+  `timeMin`/`timeMax` range; all-day events (Google's date-only `start.date`
+  field, vs. timed `start.dateTime`) are skipped, since this app's model has
+  no untimed-event concept. `GoogleSyncService.list_events` wraps it with
+  the same best-effort/swallow-failures shape as `push_interval` etc. New
+  `GET /google/events?week_start=...` (`app/routers/google_events.py`,
+  separate from the auth-flow `routers/google.py`) dedups against this
+  app's own already-synced intervals (via `IntervalService.list_for_week`)
+  so an interval this app pushed to Google (M37) doesn't also come back as
+  a second, external-looking chip.
+- `PlanCalendar.tsx`/`ExecuteCalendar.tsx` both merge in
+  `useGoogleEventsForWeek` alongside their existing intervals/entries,
+  tagging pulled events `isExternal: true` with a namespaced `google-{id}`
+  React key and a fixed neutral/gray style (`EXTERNAL_EVENT_STYLE` in
+  `eventColor.ts`) instead of task colors. Plan additionally guards
+  `draggableAccessor`/`resizableAccessor` against `isExternal` and skips
+  setting `data-interval-id` on external chips so the existing
+  mousedown-drag-arm listener and right-click context menu both naturally
+  no-op on them — no new guard logic needed there beyond that.
+- **Confirmed scope (user decision), deliberately excluded:** pulled events
+  do **not** appear on Evaluate — its calendar is a diff/gap view (planned
+  vs. tracked time, excuse-attachment) with a different purpose, and its
+  metrics (`StatsPanel`, `ExcusesPanel`) must never count them. No Evaluate
+  code was touched.
+- 3 new pytest cases (158→161), 3 new vitest cases (178→181, including a new
+  `ExecuteCalendar.test.tsx` — no test file existed for that component
+  before now).
+
 #### Google Calendar setup (needed before real-Google manual verification)
 
 Every M35–M39 automated test runs against the in-process fake adapter — no
@@ -394,11 +434,13 @@ This has repeated three times now (initial build, v00, v01) and is worth reusing
 - **Deleting or editing one routine-generated occurrence only affects that
   one interval** (v04, M38) — no Google-Calendar-style "this event / this
   and following / all events" semantics. Deliberately out of scope for v04.
-- **Google Calendar sync** (v04, M35–M37) — real OAuth2 connect/disconnect,
-  manual/automatic push of Plan intervals, all implemented. What's still
-  out of scope: syncing *from* Google back into this app (one-way only,
-  this app → Google), and Execute's tracked time is deliberately never
-  synced at all (see `prompts/interpreted_app_improvements_v04.md` item 3).
+- **Google Calendar sync** (v04 M35–M37, plus post-v04 M40) — real OAuth2
+  connect/disconnect, manual/automatic push of Plan intervals, and pulling
+  Google's own events back into Plan/Execute (read-only, not editable, not
+  reflected in Evaluate) are all implemented. Execute's tracked time is
+  still deliberately never *pushed* to Google (see
+  `prompts/interpreted_app_improvements_v04.md` item 3) — only the pull
+  direction touches Execute.
 - **No auth/users** — single-user by design for this stage.
 - **Timezone boundaries are UTC, not the user's local time.** The backend stores and
   buckets everything in UTC (`datetime.now(UTC)`, week/day/month math all UTC-based).

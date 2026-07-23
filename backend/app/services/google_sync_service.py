@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from app.models.google import GoogleEventOut
 from app.services.google_auth_service import GoogleAuthService
 from app.services.google_calendar_client import GoogleCalendarClient
 
@@ -51,3 +52,12 @@ class GoogleSyncService:
             await self._calendar.delete_event(access_token, google_event_id)
         except Exception:
             pass
+
+    async def list_events(self, time_min: datetime, time_max: datetime) -> list[GoogleEventOut]:
+        access_token = await self._auth.get_valid_access_token()
+        if access_token is None:
+            return []
+        try:
+            return await self._calendar.list_events(access_token, time_min, time_max)
+        except Exception:
+            return []

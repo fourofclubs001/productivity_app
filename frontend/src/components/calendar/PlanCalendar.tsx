@@ -28,13 +28,14 @@ import {
 import { isFullyPast, isInProgress, resolveDragRescheduleAction } from '../../lib/intervalTiming'
 import { splitAcrossDays } from '../../lib/splitEventAcrossDays'
 import { useGoogleConnectionStatus, usePushIntervalToGoogle } from '../../api/google'
+import { useGoogleEventsForWeek } from '../../api/googleEvents'
 import {
   makeCreateIntervalEntry,
   makeDeleteIntervalEntry,
   makeUpdateTimeEntry,
 } from '../../lib/intervalUndoEntries'
 import { useUndo } from '../../undo/UndoProvider'
-import { chipFillStyle } from './eventColor'
+import { chipFillStyle, EXTERNAL_EVENT_STYLE } from './eventColor'
 import CalendarDayHeader from './CalendarDayHeader'
 import CalendarTimezoneLabel from './CalendarTimezoneLabel'
 import ContextMenu from './ContextMenu'
@@ -54,6 +55,9 @@ interface CalendarEvent {
   // interval stays possible via the "Edit time" modal's typed fields
   // (independent start/end dates, from M27) instead.
   isMultiDaySegment: boolean
+  // True for a pulled-in Google Calendar event that isn't backed by a local
+  // interval at all -- read-only here, no drag/resize/context-menu.
+  isExternal: boolean
 }
 
 // Vite's dev-server esbuild pre-bundling double-wraps this addon's default
@@ -102,6 +106,10 @@ export default function PlanCalendar({
   const deleteInterval = useDeleteInterval()
   const { data: googleStatus } = useGoogleConnectionStatus()
   const pushIntervalToGoogle = usePushIntervalToGoogle()
+  const { data: googleEvents = [] } = useGoogleEventsForWeek(
+    weekStart,
+    googleStatus?.connected ?? false,
+  )
   const { pushUndo } = useUndo()
 
   // withDragAndDrop's own reschedule-drag (as opposed to the dnd-kit drag
@@ -312,21 +320,40 @@ export default function PlanCalendar({
     )
   }
 
-  const events = useMemo<CalendarEvent[]>(
-    () =>
-      intervals.flatMap((interval) => {
-        const task = tasksById.get(interval.task_id)
-        const segments = splitAcrossDays({
-          id: interval.id,
-          title: interval.task_name ?? task?.name ?? 'Unknown task',
-          start: new Date(interval.start),
-          end: new Date(interval.end),
-          colors: task?.effective_colors ?? [],
-        })
-        return segments.map((segment) => ({ ...segment, isMultiDaySegment: segments.length > 1 }))
-      }),
-    [intervals, tasksById],
-  )
+  const events = useMemo<CalendarEvent[]>(() => {
+    const own = intervals.flatMap((interval) => {
+      const task = tasksById.get(interval.task_id)
+      const segments = splitAcrossDays({
+        id: interval.id,
+        title: interval.task_name ?? task?.name ?? 'Unknown task',
+        start: new Date(interval.start),
+        end: new Date(interval.end),
+        colors: task?.effective_colors ?? [],
+      })
+      return segments.map((segment) => ({
+        ...segment,
+        isMultiDaySegment: segments.length > 1,
+        isExternal: false,
+      }))
+    })
+
+    const external = googleEvents.flatMap((event) => {
+      const segments = splitAcrossDays({
+        id: `google-${event.id}`,
+        title: event.title,
+        start: new Date(event.start),
+        end: new Date(event.end),
+        colors: [],
+      })
+      return segments.map((segment) => ({
+        ...segment,
+        isMultiDaySegment: segments.length > 1,
+        isExternal: true,
+      }))
+    })
+
+    return [...own, ...external]
+  }, [intervals, googleEvents, tasksById])
 
   return (
     <div className="flex h-full flex-col p-4">
@@ -373,9 +400,9 @@ export default function PlanCalendar({
           toolbar={false}
           selectable={false}
           resizable
-          draggableAccessor={(event: CalendarEvent) => !event.isMultiDaySegment}
+          draggableAccessor={(event: CalendarEvent) => !event.isMultiDaySegment && !event.isExternal}
           resizableAccessor={(event: CalendarEvent) =>
-            !isFullyPast(event, now) && !event.isMultiDaySegment
+            !isFullyPast(event, now) && !event.isMultiDaySegment && !event.isExternal
           }
           onEventDrop={handleEventChange}
           onEventResize={handleEventChange}
@@ -384,11 +411,13 @@ export default function PlanCalendar({
             if (interval) onOpenTask(interval.task_id)
           }}
           eventPropGetter={(event: CalendarEvent) => ({
-            style: {
-              ...chipFillStyle(event.colors),
-              border: 'none',
-              opacity: event.id === draggingEventId ? 0 : isFullyPast(event, now) ? 0.55 : 1,
-            },
+            style: event.isExternal
+              ? EXTERNAL_EVENT_STYLE
+              : {
+                  ...chipFillStyle(event.colors),
+                  border: 'none',
+                  opacity: event.id === draggingEventId ? 0 : isFullyPast(event, now) ? 0.55 : 1,
+                },
           })}
           components={{
             header: CalendarDayHeader,
@@ -396,8 +425,9 @@ export default function PlanCalendar({
             event: ({ event, title }: { event: CalendarEvent; title: string }) => (
               <div
                 className="h-full w-full truncate"
-                data-interval-id={event.id}
+                data-interval-id={event.isExternal ? undefined : event.id}
                 onContextMenu={(domEvent) => {
+                  if (event.isExternal) return
                   domEvent.preventDefault()
                   const interval = intervals.find((i) => i.id === event.id)
                   if (!interval) return

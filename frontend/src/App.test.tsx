@@ -23,6 +23,10 @@ vi.mock('./api/google', () => ({
   googleLoginUrl: () => 'http://localhost:8000/auth/google/login',
 }))
 
+vi.mock('./api/googleEvents', () => ({
+  useGoogleEventsForWeek: () => ({ data: [] }),
+}))
+
 describe('App', () => {
   it('renders the three view tabs and defaults to Plan', () => {
     render(<App />)

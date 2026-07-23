@@ -19,3 +19,12 @@ export function chipFillStyle(colors: string[]): CSSProperties {
 export function primaryChipColor(colors: string[]): string {
   return COLOR_HEX[colors[0]] ?? FALLBACK_HEX
 }
+
+// Pulled-in Google Calendar events aren't tied to a task, so they can't use
+// chipFillStyle's color logic -- a fixed neutral/outlined look keeps them
+// visually distinct from the user's own scheduled work.
+export const EXTERNAL_EVENT_STYLE: CSSProperties = {
+  backgroundColor: '#e5e7eb',
+  color: '#374151',
+  border: '1px solid #9ca3af',
+}

@@ -46,3 +46,10 @@ export interface Entry {
   end: string | null
   task_name: string | null
 }
+
+export interface GoogleEvent {
+  id: string
+  title: string
+  start: string
+  end: string
+}

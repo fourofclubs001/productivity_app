@@ -11,6 +11,7 @@ const updateMutate = vi.fn()
 const updateMutateAsync = vi.fn().mockResolvedValue(undefined)
 const useIntervalsForWeek = vi.fn(() => ({ data: [] as unknown[] }))
 const useGoogleConnectionStatus = vi.fn(() => ({ data: { connected: false } }))
+const useGoogleEventsForWeek = vi.fn(() => ({ data: [] as unknown[] }))
 const pushIntervalToGoogleMutate = vi.fn()
 
 vi.mock('../../api/intervals', () => ({
@@ -23,6 +24,10 @@ vi.mock('../../api/intervals', () => ({
 vi.mock('../../api/google', () => ({
   useGoogleConnectionStatus: () => useGoogleConnectionStatus(),
   usePushIntervalToGoogle: () => ({ mutate: pushIntervalToGoogleMutate }),
+}))
+
+vi.mock('../../api/googleEvents', () => ({
+  useGoogleEventsForWeek: () => useGoogleEventsForWeek(),
 }))
 
 function renderCalendar(tasksById: Map<string, Task>, onOpenTask: (taskId: string) => void = vi.fn()) {
@@ -38,6 +43,7 @@ beforeEach(() => {
   pushIntervalToGoogleMutate.mockClear()
   useIntervalsForWeek.mockReturnValue({ data: [] })
   useGoogleConnectionStatus.mockReturnValue({ data: { connected: false } })
+  useGoogleEventsForWeek.mockReturnValue({ data: [] })
 })
 
 describe('PlanCalendar', () => {
@@ -226,5 +232,30 @@ describe('PlanCalendar', () => {
     fireEvent.contextMenu(chips[1])
     fireEvent.click(screen.getByText('Delete'))
     expect(deleteMutate).toHaveBeenCalledWith('iv1', expect.any(Object))
+  })
+
+  it('renders a pulled Google Calendar event read-only, with no context menu or open-task click', () => {
+    useGoogleConnectionStatus.mockReturnValue({ data: { connected: true } })
+    useGoogleEventsForWeek.mockReturnValue({
+      data: [
+        {
+          id: 'ext-1',
+          title: 'Dentist',
+          start: '2026-07-15T14:00:00.000Z',
+          end: '2026-07-15T15:00:00.000Z',
+        },
+      ],
+    })
+    const onOpenTask = vi.fn()
+
+    renderCalendar(new Map(), onOpenTask)
+
+    const chip = screen.getByText('Dentist')
+    fireEvent.click(chip)
+    expect(onOpenTask).not.toHaveBeenCalled()
+
+    fireEvent.contextMenu(chip)
+    expect(screen.queryByText('Delete')).not.toBeInTheDocument()
+    expect(screen.queryByText('Edit time')).not.toBeInTheDocument()
   })
 })

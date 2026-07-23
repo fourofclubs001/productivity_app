@@ -4,6 +4,8 @@ from uuid import uuid4
 
 import httpx
 
+from app.models.google import GoogleEventOut
+
 CALENDAR_EVENTS_URL = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
 
 
@@ -23,6 +25,10 @@ class GoogleCalendarClient(Protocol):
     ) -> None: ...
 
     async def delete_event(self, access_token: str, event_id: str) -> None: ...
+
+    async def list_events(
+        self, access_token: str, time_min: datetime, time_max: datetime
+    ) -> list[GoogleEventOut]: ...
 
 
 class HttpxGoogleCalendarClient:
@@ -68,11 +74,48 @@ class HttpxGoogleCalendarClient:
             if response.status_code not in (204, 404):
                 response.raise_for_status()
 
+    async def list_events(
+        self, access_token: str, time_min: datetime, time_max: datetime
+    ) -> list[GoogleEventOut]:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                CALENDAR_EVENTS_URL,
+                headers={"Authorization": f"Bearer {access_token}"},
+                params={
+                    "timeMin": _rfc3339(time_min),
+                    "timeMax": _rfc3339(time_max),
+                    "singleEvents": "true",
+                    "orderBy": "startTime",
+                },
+            )
+            response.raise_for_status()
+            events = []
+            for item in response.json().get("items", []):
+                # All-day events carry a date-only "date" field instead of
+                # "dateTime" -- skip them, this app's intervals are always
+                # timed, so there's nothing to render them against.
+                start = item.get("start", {}).get("dateTime")
+                end = item.get("end", {}).get("dateTime")
+                if not start or not end:
+                    continue
+                events.append(
+                    GoogleEventOut(
+                        id=item["id"],
+                        title=item.get("summary") or "(no title)",
+                        start=datetime.fromisoformat(start),
+                        end=datetime.fromisoformat(end),
+                    )
+                )
+            return events
+
 
 class FakeGoogleCalendarClient:
     """No-network stand-in used whenever Google credentials aren't configured
     -- see app/dependencies.py.
     """
+
+    def __init__(self, events: list[GoogleEventOut] | None = None) -> None:
+        self._events = events or []
 
     async def create_event(
         self, access_token: str, summary: str, start: datetime, end: datetime
@@ -86,3 +129,8 @@ class FakeGoogleCalendarClient:
 
     async def delete_event(self, access_token: str, event_id: str) -> None:
         return None
+
+    async def list_events(
+        self, access_token: str, time_min: datetime, time_max: datetime
+    ) -> list[GoogleEventOut]:
+        return list(self._events)

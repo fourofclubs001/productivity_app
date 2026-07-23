@@ -5,11 +5,13 @@ import './calendar.css'
 import type { Task } from '../../types'
 import { useEntriesForWeek } from '../../api/timer'
 import { useIntervalsForWeek } from '../../api/intervals'
+import { useGoogleConnectionStatus } from '../../api/google'
+import { useGoogleEventsForWeek } from '../../api/googleEvents'
 import { formatWeekLabel, mondayOf, shiftWeek, weekStartKey } from '../../lib/week'
 import { localizer } from '../../lib/calendarLocalizer'
 import { utcNow } from '../../lib/time'
 import { splitAcrossDays } from '../../lib/splitEventAcrossDays'
-import { chipFillStyle } from './eventColor'
+import { chipFillStyle, EXTERNAL_EVENT_STYLE } from './eventColor'
 import CalendarDayHeader from './CalendarDayHeader'
 import CalendarTimezoneLabel from './CalendarTimezoneLabel'
 
@@ -19,6 +21,7 @@ interface CalendarEvent {
   start: Date
   end: Date
   colors: string[]
+  isExternal: boolean
 }
 
 export default function ExecuteCalendar({ tasksById }: { tasksById: Map<string, Task> }) {
@@ -35,6 +38,11 @@ export default function ExecuteCalendar({ tasksById }: { tasksById: Map<string, 
 
   const { data: entries = [] } = useEntriesForWeek(weekStart)
   const { data: intervals = [] } = useIntervalsForWeek(weekStart)
+  const { data: googleStatus } = useGoogleConnectionStatus()
+  const { data: googleEvents = [] } = useGoogleEventsForWeek(
+    weekStart,
+    googleStatus?.connected ?? false,
+  )
 
   const events = useMemo<CalendarEvent[]>(() => {
     const actual: CalendarEvent[] = entries.flatMap((entry) => {
@@ -45,6 +53,7 @@ export default function ExecuteCalendar({ tasksById }: { tasksById: Map<string, 
         start: new Date(entry.start),
         end: entry.end ? new Date(entry.end) : now,
         colors: task?.effective_colors ?? [],
+        isExternal: false,
       })
     })
 
@@ -58,11 +67,23 @@ export default function ExecuteCalendar({ tasksById }: { tasksById: Map<string, 
           start: new Date(interval.start),
           end: new Date(interval.end),
           colors: task?.effective_colors ?? [],
+          isExternal: false,
         })
       })
 
-    return [...actual, ...planned]
-  }, [entries, intervals, tasksById, now])
+    const external: CalendarEvent[] = googleEvents.flatMap((event) =>
+      splitAcrossDays({
+        id: `google-${event.id}`,
+        title: event.title,
+        start: new Date(event.start),
+        end: new Date(event.end),
+        colors: [],
+        isExternal: true,
+      }),
+    )
+
+    return [...actual, ...planned, ...external]
+  }, [entries, intervals, googleEvents, tasksById, now])
 
   return (
     <div className="flex h-full flex-col p-4">
@@ -99,11 +120,13 @@ export default function ExecuteCalendar({ tasksById }: { tasksById: Map<string, 
           toolbar={false}
           selectable={false}
           eventPropGetter={(event: CalendarEvent) => ({
-            style: {
-              ...chipFillStyle(event.colors),
-              border: 'none',
-              opacity: event.end <= now ? 0.55 : 1,
-            },
+            style: event.isExternal
+              ? EXTERNAL_EVENT_STYLE
+              : {
+                  ...chipFillStyle(event.colors),
+                  border: 'none',
+                  opacity: event.end <= now ? 0.55 : 1,
+                },
           })}
           components={{ header: CalendarDayHeader, timeGutterHeader: CalendarTimezoneLabel }}
           style={{ height: '100%' }}
