@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildRecurrentTree,
+  flattenRecurrentTree,
   recurrentDescendantIds,
+  recurrentNodeMap,
   resolveRecurrentDropAction,
 } from './recurrentTaskTree'
 import { makeTask } from '../test/taskFixtures'
@@ -64,6 +66,43 @@ describe('buildRecurrentTree', () => {
     })
     const tree = buildRecurrentTree([orphan])
     expect(tree.map((node) => node.task.id)).toEqual(['o1'])
+  })
+})
+
+describe('flattenRecurrentTree', () => {
+  it('flattens a nested forest into {id, depth} rows, respecting expand/collapse', () => {
+    const group = makeTask({ id: 'grp', name: 'Group', is_recurrent_group: true })
+    const child = makeTask({
+      id: 'child',
+      name: 'Child',
+      is_recurrent_task: true,
+      recurrent_parent_id: 'grp',
+    })
+    const tree = buildRecurrentTree([group, child])
+
+    expect(flattenRecurrentTree(tree, new Set())).toEqual([{ id: 'grp', depth: 0 }])
+    expect(flattenRecurrentTree(tree, new Set(['grp']))).toEqual([
+      { id: 'grp', depth: 0 },
+      { id: 'child', depth: 1 },
+    ])
+  })
+})
+
+describe('recurrentNodeMap', () => {
+  it('provides a flat id -> node lookup over the whole forest', () => {
+    const group = makeTask({ id: 'grp', name: 'Group', is_recurrent_group: true })
+    const child = makeTask({
+      id: 'child',
+      name: 'Child',
+      is_recurrent_task: true,
+      recurrent_parent_id: 'grp',
+    })
+    const tree = buildRecurrentTree([group, child])
+    const map = recurrentNodeMap(tree)
+
+    expect(map.get('grp')?.children).toHaveLength(1)
+    expect(map.get('child')?.children).toHaveLength(0)
+    expect(map.get('missing')).toBeUndefined()
   })
 })
 

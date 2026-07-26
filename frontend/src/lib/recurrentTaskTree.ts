@@ -1,4 +1,5 @@
 import type { Task } from '../types'
+import type { TreeRow } from './taskTree'
 
 export interface RecurrentNode {
   task: Task
@@ -37,6 +38,40 @@ export function buildRecurrentTree(tasks: Task[]): RecurrentNode[] {
       children: sortRecurrentSiblings(childrenOf.get(item.id) ?? []).map(toNode),
     }
   }
+}
+
+// Flat id -> node lookup over a RecurrentNode forest, so a consumer can
+// check e.g. whether a given row has children (for an expand/collapse
+// caret) without re-walking the tree.
+export function recurrentNodeMap(nodes: RecurrentNode[]): Map<string, RecurrentNode> {
+  const map = new Map<string, RecurrentNode>()
+  function walk(list: RecurrentNode[]) {
+    for (const node of list) {
+      map.set(node.task.id, node)
+      walk(node.children)
+    }
+  }
+  walk(nodes)
+  return map
+}
+
+// Flattens a RecurrentNode forest into rows given the current expand/
+// collapse state, in the same {id, depth} shape lib/taskTree.ts's
+// flattenTree already produces -- lets consumers (TaskPicker/TaskFilter)
+// drive a "Recurrent tasks" section through the same row-rendering loop
+// they already use for the main tree's section.
+export function flattenRecurrentTree(nodes: RecurrentNode[], expanded: Set<string>): TreeRow[] {
+  const rows: TreeRow[] = []
+  function walk(list: RecurrentNode[], depth: number) {
+    for (const node of list) {
+      rows.push({ id: node.task.id, depth })
+      if (expanded.has(node.task.id)) {
+        walk(node.children, depth + 1)
+      }
+    }
+  }
+  walk(nodes, 0)
+  return rows
 }
 
 // A separate ordering sequence from the main tree's `order` (see the
