@@ -170,3 +170,25 @@ export function resolveDropAction(
   if (activeTask.parent_ids.length === 1 && activeTask.parent_ids[0] === overId) return null
   return { kind: 'reparent', parentId: overId }
 }
+
+// A live, continuously-updated preview of what `resolveDropAction` would
+// resolve to if dropped right now -- computed on every dragover, not just at
+// drop time, so the tree can render a hover indicator during the drag
+// itself (item 2).
+export interface DropPreview {
+  overId: string
+  action: DropAction
+}
+
+export function sameDropPreview(a: DropPreview | null, b: DropPreview | null): boolean {
+  if (a === b) return true
+  if (!a || !b) return false
+  if (a.overId !== b.overId || a.action.kind !== b.action.kind) return false
+  if (a.action.kind === 'reparent' && b.action.kind === 'reparent') {
+    return a.action.parentId === b.action.parentId
+  }
+  if (a.action.kind === 'reorder' && b.action.kind === 'reorder') {
+    return a.action.afterId === b.action.afterId && a.action.beforeId === b.action.beforeId
+  }
+  return false
+}

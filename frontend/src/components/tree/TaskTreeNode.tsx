@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import type { Task } from '../../types'
-import { isHiddenFromPlan, qualifiesForRemovalPrompt } from '../../lib/taskTree'
+import { isHiddenFromPlan, qualifiesForRemovalPrompt, type DropPreview } from '../../lib/taskTree'
 import type { ParentDecision } from '../../lib/useParentDismissal'
 import { useDeleteTask, useKeepAsBacklog } from '../../api/tasks'
 import { useUndo, type UndoEntry } from '../../undo/UndoProvider'
@@ -24,6 +24,7 @@ interface TaskTreeNodeProps {
   decisions: Record<string, ParentDecision>
   onDecide: (taskId: string, decision: ParentDecision) => void
   onUndecide: (taskId: string) => void
+  dropPreview: DropPreview | null
 }
 
 export default function TaskTreeNode({
@@ -39,11 +40,12 @@ export default function TaskTreeNode({
   decisions,
   onDecide,
   onUndecide,
+  dropPreview,
 }: TaskTreeNodeProps) {
   const { attributes, listeners, setNodeRef: setDraggableRef, isDragging } = useDraggable({
     id: taskId,
   })
-  const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id: taskId })
+  const { setNodeRef: setDroppableRef } = useDroppable({ id: taskId })
   const { pushUndo } = useUndo()
   const keepAsBacklog = useKeepAsBacklog()
   const deleteTask = useDeleteTask()
@@ -128,6 +130,19 @@ export default function TaskTreeNode({
     return child && !isHiddenFromPlan(child, decisions)
   })
 
+  // Only the middle third (reparent) still gets the full-row outline; the
+  // outer thirds (reorder) instead get a thin line at the shared boundary
+  // with whichever neighbor the drop would land next to -- "it'll land
+  // here, between these two rows," not "onto this row" (item 2).
+  const isPreviewTarget = dropPreview?.overId === taskId
+  const isReparentPreview = isPreviewTarget && dropPreview!.action.kind === 'reparent'
+  const reorderEdge =
+    isPreviewTarget && dropPreview!.action.kind === 'reorder'
+      ? dropPreview!.action.beforeId === taskId
+        ? 'top'
+        : 'bottom'
+      : null
+
   return (
     <div>
       <div
@@ -137,10 +152,10 @@ export default function TaskTreeNode({
         }}
         {...listeners}
         {...attributes}
-        className={`group flex cursor-pointer items-center gap-1.5 rounded px-1 py-1 text-sm ${
+        className={`group relative flex cursor-pointer items-center gap-1.5 rounded px-1 py-1 text-sm ${
           isSelected ? 'bg-accent-soft text-accent' : 'text-text-primary hover:bg-surface-hover'
         } ${isDragging ? 'opacity-40' : ''} ${
-          isOver ? 'outline outline-2 outline-accent' : ''
+          isReparentPreview ? 'outline outline-2 outline-accent' : ''
         }`}
         style={{ paddingLeft: depth * 16 + 4 }}
         onClick={() => onSelect(taskId)}
@@ -149,6 +164,12 @@ export default function TaskTreeNode({
           setContextMenu({ x: event.clientX, y: event.clientY })
         }}
       >
+        {reorderEdge && (
+          <div
+            data-testid="drop-reorder-line"
+            className={`absolute inset-x-0 h-0.5 bg-accent ${reorderEdge === 'top' ? 'top-0' : 'bottom-0'}`}
+          />
+        )}
         <button
           type="button"
           onClick={(event) => {
@@ -193,6 +214,7 @@ export default function TaskTreeNode({
               decisions={decisions}
               onDecide={onDecide}
               onUndecide={onUndecide}
+              dropPreview={dropPreview}
             />
           ))}
         </div>

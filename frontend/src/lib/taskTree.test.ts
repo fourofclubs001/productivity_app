@@ -7,6 +7,7 @@ import {
   qualifiesForRemovalPrompt,
   resolveDropAction,
   rootIds,
+  sameDropPreview,
   sinkCompletedRoots,
   sortByOrder,
   treeChildIds,
@@ -137,6 +138,40 @@ describe('resolveDropAction', () => {
       afterId: 'b',
       beforeId: null,
     })
+  })
+})
+
+describe('sameDropPreview', () => {
+  it('treats null and null as equal', () => {
+    expect(sameDropPreview(null, null)).toBe(true)
+  })
+
+  it('treats null and a real preview as different', () => {
+    expect(sameDropPreview(null, { overId: 'a', action: { kind: 'reparent', parentId: 'a' } })).toBe(false)
+  })
+
+  it('treats two reparent previews with the same parentId as equal', () => {
+    const a = { overId: 'x', action: { kind: 'reparent' as const, parentId: 'x' } }
+    const b = { overId: 'x', action: { kind: 'reparent' as const, parentId: 'x' } }
+    expect(sameDropPreview(a, b)).toBe(true)
+  })
+
+  it('treats two reorder previews with the same afterId/beforeId as equal', () => {
+    const a = { overId: 'x', action: { kind: 'reorder' as const, afterId: 'p', beforeId: 'x' } }
+    const b = { overId: 'x', action: { kind: 'reorder' as const, afterId: 'p', beforeId: 'x' } }
+    expect(sameDropPreview(a, b)).toBe(true)
+  })
+
+  it('treats a reorder and a reparent over the same row as different', () => {
+    const reorder = { overId: 'x', action: { kind: 'reorder' as const, afterId: null, beforeId: 'x' } }
+    const reparent = { overId: 'x', action: { kind: 'reparent' as const, parentId: 'x' } }
+    expect(sameDropPreview(reorder, reparent)).toBe(false)
+  })
+
+  it('treats previews over different rows as different, even with the same action shape', () => {
+    const a = { overId: 'x', action: { kind: 'reparent' as const, parentId: 'x' } }
+    const b = { overId: 'y', action: { kind: 'reparent' as const, parentId: 'y' } }
+    expect(sameDropPreview(a, b)).toBe(false)
   })
 })
 

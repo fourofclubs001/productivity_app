@@ -1,8 +1,14 @@
 import { useMemo, useState } from 'react'
-import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core'
+import { useDndMonitor, type DragEndEvent, type DragMoveEvent } from '@dnd-kit/core'
 import type { Task } from '../../types'
 import TaskTreeNode from './TaskTreeNode'
-import { isHiddenFromPlan, rootIds as computeRootIds, resolveDropAction } from '../../lib/taskTree'
+import {
+  isHiddenFromPlan,
+  rootIds as computeRootIds,
+  resolveDropAction,
+  sameDropPreview,
+  type DropPreview,
+} from '../../lib/taskTree'
 import { useAddParent, useRemoveParent, useReorderTask } from '../../api/tasks'
 import { useUndo, type UndoEntry } from '../../undo/UndoProvider'
 import { useParentDismissal } from '../../lib/useParentDismissal'
@@ -19,6 +25,7 @@ export default function TaskTree({
   onOpenNewTask: (parentId: string | null) => void
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [dropPreview, setDropPreview] = useState<DropPreview | null>(null)
   const { decisions, decide, undecide } = useParentDismissal()
 
   const tasksById = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks])
@@ -45,7 +52,42 @@ export default function TaskTree({
     })
   }
 
-  useDndMonitor({ onDragEnd: handleDragEnd })
+  // Mirrors handleDragEnd's relativeY/resolveDropAction computation, but as a
+  // non-mutating live preview. Deliberately onDragMove, not onDragOver --
+  // onDragOver only fires when the *hovered target itself* changes, so it
+  // never sees the pointer move from one third of the same row to another
+  // (e.g. middle -> top edge without leaving the row), which is exactly the
+  // transition between reparent and reorder previews this needs to track.
+  // onDragMove fires on every pointer move regardless. Guarded with
+  // sameDropPreview so a no-op re-render doesn't fire on every tick.
+  function handleDragOver(event: DragMoveEvent) {
+    const { active, over } = event
+    if (!over) {
+      setDropPreview((prev) => (prev === null ? prev : null))
+      return
+    }
+    const activeId = String(active.id)
+    const overId = String(over.id)
+    if (!tasksById.has(activeId) || !tasksById.has(overId)) {
+      setDropPreview((prev) => (prev === null ? prev : null))
+      return
+    }
+    const activeRect = active.rect.current.translated
+    if (!activeRect) return
+    const relativeY = (activeRect.top + activeRect.height / 2 - over.rect.top) / over.rect.height
+    const action = resolveDropAction(activeId, overId, relativeY, tasks)
+    const next = action ? { overId, action } : null
+    setDropPreview((prev) => (sameDropPreview(prev, next) ? prev : next))
+  }
+
+  useDndMonitor({
+    onDragMove: handleDragOver,
+    onDragEnd: (event) => {
+      setDropPreview(null)
+      handleDragEnd(event)
+    },
+    onDragCancel: () => setDropPreview(null),
+  })
 
   // No server-generated id is involved in either transition (order is a
   // plain float, parent edges are set membership), so a simple symmetric
@@ -158,6 +200,7 @@ export default function TaskTree({
             decisions={decisions}
             onDecide={decide}
             onUndecide={undecide}
+            dropPreview={dropPreview}
           />
         ))}
       </div>
