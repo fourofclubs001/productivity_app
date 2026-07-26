@@ -3,6 +3,7 @@ import PlanView from './views/PlanView'
 import ExecuteView from './views/ExecuteView'
 import EvaluateView from './views/EvaluateView'
 import GoogleConnectButton from './components/nav/GoogleConnectButton'
+import ConfigButton from './components/nav/ConfigButton'
 import { UndoProvider } from './undo/UndoProvider'
 import type { ViewKey } from './lib/views'
 
@@ -20,7 +21,8 @@ function App() {
     <UndoProvider activeView={activeView}>
       <div className="flex h-full min-h-screen flex-col bg-surface">
         <nav className="flex items-center justify-between gap-1 border-b border-border bg-surface px-4">
-          <div className="flex gap-1">
+          <div className="flex items-center gap-1">
+            <ConfigButton />
             {(Object.keys(VIEWS) as ViewKey[]).map((key) => (
               <button
                 key={key}
