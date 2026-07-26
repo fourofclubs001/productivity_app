@@ -4,32 +4,29 @@ Working notes for picking this project back up in a future session. Not user-fac
 docs (see `README.md` for that) — this is "what's true right now and how we work
 here."
 
-## Where things stand (as of M49, post-v05)
+## Where things stand (as of M54, post-v06)
 
 The app is fully built and working: Plan / Execute / Evaluate views, FastAPI +
 Redis backend, React + Tailwind frontend, Google Workspace/Calendar-styled light
 theme. v00 (8 items), v01 (30 items, M1–M12), v02 (19 items, M13–M23), v03
 (11 items, M24–M34, plus one post-v03 ad hoc fix), v04 (4 items, M35–M39:
 Google Calendar sync + routine/recurring tasks, plus one post-v04 ad hoc fix,
-M40: pulling Google events back into Plan/Execute), and v05 (11 items,
-M41–M49: timer stop UX, two real bug fixes, the "routine"→"recurrent task"
-rename, recurrent-task groups + drag-and-drop, and drag-to-create on the Plan
-calendar) are all fully implemented, committed, and pushed.
+M40: pulling Google events back into Plan/Execute), v05 (11 items, M41–M49:
+timer stop UX, two real bug fixes, the "routine"→"recurrent task" rename,
+recurrent-task groups + drag-and-drop, and drag-to-create on the Plan
+calendar), and v06 (5 items, M50–M54: Execute/Evaluate dropdown grouping,
+a live drag reorder-line indicator on the Plan tree, a Configuration dialog,
+idle-detection auto-stop for time tracking, and a dynamic favicon reflecting
+timer state) are all fully implemented, committed, and pushed.
 
-**Deployed to prod as of 2026-07-23** — M45's rename + its Redis data
-migration ran against prod partway through the v05 session (dry-run first,
-then for real, preserving all 9 real recurrent tasks), and prod was rebuilt
-again (`docker compose up --build`) at the end of the session to bring
-M46–M49 (groups, drag-and-drop, drag-to-create) live too. No further
-migration was needed for M46–M49 — they only added new fields/endpoints,
-nothing pre-existing needed renaming. Verified post-deploy: `/health` ok,
-frontend 200, the new `/recurrent-tasks/groups` endpoint live, and all 9 of
-the user's real recurrent tasks still intact.
+**v06 is frontend-only and not yet deployed to prod** — unlike v05, no
+backend changes and no data migration are involved, so shipping it is just
+`docker compose up --build` against prod whenever that's next done; not run
+yet as of this writing. Prod is still at v05 (2026-07-23), M41–M49.
 
-No `prompts/app_improvements_vNN.md` is currently pending for a *new* pass —
-`prompts/app_improvements_v06.md` was dropped in during the v05 session but
-not yet read/interpreted; that's the next thing to pick up, per the workflow
-below.
+No `prompts/app_improvements_vNN.md` is currently pending for a *new*
+pass — the next one arrives whenever the user drops one in, per the
+workflow below.
 
 ### v02 milestones (M13–M23, one commit each, all pushed)
 
@@ -508,6 +505,91 @@ Full design rationale is in `prompts/interpreted_app_improvements_v05.md`.
   reusing `TaskPicker` + `useCreateInterval` directly). **This completes
   the v05 pass.**
 
+### v06 milestones (M50–M54, one commit each, all pushed)
+
+Full design rationale is in `prompts/interpreted_app_improvements_v06.md`.
+Entirely frontend-only — no backend/pytest changes anywhere in this pass.
+
+- **M50** (`7b82744`) — item 3: a Configuration button + dialog. New
+  `ConfigButton.tsx`/`ConfigDialog.tsx` (`components/nav/`), matching
+  `GoogleConnectButton.tsx`'s self-contained convention (owns its own open
+  state, no props). Wired into `App.tsx`'s nav as the first child *inside*
+  the existing left tab-group `<div>`, not as a third top-level sibling of
+  `<nav>` — that div uses `justify-between` with exactly two groups, so a
+  third sibling would drift the tabs toward center instead of staying
+  flush-left. Empty placeholder body (M51 fills it in).
+- **M51** (`8ae3a55`) — item 4: idle-detection auto-stop for time tracking,
+  off by default. New always-mounted `GlobalTimerWatcher.tsx` (rendered
+  once in `App.tsx`, **not** inside `TimerControl`/`ExecuteView`) owns the
+  idle-timeout listener/timer, since the backend's active timer (single
+  global Redis key) keeps running regardless of which view is on screen,
+  and `TimerControl` unmounts — along with anything it owned — the instant
+  the user leaves Execute. While enabled and a timer is active, `window`
+  keydown/mousedown/mousemove/wheel listeners reset a `setTimeout`; on
+  fire it stops the timer without marking done (today's existing
+  "No, stop the timer" path), plays a generated Web Audio tone
+  (`lib/playAlertTone.ts`, no audio asset file), and shows an `AlertDialog`
+  acknowledgement the user must dismiss. Settings (`{enabled,
+  timeoutMinutes}`) live in a small external store
+  (`lib/idleDetectionSettings.ts` + `useSyncExternalStore`-based
+  `useIdleDetectionSettings.ts`), not a plain per-component `useState`
+  localStorage hook like `useResizableWidth.ts` — the Configuration dialog
+  (writer) and `GlobalTimerWatcher` (reader) are separate component
+  instances that both need the *same* live value in the same tab, which a
+  plain hook can't give without a page reload.
+- **M52** (`426081d`) — item 5: dynamic favicon reflecting timer state.
+  New `lib/favicon.ts`, split for testability since jsdom has no real
+  `<canvas>` 2D context: pure `formatFaviconLabel`/`faviconState`, a
+  fake-context-testable `drawFavicon`, and an untested imperative
+  `applyFavicon` shell (canvas → data URL → swap `<link rel="icon">`,
+  also switching `type` to `image/png` since a PNG data URL under the
+  static `index.html`'s `type="image/svg+xml"` risks being ignored).
+  Green with live elapsed mm:ss digits while tracking; red the instant
+  M51's idle-detection auto-stops the timer, reverting to neutral only
+  once that acknowledgement dialog is dismissed — a normal manual stop
+  goes straight to neutral, never through red. Also fixed, while writing
+  this milestone's Playwright spec: the fixture task name "Idle stop …"
+  collided with the Stop button's accessible name once the entry's
+  calendar chip rendered, breaking every later `timer.spec.ts` test in the
+  same run — renamed to "Idle timeout …" (same fixture-naming gotcha
+  documented repeatedly below).
+- **M53** (`5261d8e`) — item 1: group the Execute/Evaluate dropdowns by
+  "Tasks" vs. "Recurrent tasks". `TaskPicker.tsx` (Execute) and
+  `TaskFilter.tsx` (Evaluate Metrics) both already excluded recurrent
+  tasks/groups from their *visible* main-tree computation, but never gave
+  them a section of their own — they leaked in as bare, ungrouped extra
+  "roots" (recurrent items always have `parent_ids: []`, so they
+  trivially qualified as main-tree roots too). Now two independently-
+  collapsible sections per dropdown: "Tasks" (unchanged) and "Recurrent
+  tasks" (via a new `flattenRecurrentTree`/`recurrentNodeMap` pair added
+  to `lib/recurrentTaskTree.ts`, reusing the same `{id, depth}` row shape
+  `lib/taskTree.ts`'s `flattenTree` already produces). Recurrent groups
+  are forced non-selectable/non-checkable in both — a real correctness
+  fix, not just cosmetic parity: a recurrent group computes `is_leaf: true`
+  (it has no main-tree `children_ids`, only a `recurrent_parent_id` edge),
+  so the existing `isSelectable`/is_leaf-based conventions that correctly
+  exclude a main-tree "goal" can't be trusted to exclude a recurrent group
+  the same way.
+- **M54** (`d7e06a8`) — item 2: a live drag reorder-line indicator on the
+  Plan tree. Dragging a task row over another row's outer third (a
+  reorder) previously got the exact same full-row `outline-accent` as the
+  middle third (a reparent) — both looked like "drop onto this row." New
+  `DropPreview` type + `sameDropPreview` in `lib/taskTree.ts`, computed
+  live in `TaskTree.tsx` and threaded down through `TaskTreeNode.tsx`'s
+  recursion (at *every* level, same as `expanded`/`selectedId` already
+  are): the middle third keeps the unchanged outline; the outer thirds
+  instead render a thin absolutely-positioned line at the boundary shared
+  with whichever neighbor the drop would land next to. **Real gotcha
+  caught by the new Playwright spec, not just a design guess**: the live
+  preview was first wired to dnd-kit's `onDragOver`, which only fires when
+  the *hovered target itself* changes — so it never saw the pointer move
+  from a row's middle third to its own top edge without leaving the row,
+  leaving the preview stuck on whatever it resolved to on entry. Fixed by
+  switching to `onDragMove`, which fires on every pointer move regardless.
+  Scoped to the main Plan tree only — the separate Recurrent-tasks drag
+  (`RecurrentTasksList.tsx`, M48) is untouched. **This completes the v06
+  pass.**
+
 ## The workflow established for this project
 
 This has repeated three times now (initial build, v00, v01) and is worth reusing:
@@ -600,6 +682,27 @@ This has repeated three times now (initial build, v00, v01) and is worth reusing
   file's "no recurrent tasks yet" empty-state assertion when the full suite
   ran together (fixed by dropping that assertion from the e2e spec — it's
   already covered by a unit test — rather than fighting cross-file order).
+  **Recurred again during the v06 pass** (M52): a fixture task named
+  "Idle stop …" collided with the timer's own "Stop" button — same fix
+  again (renamed to "Idle timeout …").
+  **A materially different, more severe issue found during the v06 pass**
+  (not this crowding gotcha — flagged separately so it isn't conflated with
+  it): `schedule.spec.ts`, `calendar-move-resize.spec.ts`,
+  `drag-to-create.spec.ts`, and the two calendar-drag cases in `undo.spec.ts`
+  (drag-created-interval undo/redo, and the per-view-scoped-undo test) fail
+  **even completely alone**, immediately after a fresh Redis flush — not
+  just when crowded by a full-suite run. Confirmed by checking out the
+  pre-v06 baseline commit (`dbc44eb`) and re-running `schedule.spec.ts` in
+  isolation there too: identical failures, so this is an environment-level
+  regression (this session's Windows/Docker/Playwright/Chromium
+  combination, most likely) unrelated to any v06 code change, not a defect
+  introduced by M50–M54. The main Plan **tree's** own drag (`tree-drag.spec.ts`,
+  `tree-drop-preview.spec.ts`, both used to verify M54) is unaffected and
+  passes reliably — the break is specific to react-big-calendar's
+  drag-to-schedule/reschedule interactions, not dnd-kit row-dragging in
+  general. Not investigated further or fixed (out of scope for the v06
+  improvements list) — worth a real root-cause pass if it's still
+  reproducing next session.
 
 ## Environment notes
 
@@ -701,9 +804,17 @@ docker compose -f docker-compose.dev.yml up --build     # dev: isolated data, po
 
 ## Next possible steps
 
-- **`prompts/app_improvements_v06.md` was dropped in during the v05 session
-  but not yet read or interpreted** — that's the next thing to do, following
-  the workflow above (interpret, clarify, commit, plan, implement).
+- **Ship v06 to prod** — implemented, committed, pushed, but not yet
+  deployed (`docker compose up --build` against the prod stack hasn't been
+  run for it). Frontend-only, no migration needed, unlike v05.
+- **Root-cause the calendar-drag Playwright environment issue** flagged
+  above (`schedule.spec.ts` etc. failing even in total isolation, confirmed
+  unrelated to v06 code) — the next session should check whether it's
+  still reproducing before spending time on it; if so, start by diffing
+  this environment's Playwright/Chromium versions against whatever last
+  had these specs passing.
+- No `prompts/app_improvements_vNN.md` pending — next one arrives whenever
+  the user drops one in.
 - Consider actually fixing the M18 dnd-kit scrolled-container drag bug (currently
   only worked around in tests) if it turns out to bite a real user.
 - Revisit the UTC-vs-local-timezone limitation if week/day boundaries ever look
@@ -711,10 +822,15 @@ docker compose -f docker-compose.dev.yml up --build     # dev: isolated data, po
 - Revisit the tree auto-expand-on-add-child gap if it becomes annoying.
 - Consider a per-spec (not per-run) Redis flush for the Playwright suite if the
   crowding-related flakiness noted above gets worse as more specs are added
-  (it has: recurred in the v03, v04, *and now v05* passes across several
+  (it has: recurred in the v03, v04, v05, *and now v06* passes across several
   specs, always resolved by an isolated re-run).
 - Editing an existing recurrent task's recurrence rule (v04/v05 limitation
   above) if it turns out to be annoying in practice.
 - Recurrent-task groups (v05 M47) currently have no way to set up nesting at
   *creation* time (only via drag-and-drop, M48, after the fact) — revisit if
   that turns out to be an annoying two-step dance in practice.
+- The main Plan tree currently has no way to configure idle-detection's
+  default timeout beyond the Configuration dialog's plain number input
+  (v06 M51) — revisit if a fixed default (rather than the current
+  off-by-default) turns out to be what the user actually wants after using
+  it a while.
