@@ -19,10 +19,13 @@ a live drag reorder-line indicator on the Plan tree, a Configuration dialog,
 idle-detection auto-stop for time tracking, and a dynamic favicon reflecting
 timer state) are all fully implemented, committed, and pushed.
 
-**v06 is frontend-only and not yet deployed to prod** — unlike v05, no
-backend changes and no data migration are involved, so shipping it is just
-`docker compose up --build` against prod whenever that's next done; not run
-yet as of this writing. Prod is still at v05 (2026-07-23), M41–M49.
+**Deployed to prod as of 2026-07-26** — `docker compose up --build -d` run
+against the prod stack (ports 8000/5173/6379). Frontend-only change, no
+migration needed (unlike v05) — only the `frontend` container was rebuilt/
+recreated, `backend` stayed running throughout. Verified post-deploy:
+`/health` ok, frontend 200, and the served bundle's asset hash
+(`index-yAtv-TKV.js`) matches the final dev build, confirming M50–M54 are
+live.
 
 No `prompts/app_improvements_vNN.md` is currently pending for a *new*
 pass — the next one arrives whenever the user drops one in, per the
@@ -804,9 +807,6 @@ docker compose -f docker-compose.dev.yml up --build     # dev: isolated data, po
 
 ## Next possible steps
 
-- **Ship v06 to prod** — implemented, committed, pushed, but not yet
-  deployed (`docker compose up --build` against the prod stack hasn't been
-  run for it). Frontend-only, no migration needed, unlike v05.
 - **Root-cause the calendar-drag Playwright environment issue** flagged
   above (`schedule.spec.ts` etc. failing even in total isolation, confirmed
   unrelated to v06 code) — the next session should check whether it's
