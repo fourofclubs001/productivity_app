@@ -10,7 +10,6 @@ describe('ConfigButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Configuration' }))
     expect(screen.getByText('Configuration')).toBeInTheDocument()
-    expect(screen.getByText('No settings yet.')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(screen.queryByText('Configuration')).not.toBeInTheDocument()

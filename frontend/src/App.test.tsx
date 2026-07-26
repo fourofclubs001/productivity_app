@@ -27,6 +27,11 @@ vi.mock('./api/googleEvents', () => ({
   useGoogleEventsForWeek: () => ({ data: [] }),
 }))
 
+vi.mock('./api/timer', () => ({
+  useActiveTimer: () => ({ data: null }),
+  useStopTimer: () => ({ mutate: vi.fn(), isPending: false }),
+}))
+
 describe('App', () => {
   it('renders the three view tabs and defaults to Plan', () => {
     render(<App />)

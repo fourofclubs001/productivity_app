@@ -4,6 +4,7 @@ import ExecuteView from './views/ExecuteView'
 import EvaluateView from './views/EvaluateView'
 import GoogleConnectButton from './components/nav/GoogleConnectButton'
 import ConfigButton from './components/nav/ConfigButton'
+import GlobalTimerWatcher from './components/timer/GlobalTimerWatcher'
 import { UndoProvider } from './undo/UndoProvider'
 import type { ViewKey } from './lib/views'
 
@@ -43,6 +44,7 @@ function App() {
         <main className="flex-1">
           <ActiveComponent />
         </main>
+        <GlobalTimerWatcher />
       </div>
     </UndoProvider>
   )
