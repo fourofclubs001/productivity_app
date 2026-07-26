@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useActiveTimer, useStopTimer } from '../../api/timer'
 import { useIdleDetectionSettings } from '../../lib/useIdleDetectionSettings'
 import { playAlertTone } from '../../lib/playAlertTone'
+import { applyFavicon, faviconState } from '../../lib/favicon'
 import AlertDialog from '../common/AlertDialog'
 
 const IDLE_EVENTS = ['keydown', 'mousedown', 'mousemove', 'wheel'] as const
@@ -61,6 +62,27 @@ export default function GlobalTimerWatcher() {
       IDLE_EVENTS.forEach((event) => window.removeEventListener(event, resetIdleTimer))
     }
   }, [active?.id, enabled, timeoutMinutes])
+
+  // Elapsed-time tick for the favicon's live digits, mirroring
+  // TimerControl.tsx's own identical per-second effect -- kept separate
+  // (rather than shared) since TimerControl unmounts outside Execute while
+  // this component must keep ticking regardless of which view is active.
+  const [elapsedMs, setElapsedMs] = useState(0)
+  useEffect(() => {
+    if (!active) {
+      setElapsedMs(0)
+      return undefined
+    }
+    const start = new Date(active.start).getTime()
+    const update = () => setElapsedMs(Date.now() - start)
+    update()
+    const interval = setInterval(update, 1000)
+    return () => clearInterval(interval)
+  }, [active])
+
+  useEffect(() => {
+    applyFavicon(faviconState(!!active, !!idleStopped), elapsedMs)
+  }, [active, idleStopped, elapsedMs])
 
   if (!idleStopped) return null
 
