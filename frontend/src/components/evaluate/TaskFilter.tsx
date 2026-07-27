@@ -81,11 +81,6 @@ export default function TaskFilter({
   function renderRow(id: string, depth: number, hasChildren: boolean, isExpanded: boolean, onToggle: () => void) {
     const task = tasksById.get(id)
     if (!task) return null
-    // A recurrent group is purely organizational -- no time is ever tracked
-    // against it directly (unlike a main-tree "goal", the backend has no
-    // rollup expanding a group selection into its recurrent children), so
-    // it gets no checkbox, only an expand/collapse caret.
-    const checkable = !task.is_recurrent_group
     return (
       <div
         key={id}
@@ -101,18 +96,15 @@ export default function TaskFilter({
         >
           {hasChildren ? (isExpanded ? '▾' : '▸') : ''}
         </button>
-        {checkable ? (
-          <label className="flex flex-1 cursor-pointer items-center gap-1.5 text-text-primary">
-            <input type="checkbox" checked={selectedIds.includes(id)} onChange={() => toggle(id)} />
-            <span className="truncate">{task.name}</span>
-            {!task.is_leaf && <span className="shrink-0 text-text-secondary">(goal)</span>}
-          </label>
-        ) : (
-          <span className="flex-1 truncate text-text-secondary">
-            {task.name}
-            <span className="ml-1.5 shrink-0">(group)</span>
-          </span>
-        )}
+        <label className="flex flex-1 cursor-pointer items-center gap-1.5 text-text-primary">
+          <input type="checkbox" checked={selectedIds.includes(id)} onChange={() => toggle(id)} />
+          <span className="truncate">{task.name}</span>
+          {task.is_recurrent_group ? (
+            <span className="shrink-0 text-text-secondary">(group)</span>
+          ) : (
+            !task.is_leaf && <span className="shrink-0 text-text-secondary">(goal)</span>
+          )}
+        </label>
       </div>
     )
   }

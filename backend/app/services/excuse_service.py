@@ -17,7 +17,7 @@ from app.services.errors import (
     FutureGapExcuseError,
     TaskNotFoundError,
 )
-from app.services.period_utils import Granularity, period_bounds
+from app.services.period_utils import Granularity, expand_task_selection, period_bounds
 
 
 class ExcuseService:
@@ -118,8 +118,17 @@ class ExcuseService:
         attachments = await self._excuses.list_attachments_for_range(
             range_start_dt.timestamp(), range_end_dt.timestamp()
         )
+
+        graph = await self._tasks.load_graph()
+
         if task_ids:
-            selected = set(task_ids)
+            # A selected goal or recurrent group rolls up to its descendant
+            # leaves/recurrent tasks, same as the Metrics filter (see
+            # EvaluateService.evaluate_period) -- an excuse attachment's
+            # task_id is always an actual trackable leaf, never a goal's or
+            # group's own id, so without this expansion selecting either
+            # would silently match nothing.
+            selected = expand_task_selection(task_ids, graph)
             attachments = [a for a in attachments if a["task_id"] in selected]
 
         totals: dict[str, int] = defaultdict(int)
@@ -133,8 +142,6 @@ class ExcuseService:
             if excuse_id not in excuse_texts:
                 excuse = await self._excuses.get_excuse(excuse_id)
                 excuse_texts[excuse_id] = excuse["text"] if excuse else excuse_id
-
-        graph = await self._tasks.load_graph()
 
         total_rows = [
             ExcuseFrequencyRow(

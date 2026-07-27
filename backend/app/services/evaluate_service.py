@@ -6,8 +6,15 @@ from pydantic import BaseModel
 from app.models.task import TaskState
 from app.repositories.entry_repository import EntryRepository
 from app.repositories.interval_repository import IntervalRepository, monday_of
-from app.repositories.task_repository import TaskNode, TaskRepository
-from app.services.period_utils import Granularity, period_bounds
+from app.repositories.task_repository import TaskRepository
+from app.services.period_utils import (
+    Granularity,
+    expand_task_selection,
+    main_tree_descendant_leaves,
+    period_bounds,
+    recurrent_ancestors,
+    recurrent_descendant_tasks,
+)
 
 __all__ = ["EvaluatePeriodResult", "EvaluateService", "Granularity"]
 
@@ -46,21 +53,6 @@ def _hours(seconds: float) -> float:
 
 def _percentage(executed: float, planned: float) -> float | None:
     return round(executed / planned * 100, 1) if planned > 0 else None
-
-
-def _descendant_leaves(task_id: str, graph: dict[str, TaskNode]) -> set[str]:
-    result: set[str] = set()
-    stack = list(graph[task_id].children)
-    while stack:
-        current = stack.pop()
-        if current in result:
-            continue
-        node = graph[current]
-        if not node.children:
-            result.add(current)
-        else:
-            stack.extend(node.children)
-    return result
 
 
 class EvaluateService:
@@ -102,12 +94,7 @@ class EvaluateService:
         graph = await self._tasks.load_graph()
 
         if task_ids:
-            selected: set[str] = set()
-            for task_id in task_ids:
-                selected.add(task_id)
-                if task_id in graph:
-                    selected |= _descendant_leaves(task_id, graph)
-            relevant_leaf_ids &= selected
+            relevant_leaf_ids &= expand_task_selection(task_ids, graph)
 
         finished_leaf_ids = {
             leaf_id
@@ -147,9 +134,20 @@ class EvaluateService:
                     continue
                 ancestor_ids.add(current)
                 stack.extend(graph[current].parents)
+            # Recurrent tasks have no main-tree parents (they're
+            # organizationally separate), so a recurrent group would never
+            # get its own aggregated row via the main-tree climb above --
+            # climb the separate recurrent_parent_id hierarchy too.
+            ancestor_ids.update(recurrent_ancestors(leaf_id, graph))
 
         for node_id in ancestor_ids:
-            descendants = _descendant_leaves(node_id, graph) & relevant_leaf_ids
+            # A plain main-tree goal has no recurrent descendants and a
+            # recurrent group has no main-tree descendants, so combining
+            # both is safe regardless of which kind `node_id` is.
+            node_descendants = main_tree_descendant_leaves(
+                node_id, graph
+            ) | recurrent_descendant_tasks(node_id, graph)
+            descendants = node_descendants & relevant_leaf_ids
             planned = sum(planned_seconds.get(lid, 0.0) for lid in descendants)
             executed = sum(executed_seconds.get(lid, 0.0) for lid in descendants)
             finished = sum(1 for lid in descendants if lid in finished_leaf_ids)

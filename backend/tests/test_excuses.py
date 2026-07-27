@@ -225,6 +225,54 @@ def test_frequency_respects_task_ids_filter(client):
     assert [row["excuse_text"] for row in body["totals"]] == ["Got distracted"]
 
 
+# Nesting a recurrent task under a group has no creation-time API -- seed
+# `recurrent_parent_id`/`is_recurrent_group`/`is_recurrent_task` directly via
+# Redis, mirroring test_recurrent_tasks.py's own established convention for
+# simulating an already-nested structure.
+async def set_recurrent_group(redis_client, task_id: str) -> None:
+    await redis_client.hset(f"task:{task_id}", "is_recurrent_group", "1")
+
+
+async def set_recurrent_task(redis_client, task_id: str, parent_id: str) -> None:
+    mapping = {"is_recurrent_task": "1", "recurrent_parent_id": parent_id}
+    await redis_client.hset(f"task:{task_id}", mapping=mapping)
+
+
+async def test_frequency_filter_on_a_recurrent_group_rolls_up_its_recurrent_tasks(
+    client, redis_client
+):
+    group = create_leaf(client, "Recurring Chores")
+    await set_recurrent_group(redis_client, group["id"])
+
+    task_a = create_leaf(client, "Water plants")
+    await set_recurrent_task(redis_client, task_a["id"], group["id"])
+    task_b = create_leaf(client, "Feed cat")
+    await set_recurrent_task(redis_client, task_b["id"], group["id"])
+    other = create_leaf(client, "Unrelated")
+
+    attach(
+        client, task_a["id"], START, START + timedelta(hours=1), new_excuse_text="Got distracted"
+    )
+    attach(
+        client,
+        task_b["id"],
+        START + timedelta(hours=2),
+        START + timedelta(hours=3),
+        new_excuse_text="Forgot",
+    )
+    attach(
+        client,
+        other["id"],
+        START + timedelta(hours=4),
+        START + timedelta(hours=5),
+        new_excuse_text="Unrelated reason",
+    )
+
+    body = frequency(client, task_ids=[group["id"]])
+    excuse_texts = {row["excuse_text"] for row in body["totals"]}
+    assert excuse_texts == {"Got distracted", "Forgot"}
+
+
 def test_attach_rejects_a_future_gap(client):
     task = create_leaf(client, "Write report")
     future_start = _monday_weeks_from_now(weeks=4) + timedelta(hours=9)

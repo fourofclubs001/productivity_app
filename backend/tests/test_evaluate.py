@@ -231,3 +231,43 @@ def test_task_filter_on_a_goal_rolls_up_its_descendants(client):
     assert task_ids_in_result == {parent["id"], child_a["id"], child_b["id"]}
     assert other["id"] not in task_ids_in_result
     assert body["period"]["planned_hours"] == 3
+
+
+# Nesting a recurrent task under a group has no creation-time API -- seed
+# `recurrent_parent_id`/`is_recurrent_group`/`is_recurrent_task` directly via
+# Redis, mirroring test_recurrent_tasks.py's own established convention for
+# simulating an already-nested structure.
+async def set_recurrent_group(redis_client, task_id: str) -> None:
+    await redis_client.hset(f"task:{task_id}", "is_recurrent_group", "1")
+
+
+async def set_recurrent_task(redis_client, task_id: str, parent_id: str) -> None:
+    mapping = {"is_recurrent_task": "1", "recurrent_parent_id": parent_id}
+    await redis_client.hset(f"task:{task_id}", mapping=mapping)
+
+
+async def test_task_filter_on_a_recurrent_group_rolls_up_its_recurrent_tasks(client, redis_client):
+    group = create_leaf(client, "Recurring Chores")
+    await set_recurrent_group(redis_client, group["id"])
+
+    task_a = create_leaf(client, "Water plants")
+    await set_recurrent_task(redis_client, task_a["id"], group["id"])
+    task_b = create_leaf(client, "Feed cat")
+    await set_recurrent_task(redis_client, task_b["id"], group["id"])
+    other = create_leaf(client, "Unrelated")
+
+    start = START
+    create_interval(client, task_a["id"], start, start + timedelta(hours=1))
+    create_interval(client, task_b["id"], start, start + timedelta(hours=2))
+    create_interval(client, other["id"], start, start + timedelta(hours=5))
+
+    body = evaluate(client, task_ids=[group["id"]])
+
+    task_ids_in_result = {stats["task_id"] for stats in body["by_task"]}
+    assert task_ids_in_result == {group["id"], task_a["id"], task_b["id"]}
+    assert other["id"] not in task_ids_in_result
+    assert body["period"]["planned_hours"] == 3
+
+    group_stats = next(stats for stats in body["by_task"] if stats["task_id"] == group["id"])
+    assert group_stats["is_leaf"] is False
+    assert group_stats["planned_hours"] == 3

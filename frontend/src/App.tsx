@@ -23,7 +23,6 @@ function App() {
       <div className="flex h-full min-h-screen flex-col bg-surface">
         <nav className="flex items-center justify-between gap-1 border-b border-border bg-surface px-4">
           <div className="flex items-center gap-1">
-            <ConfigButton />
             {(Object.keys(VIEWS) as ViewKey[]).map((key) => (
               <button
                 key={key}
@@ -39,7 +38,10 @@ function App() {
               </button>
             ))}
           </div>
-          <GoogleConnectButton />
+          <div className="flex items-center gap-2">
+            <GoogleConnectButton />
+            <ConfigButton />
+          </div>
         </nav>
         <main className="flex-1">
           <ActiveComponent />

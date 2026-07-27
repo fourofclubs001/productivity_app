@@ -58,11 +58,14 @@ describe('TaskFilter', () => {
     expect(screen.getByText('Recurrent tasks')).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: /Plain task/i })).toBeInTheDocument()
 
-    // The recurrent group has no checkbox -- selecting it would send an id
-    // the backend can't roll time up against. Its child starts collapsed.
-    expect(screen.getByText('Weekly stuff')).toBeInTheDocument()
-    expect(screen.queryByRole('checkbox', { name: /Weekly stuff/i })).not.toBeInTheDocument()
+    // A recurrent group is selectable too, same as a main-tree "goal" --
+    // the backend rolls its selection up to its recurrent tasks. Its child
+    // starts collapsed.
+    expect(screen.getByRole('checkbox', { name: /Weekly stuff/i })).toBeInTheDocument()
     expect(screen.queryByText('Recurrent leaf')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /Weekly stuff/i }))
+    expect(onChange).toHaveBeenCalledWith(['grp'])
 
     const groupToggle = screen.getAllByRole('button').find((btn) => btn.textContent === '▸')
     fireEvent.click(groupToggle!)
