@@ -1,0 +1,1 @@
+- at prod I see a the leave task "depositar plata alquiler" from Tramites group that is marked as done. This task should not appear in the panel given that is already done. check why is this bug present and fix it.
