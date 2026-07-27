@@ -593,6 +593,48 @@ Entirely frontend-only — no backend/pytest changes anywhere in this pass.
   (`RecurrentTasksList.tsx`, M48) is untouched. **This completes the v06
   pass.**
 
+### Post-v06 ad hoc addition: recurrent groups selectable in Evaluate filters (M55)
+
+- **M55** (`cc8f122`) — a recurrent group was non-selectable in Evaluate's
+  Metrics and Excuses task filters (M53 above forced this, since a group
+  computes `is_leaf: true` and has no main-tree rollup). This left a group
+  with real tracked recurrent tasks under it unfilterable, just a mute
+  label. Generalized the old goal-only rollup helper in
+  `backend/app/services/period_utils.py` into `expand_task_selection`/
+  `recurrent_ancestors`/`recurrent_descendant_tasks`/
+  `main_tree_descendant_leaves`, covering the main tree's `children_ids`
+  hierarchy and the separate `recurrent_parent_id` hierarchy independently
+  (a plain task has no recurrent descendants, a recurrent group has no
+  main-tree descendants, so combining both is always safe). `evaluate_
+  service.py` and `excuse_service.py` both reuse it — selecting a recurrent
+  group now rolls up its hours/excuse counts the same way selecting a goal
+  already rolled up its leaves, and a leaf's recurrent-group ancestors get
+  their own aggregated row via `recurrent_ancestors`. `TaskFilter.tsx`
+  (Evaluate) gives a recurrent group a checkbox again. **Execute's
+  `TaskPicker` deliberately stays unchanged** — it's leaf-only/group-
+  excluded by design (M53), since tracking time against a specific task has
+  no rollup concept, unlike a period-scoped filter. 6 new pytest cases
+  (192 total across a new `test_period_utils.py` plus `test_evaluate.py`/
+  `test_excuses.py` additions), frontend `TaskFilter.test.tsx` extended to
+  assert the group checkbox fires `onChange` with the group's own id.
+  Also bundled in: `ConfigButton` moved next to `GoogleConnectButton` in
+  the nav bar (incidental, same session, no functional change).
+  This work was implemented but left uncommitted at the end of the v06
+  session — picked back up and committed here once noticed.
+
+### Post-v06 ad hoc fix: recurrent groups excluded from the main Tasks tree (M56)
+
+- **M56** (`987ccf4`) — a recurrent group leaked into the Plan view's main
+  "Tasks" tab as a root, alongside real top-level tasks. Root cause: like a
+  recurrent task, a recurrent group has `parent_ids: []` (both hierarchies
+  are organizationally separate from the main tree), so it trivially
+  qualified as a main-tree root too — the same category of bug M53 already
+  fixed for the Execute/Evaluate dropdowns, just never applied to
+  `TaskTree.tsx`'s own root filter. Fixed by excluding `is_recurrent_group`
+  there alongside the existing `is_recurrent_task` exclusion. New
+  `TaskTree.test.tsx` case asserting neither a recurrent task nor a
+  recurrent group renders as a Plan-tree root.
+
 ## The workflow established for this project
 
 This has repeated three times now (initial build, v00, v01) and is worth reusing:
