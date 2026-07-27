@@ -30,11 +30,15 @@ export default function TaskTree({
 
   const tasksById = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks])
   const rootIds = useMemo(() => {
-    // Recurrent tasks live only in the Recurrent tasks tab (see
-    // RecurrentTasksList.tsx), never duplicated into this tree.
+    // Recurrent tasks/groups live only in the Recurrent tasks tab (see
+    // RecurrentTasksList.tsx), never duplicated into this tree. Both kinds
+    // have parent_ids: [] (they're organizationally separate from the main
+    // tree), so they'd otherwise trivially qualify as main-tree roots too.
     return computeRootIds(tasks).filter((id) => {
       const task = tasksById.get(id)
-      return task && !task.is_recurrent_task && !isHiddenFromPlan(task, decisions)
+      return (
+        task && !task.is_recurrent_task && !task.is_recurrent_group && !isHiddenFromPlan(task, decisions)
+      )
     })
   }, [tasks, tasksById, decisions])
 

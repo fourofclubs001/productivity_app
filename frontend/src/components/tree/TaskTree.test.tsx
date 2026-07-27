@@ -50,6 +50,24 @@ describe('TaskTree', () => {
     expect(screen.getAllByText('Shared child')).toHaveLength(2)
   })
 
+  it('does not show recurrent tasks or recurrent groups as roots', () => {
+    const solo = makeTask({ id: 't', name: 'Solo task' })
+    const recurrentTask = makeTask({ id: 'r', name: 'Recurrent task', is_recurrent_task: true })
+    const recurrentGroup = makeTask({ id: 'g', name: 'Recurrent group', is_recurrent_group: true })
+    renderWithClient(
+      <TaskTree
+        tasks={[solo, recurrentTask, recurrentGroup]}
+        selectedId={null}
+        onSelect={() => {}}
+        onOpenNewTask={() => {}}
+      />,
+    )
+
+    expect(screen.getByText('Solo task')).toBeInTheDocument()
+    expect(screen.queryByText('Recurrent task')).not.toBeInTheDocument()
+    expect(screen.queryByText('Recurrent group')).not.toBeInTheDocument()
+  })
+
   it('calls onSelect with the task id when a row is clicked', () => {
     const onSelect = vi.fn()
     const task = makeTask({ id: 't', name: 'Solo task' })
