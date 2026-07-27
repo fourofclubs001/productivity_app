@@ -27,6 +27,12 @@ recreated, `backend` stayed running throughout. Verified post-deploy:
 (`index-yAtv-TKV.js`) matches the final dev build, confirming M50–M54 are
 live.
 
+**Redeployed to prod as of 2026-07-27** (M55, M56) — this pass touched
+both backend and frontend, so `docker compose up --build -d` rebuilt/
+recreated both containers this time. Verified post-deploy: `/health` ok,
+frontend 200, served bundle's asset hash (`index-DwedjtUy.js`) matches the
+final build.
+
 No `prompts/app_improvements_vNN.md` is currently pending for a *new*
 pass — the next one arrives whenever the user drops one in, per the
 workflow below.
