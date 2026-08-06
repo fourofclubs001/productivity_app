@@ -33,10 +33,14 @@ def _recurrent_order_of(node: TaskNode) -> float:
     except (TypeError, ValueError):
         return 0.0
 
-# How far ahead occurrences are lazily generated, extended on every call
-# (mirrors RolloverService's "catch up on read" idiom -- this app has no
-# background/cron jobs, all lazy work happens per-request).
-GENERATION_WINDOW_DAYS = 28
+# How far ahead a never-ending recurrence's occurrences are lazily
+# generated, extended on every call (mirrors RolloverService's "catch up on
+# read" idiom -- this app has no background/cron jobs, all lazy work
+# happens per-request). A bounded recurrence (on_date/after_count) instead
+# generates everything through its own true end at creation time -- see
+# _initial_generation_window_end -- since there's a real, known stopping
+# point to generate up to, unlike a never-ending rule.
+GENERATION_WINDOW_DAYS = 365
 
 
 def _days_in_month(year: int, month: int) -> int:
@@ -184,8 +188,36 @@ class RecurrentTaskService:
         if payload.colors:
             await self._tasks.set_colors(task_id, payload.colors)
 
+        # Bounded rules (on_date/after_count) generate every occurrence
+        # through their own true end right now, not just the rolling
+        # window -- there's a real, known stopping point, so there's no
+        # reason to make the user wait for repeated catch-up calls to see
+        # the full schedule. Synchronous Google Calendar sync for every
+        # occurrence generated here is accepted as the cost of that (no
+        # background job).
+        initial_window_end = self._initial_generation_window_end(payload, anchor, now)
+        await self._generate_occurrences(task_id, fields, initial_window_end)
         await self.ensure_applied(now)
         return await self._task_service.get_task(task_id)
+
+    def _initial_generation_window_end(
+        self, payload: RecurrentTaskCreate, anchor: date, now: datetime
+    ) -> date:
+        if payload.recurrence_end_type == RecurrenceEndType.on_date and payload.recurrence_end_date:
+            return payload.recurrence_end_date
+        if (
+            payload.recurrence_end_type == RecurrenceEndType.after_count
+            and payload.recurrence_end_count is not None
+        ):
+            # occurrence_dates() already truncates internally once
+            # end_count is reached -- this just needs a window_end
+            # guaranteed to be past the last theoretical occurrence, not a
+            # literal generation target. 366 days/cycle covers the worst
+            # case (yearly unit, accounting for leap years).
+            span_days = payload.recurrence_end_count * payload.recurrence_interval * 366
+            return anchor + timedelta(days=span_days)
+        # never-ending: same rolling window ensure_applied() uses elsewhere.
+        return now.date() + timedelta(days=GENERATION_WINDOW_DAYS)
 
     async def ensure_applied(self, now: datetime | None = None) -> None:
         now = now or datetime.now(UTC)

@@ -12,7 +12,11 @@ from app.services.google_calendar_client import FakeGoogleCalendarClient
 from app.services.google_oauth_client import FakeGoogleOAuthClient
 from app.services.google_sync_service import GoogleSyncService
 from app.services.interval_service import IntervalService
-from app.services.recurrent_task_service import RecurrentTaskService, occurrence_dates
+from app.services.recurrent_task_service import (
+    GENERATION_WINDOW_DAYS,
+    RecurrentTaskService,
+    occurrence_dates,
+)
 from app.services.task_service import TaskService
 
 
@@ -230,11 +234,26 @@ async def test_ensure_applied_generates_intervals_within_the_window(services):
     await services["recurrent_tasks"].ensure_applied(now=now)
 
     intervals = await services["intervals"].list_for_task(task_id)
-    assert len(intervals) == 29  # anchor through anchor+28 inclusive, daily
+    assert len(intervals) == GENERATION_WINDOW_DAYS + 1  # anchor through anchor+window, daily
     assert min(i.start for i in intervals) == datetime.combine(anchor, time(9, 0), tzinfo=UTC)
     assert max(i.start for i in intervals) == datetime.combine(
-        anchor + timedelta(days=28), time(9, 0), tzinfo=UTC
+        anchor + timedelta(days=GENERATION_WINDOW_DAYS), time(9, 0), tzinfo=UTC
     )
+
+
+async def test_never_ending_rule_uses_a_365_day_window_not_28(services):
+    anchor = _future_anchor(1)
+    task_id = await seed_recurrent_task(services, anchor, RecurrenceUnit.day)
+
+    # 200 days out is well past the old 28-day window but comfortably
+    # inside the new 365-day one -- a single ensure_applied() call should
+    # already cover it, no repeated catch-up calls needed.
+    now = datetime.combine(anchor + timedelta(days=200), time(8, 0), tzinfo=UTC)
+    await services["recurrent_tasks"].ensure_applied(now=now)
+
+    intervals = await services["intervals"].list_for_task(task_id)
+    farthest = max(interval.start.date() for interval in intervals)
+    assert farthest >= anchor + timedelta(days=200)
 
 
 async def test_ensure_applied_is_idempotent(services):
@@ -246,7 +265,7 @@ async def test_ensure_applied_is_idempotent(services):
     await services["recurrent_tasks"].ensure_applied(now=now)
 
     intervals = await services["intervals"].list_for_task(task_id)
-    assert len(intervals) == 29
+    assert len(intervals) == GENERATION_WINDOW_DAYS + 1
 
 
 async def test_ensure_applied_extends_the_window_on_a_later_call(services):
@@ -264,9 +283,9 @@ async def test_ensure_applied_extends_the_window_on_a_later_call(services):
     )
 
     intervals = await services["intervals"].list_for_task(task_id)
-    assert len(intervals) == 36  # anchor through (anchor+7)+28 inclusive
+    assert len(intervals) == 7 + GENERATION_WINDOW_DAYS + 1  # anchor through later+window
     assert max(i.start for i in intervals) == datetime.combine(
-        later + timedelta(days=28), time(9, 0), tzinfo=UTC
+        later + timedelta(days=GENERATION_WINDOW_DAYS), time(9, 0), tzinfo=UTC
     )
 
 
@@ -311,7 +330,7 @@ async def test_biweekly_recurrence_keeps_generating_across_many_catchup_calls(se
         await services["recurrent_tasks"].ensure_applied(now=now)
 
     final_now = datetime.combine(anchor + timedelta(days=cumulative), time(8, 0), tzinfo=UTC)
-    window_end = final_now.date() + timedelta(days=28)
+    window_end = final_now.date() + timedelta(days=GENERATION_WINDOW_DAYS)
 
     expected_dates = occurrence_dates(
         anchor,
@@ -437,6 +456,62 @@ def test_create_recurrent_task_endpoint_generates_its_first_occurrence(client):
     intervals = client.get(f"/intervals/by-task/{body['id']}").json()
     starts = {datetime.fromisoformat(interval["start"]) for interval in intervals}
     assert start in starts
+
+
+def test_create_recurrent_task_with_on_date_end_generates_the_whole_range_up_front(client):
+    anchor = _future_anchor(1)
+    start = datetime.combine(anchor, time(9, 0), tzinfo=UTC)
+    end = start + timedelta(hours=1)
+    end_date = anchor + timedelta(days=10)
+
+    response = client.post(
+        "/recurrent-tasks",
+        json={
+            "name": "Bounded by date",
+            "definition_of_done": "d",
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            "recurrence_interval": 1,
+            "recurrence_unit": "day",
+            "recurrence_end_type": "on_date",
+            "recurrence_end_date": end_date.isoformat(),
+        },
+    )
+    assert response.status_code == 201, response.text
+    task_id = response.json()["id"]
+
+    # 11 days inclusive (anchor through end_date), all generated in this
+    # one creation call -- no further catch-up needed to see the full range,
+    # unlike the old flat 28-day window every rule used to share.
+    intervals = client.get(f"/intervals/by-task/{task_id}").json()
+    assert len(intervals) == 11
+    starts = {datetime.fromisoformat(i["start"]).date() for i in intervals}
+    assert starts == {anchor + timedelta(days=n) for n in range(11)}
+
+
+def test_create_recurrent_task_with_after_count_end_generates_exactly_that_many(client):
+    anchor = _future_anchor(1)
+    start = datetime.combine(anchor, time(9, 0), tzinfo=UTC)
+    end = start + timedelta(hours=1)
+
+    response = client.post(
+        "/recurrent-tasks",
+        json={
+            "name": "Bounded by count",
+            "definition_of_done": "d",
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            "recurrence_interval": 1,
+            "recurrence_unit": "week",
+            "recurrence_end_type": "after_count",
+            "recurrence_end_count": 4,
+        },
+    )
+    assert response.status_code == 201, response.text
+    task_id = response.json()["id"]
+
+    intervals = client.get(f"/intervals/by-task/{task_id}").json()
+    assert len(intervals) == 4
 
 
 # ---------------------------------------------------------------------------
