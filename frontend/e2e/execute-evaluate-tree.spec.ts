@@ -11,7 +11,8 @@ test('Execute picker and Evaluate lists mirror the Plan panel tree shape', async
   await page.getByLabel('Definition of done').fill('done')
   await page.getByRole('button', { name: 'Create' }).click()
 
-  await page.getByTitle('Create child task').click()
+  await page.getByTitle('Add child task').click()
+  await page.getByRole('button', { name: 'Create new task' }).click()
   await page.getByLabel('Name', { exact: true }).fill(childName)
   await page.getByLabel('Definition of done').fill('done')
   await page.getByRole('button', { name: 'Create' }).click()

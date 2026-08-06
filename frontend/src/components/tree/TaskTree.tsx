@@ -12,6 +12,7 @@ import {
 import { useAddParent, useRemoveParent, useReorderTask } from '../../api/tasks'
 import { useUndo, type UndoEntry } from '../../undo/UndoProvider'
 import { useParentDismissal } from '../../lib/useParentDismissal'
+import { makeSetParentsEntry } from '../../lib/reparentUndo'
 
 export default function TaskTree({
   tasks,
@@ -108,20 +109,9 @@ export default function TaskTree({
     }
   }
 
-  function setParentsEntry(taskId: string, target: string[], current: string[]): UndoEntry {
-    return {
-      label: 'Move task',
-      views: ['plan'],
-      run: async () => {
-        for (const parentId of current) {
-          await removeParent.mutateAsync({ id: taskId, parentId })
-        }
-        for (const parentId of target) {
-          await addParent.mutateAsync({ id: taskId, parentId })
-        }
-        return setParentsEntry(taskId, current, target)
-      },
-    }
+  const reparentMutators = {
+    addParentAsync: addParent.mutateAsync,
+    removeParentAsync: removeParent.mutateAsync,
   }
 
   function handleDragEnd(event: DragEndEvent) {
@@ -162,7 +152,9 @@ export default function TaskTree({
           for (const parentId of previousParentIds) {
             await removeParent.mutateAsync({ id: activeId, parentId })
           }
-          pushUndo(setParentsEntry(activeId, previousParentIds, [newParentId]))
+          pushUndo(
+            makeSetParentsEntry(activeId, previousParentIds, [newParentId], reparentMutators),
+          )
         },
       },
     )

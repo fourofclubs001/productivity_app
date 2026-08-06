@@ -44,7 +44,8 @@ test('the Requires picker renders as an indented tree and allows selecting a goa
 
   await page.goto('/')
   await createTask(page, goalName)
-  await page.getByTitle('Create child task').click()
+  await page.getByTitle('Add child task').click()
+  await page.getByRole('button', { name: 'Create new task' }).click()
   await page.getByLabel('Name', { exact: true }).fill(childName)
   await page.getByLabel('Definition of done').fill('done')
   await page.getByRole('button', { name: 'Create' }).click()

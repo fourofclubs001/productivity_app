@@ -152,7 +152,7 @@ describe('TaskDetailPanel', () => {
     expect(deleteMutate).toHaveBeenCalledWith('t1', expect.any(Object))
   })
 
-  it('calls onAddChild with this task id when "+ Child task" is clicked', () => {
+  it('opens a chooser when "+ Child task" is clicked, and "Create new task" calls onAddChild', () => {
     const onAddChild = vi.fn()
     const task = makeTask({ id: 't1' })
     render(
@@ -163,8 +163,34 @@ describe('TaskDetailPanel', () => {
       />,
     )
 
-    fireEvent.click(screen.getByTitle('Create child task'))
+    fireEvent.click(screen.getByTitle('Add child task'))
+    expect(screen.getByRole('heading', { name: 'Add child task' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('Create new task'))
     expect(onAddChild).toHaveBeenCalledWith('t1')
+  })
+
+  it('"Attach existing task" opens the existing-task picker instead of creating a new task', () => {
+    const onAddChild = vi.fn()
+    const task = makeTask({ id: 't1' })
+    const other = makeTask({ id: 't2', name: 'Other task' })
+    render(
+      <TaskDetailPanel
+        task={task}
+        tasksById={
+          new Map([
+            [task.id, task],
+            [other.id, other],
+          ])
+        }
+        onAddChild={onAddChild}
+      />,
+    )
+
+    fireEvent.click(screen.getByTitle('Add child task'))
+    fireEvent.click(screen.getByText('Attach existing task'))
+    expect(onAddChild).not.toHaveBeenCalled()
+    expect(screen.getByText(/Move an existing task to become a child of/)).toBeInTheDocument()
   })
 
   it('removes a parent when its chip is clicked', () => {

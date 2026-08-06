@@ -22,7 +22,9 @@ test('creating a task auto-selects it, and a child task can be created from the 
   )
 
   const childName = `Child ${Date.now()}`
-  await page.getByTitle('Create child task').click()
+  await page.getByTitle('Add child task').click()
+  await expect(page.getByRole('heading', { name: 'Add child task' })).toBeVisible()
+  await page.getByRole('button', { name: 'Create new task' }).click()
   await expect(page.getByRole('heading', { name: 'New sub-task' })).toBeVisible()
   await page.getByLabel('Name', { exact: true }).fill(childName)
   await page.getByLabel('Definition of done').fill('done')

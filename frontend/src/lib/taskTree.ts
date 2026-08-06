@@ -30,6 +30,22 @@ export function descendantIds(taskId: string, tasksById: Map<string, Task>): Set
   return result
 }
 
+// Mirrors descendantIds, walking parent_ids upward instead -- used to keep a
+// reparent picker (e.g. AttachExistingChildDialog) from ever offering a
+// would-be-cyclic pick: attaching one of a task's own ancestors as a new
+// child of it would make that ancestor its own descendant.
+export function ancestorIds(taskId: string, tasksById: Map<string, Task>): Set<string> {
+  const result = new Set<string>()
+  const stack = [...(tasksById.get(taskId)?.parent_ids ?? [])]
+  while (stack.length > 0) {
+    const current = stack.pop()!
+    if (result.has(current)) continue
+    result.add(current)
+    stack.push(...(tasksById.get(current)?.parent_ids ?? []))
+  }
+  return result
+}
+
 // A finished leaf (sprint_done, or done once the weekly rollover has run) is
 // always hidden from the Plan tree (item 9). A parent is hidden only once
 // the user has confirmed removing it (item 10) -- see qualifiesForRemovalPrompt

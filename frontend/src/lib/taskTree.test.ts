@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ancestorIds,
   compareByOrder,
   descendantIds,
   flattenTree,
@@ -70,6 +71,22 @@ describe('descendantIds', () => {
   it('returns an empty set for a leaf task', () => {
     const leaf = makeTask({ id: 'leaf' })
     expect(descendantIds('leaf', new Map([['leaf', leaf]]))).toEqual(new Set())
+  })
+})
+
+describe('ancestorIds', () => {
+  it('returns all transitive ancestors, not just the immediate parent', () => {
+    const grandparent = makeTask({ id: 'gp', children_ids: ['p'] })
+    const parent = makeTask({ id: 'p', parent_ids: ['gp'], children_ids: ['c'] })
+    const child = makeTask({ id: 'c', parent_ids: ['p'] })
+    const tasksById = new Map([grandparent, parent, child].map((task) => [task.id, task]))
+
+    expect(ancestorIds('c', tasksById)).toEqual(new Set(['p', 'gp']))
+  })
+
+  it('returns an empty set for a root task', () => {
+    const root = makeTask({ id: 'root' })
+    expect(ancestorIds('root', new Map([['root', root]]))).toEqual(new Set())
   })
 })
 

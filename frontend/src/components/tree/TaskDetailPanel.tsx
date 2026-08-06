@@ -34,6 +34,8 @@ import ColorSwatchPicker from './ColorSwatchPicker'
 import StateBadge from './StateBadge'
 import AlertDialog from '../common/AlertDialog'
 import ConfirmDialog from '../common/ConfirmDialog'
+import AddChildChooserDialog from './AddChildChooserDialog'
+import AttachExistingChildDialog from './AttachExistingChildDialog'
 
 export default function TaskDetailPanel({
   task,
@@ -72,6 +74,8 @@ export default function TaskDetailPanel({
   const [editingIntervalId, setEditingIntervalId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState<IntervalTimeValue | null>(null)
   const [alertMessage, setAlertMessage] = useState<string | null>(null)
+  const [showAddChildChooser, setShowAddChildChooser] = useState(false)
+  const [showAttachExisting, setShowAttachExisting] = useState(false)
 
   useEffect(() => {
     setName(task.name)
@@ -84,6 +88,8 @@ export default function TaskDetailPanel({
     setEditingIntervalId(null)
     setEditValue(null)
     setAlertMessage(null)
+    setShowAddChildChooser(false)
+    setShowAttachExisting(false)
     resetDeleteTask()
   }, [task.id, task.name, task.definition_of_done, resetDeleteTask])
 
@@ -430,8 +436,8 @@ export default function TaskDetailPanel({
           <div className="mt-2 flex flex-wrap gap-2">
             <button
               type="button"
-              title="Create child task"
-              onClick={() => onAddChild(task.id)}
+              title="Add child task"
+              onClick={() => setShowAddChildChooser(true)}
               className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-alt hover:text-text-primary"
             >
               + Child task
@@ -547,6 +553,28 @@ export default function TaskDetailPanel({
 
       {alertMessage && (
         <AlertDialog message={alertMessage} onClose={() => setAlertMessage(null)} />
+      )}
+
+      {showAddChildChooser && (
+        <AddChildChooserDialog
+          onChooseNew={() => {
+            setShowAddChildChooser(false)
+            onAddChild(task.id)
+          }}
+          onChooseExisting={() => {
+            setShowAddChildChooser(false)
+            setShowAttachExisting(true)
+          }}
+          onClose={() => setShowAddChildChooser(false)}
+        />
+      )}
+
+      {showAttachExisting && (
+        <AttachExistingChildDialog
+          parentTask={task}
+          tasksById={tasksById}
+          onClose={() => setShowAttachExisting(false)}
+        />
       )}
     </div>
   )
