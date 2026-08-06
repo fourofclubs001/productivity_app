@@ -23,6 +23,23 @@ def is_reachable(start_id: str, target_id: str, get_edges: Callable[[str], Itera
     return False
 
 
+def descendant_ids(task_id: str, graph: dict[str, TaskNode]) -> set[str]:
+    """Every task transitively reachable from task_id via children -- not
+    just the leaves (see leaf_descendants below for that). Used by the
+    "delete whole subtree" cascade (item 6), mirroring the frontend's own
+    descendantIds() in lib/taskTree.ts.
+    """
+    result: set[str] = set()
+    stack = list(graph[task_id].children)
+    while stack:
+        current = stack.pop()
+        if current in result:
+            continue
+        result.add(current)
+        stack.extend(graph[current].children)
+    return result
+
+
 def leaf_descendants(task_id: str, graph: dict[str, TaskNode]) -> set[str]:
     """task_id itself if it's a leaf, else every leaf beneath it in the DAG.
 

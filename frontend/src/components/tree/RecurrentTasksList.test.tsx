@@ -112,7 +112,7 @@ describe('RecurrentTasksList', () => {
     fireEvent.contextMenu(screen.getByText('Water plants'))
     fireEvent.click(screen.getByText('Delete'))
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
-    expect(deleteMutate).toHaveBeenCalledWith('r1', expect.anything())
+    expect(deleteMutate).toHaveBeenCalledWith({ id: 'r1' }, expect.anything())
   })
 
   it('a group nests its recurrent-task children, expandable/collapsible, and is not itself selectable', () => {

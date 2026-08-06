@@ -36,6 +36,7 @@ import AlertDialog from '../common/AlertDialog'
 import ConfirmDialog from '../common/ConfirmDialog'
 import AddChildChooserDialog from './AddChildChooserDialog'
 import AttachExistingChildDialog from './AttachExistingChildDialog'
+import DeleteWithChildrenDialog from './DeleteWithChildrenDialog'
 
 export default function TaskDetailPanel({
   task,
@@ -514,16 +515,44 @@ export default function TaskDetailPanel({
         />
       )}
 
-      {confirmingDelete && (
+      {confirmingDelete && task.is_leaf && (
         <ConfirmDialog
           message="Delete this task permanently?"
           confirmLabel="Delete"
           onCancel={() => setConfirmingDelete(false)}
           onConfirm={() =>
-            deleteTask.mutate(task.id, {
-              onError: (error) => setAlertMessage((error as Error).message),
-              onSettled: () => setConfirmingDelete(false),
-            })
+            deleteTask.mutate(
+              { id: task.id },
+              {
+                onError: (error) => setAlertMessage((error as Error).message),
+                onSettled: () => setConfirmingDelete(false),
+              },
+            )
+          }
+        />
+      )}
+      {confirmingDelete && !task.is_leaf && (
+        <DeleteWithChildrenDialog
+          taskName={task.name}
+          isPending={deleteTask.isPending}
+          onCancel={() => setConfirmingDelete(false)}
+          onJustThisTask={() =>
+            deleteTask.mutate(
+              { id: task.id, deleteChildren: false },
+              {
+                onError: (error) => setAlertMessage((error as Error).message),
+                onSettled: () => setConfirmingDelete(false),
+              },
+            )
+          }
+          onDeleteChildren={() =>
+            deleteTask.mutate(
+              { id: task.id, deleteChildren: true },
+              {
+                onError: (error) => setAlertMessage((error as Error).message),
+                onSettled: () => setConfirmingDelete(false),
+              },
+            )
           }
         />
       )}

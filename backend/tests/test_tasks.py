@@ -80,6 +80,75 @@ def test_delete_task_promotes_orphaned_child_to_root(client):
     assert response.json()["parent_ids"] == []
 
 
+def test_delete_task_just_this_task_reparents_children_to_grandparent(client):
+    grandparent = create_task(client, name="Grandparent")
+    middle = create_task(client, name="Middle", parent_ids=[grandparent["id"]])
+    leaf = create_task(client, name="Leaf", parent_ids=[middle["id"]])
+
+    response = client.delete(f"/tasks/{middle['id']}")
+    assert response.status_code == 204
+
+    leaf_after = client.get(f"/tasks/{leaf['id']}").json()
+    assert leaf_after["parent_ids"] == [grandparent["id"]]
+    grandparent_after = client.get(f"/tasks/{grandparent['id']}").json()
+    assert grandparent_after["children_ids"] == [leaf["id"]]
+
+
+def test_delete_task_just_this_task_with_multiple_parents_reparents_to_all_of_them(client):
+    grandparent_a = create_task(client, name="Grandparent A")
+    grandparent_b = create_task(client, name="Grandparent B")
+    middle = create_task(
+        client, name="Middle", parent_ids=[grandparent_a["id"], grandparent_b["id"]]
+    )
+    leaf = create_task(client, name="Leaf", parent_ids=[middle["id"]])
+
+    client.delete(f"/tasks/{middle['id']}")
+
+    leaf_after = client.get(f"/tasks/{leaf['id']}").json()
+    assert set(leaf_after["parent_ids"]) == {grandparent_a["id"], grandparent_b["id"]}
+
+
+def test_delete_task_with_delete_children_cascades_through_the_whole_subtree(client):
+    goal = create_task(client, name="Goal")
+    middle = create_task(client, name="Middle", parent_ids=[goal["id"]])
+    leaf = create_task(client, name="Leaf", parent_ids=[middle["id"]])
+
+    response = client.delete(f"/tasks/{goal['id']}?delete_children=true")
+    assert response.status_code == 204
+
+    assert client.get(f"/tasks/{goal['id']}").status_code == 404
+    assert client.get(f"/tasks/{middle['id']}").status_code == 404
+    assert client.get(f"/tasks/{leaf['id']}").status_code == 404
+
+
+def test_delete_task_with_delete_children_cleans_up_future_intervals_of_every_leaf(client):
+    goal = create_task(client, name="Goal")
+    leaf_a = create_task(client, name="Leaf A", parent_ids=[goal["id"]])
+    leaf_b = create_task(client, name="Leaf B", parent_ids=[goal["id"]])
+
+    from datetime import UTC, datetime, timedelta
+
+    start = datetime.now(UTC) + timedelta(days=1)
+    end = start + timedelta(hours=1)
+    for leaf in (leaf_a, leaf_b):
+        response = client.post(
+            "/intervals",
+            json={
+                "task_id": leaf["id"],
+                "start": start.isoformat(),
+                "end": end.isoformat(),
+            },
+        )
+        assert response.status_code == 201, response.text
+        assert len(client.get(f"/intervals/by-task/{leaf['id']}").json()) == 1
+
+    response = client.delete(f"/tasks/{goal['id']}?delete_children=true")
+    assert response.status_code == 204
+
+    for leaf in (leaf_a, leaf_b):
+        assert client.get(f"/intervals/by-task/{leaf['id']}").json() == []
+
+
 def test_add_and_remove_parent(client):
     parent = create_task(client, name="Parent")
     child = create_task(client, name="Child")

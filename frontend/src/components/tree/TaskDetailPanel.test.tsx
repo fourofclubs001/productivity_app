@@ -149,7 +149,30 @@ describe('TaskDetailPanel', () => {
     expect(deleteMutate).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
-    expect(deleteMutate).toHaveBeenCalledWith('t1', expect.any(Object))
+    expect(deleteMutate).toHaveBeenCalledWith({ id: 't1' }, expect.any(Object))
+  })
+
+  it('offers just-this-task vs whole-subtree for a non-leaf task, via the kebab menu', () => {
+    const task = makeTask({ id: 't1', name: 'Goal task', is_leaf: false, children_ids: ['c1'] })
+    render(
+      <TaskDetailPanel
+        task={task}
+        tasksById={
+          new Map([
+            [task.id, task],
+            ['c1', makeTask({ id: 'c1', parent_ids: ['t1'] })],
+          ])
+        }
+        onAddChild={() => {}}
+      />,
+    )
+
+    fireEvent.click(screen.getByTitle('Options'))
+    fireEvent.click(screen.getByText('Delete task'))
+    expect(screen.getByText(/It has sub-tasks/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete whole subtree' }))
+    expect(deleteMutate).toHaveBeenCalledWith({ id: 't1', deleteChildren: true }, expect.any(Object))
   })
 
   it('opens a chooser when "+ Child task" is clicked, and "Create new task" calls onAddChild', () => {

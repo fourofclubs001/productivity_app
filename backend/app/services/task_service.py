@@ -22,7 +22,7 @@ from app.services.errors import (
     TaskNotFoundError,
     TaskNotLeafError,
 )
-from app.services.graph_utils import is_reachable, leaf_descendants
+from app.services.graph_utils import descendant_ids, is_reachable, leaf_descendants
 
 
 def _order_of(node: TaskNode) -> float:
@@ -221,6 +221,17 @@ class TaskService:
             raise TaskNotFoundError(task_id)
         return self._to_task_out(task_id, graph, {})
 
+    async def leaf_descendant_ids(self, task_id: str) -> set[str]:
+        """task_id itself if it's a leaf, else every leaf beneath it --
+        used by the delete-with-children router to know which of a cascade
+        delete's descendants need their future intervals cleaned up first
+        (only leaves ever have intervals).
+        """
+        graph = await self._repo.load_graph()
+        if task_id not in graph:
+            raise TaskNotFoundError(task_id)
+        return leaf_descendants(task_id, graph)
+
     async def update_task(self, task_id: str, payload: TaskUpdate) -> TaskOut:
         node = await self._repo.load_node(task_id)
         if node is None:
@@ -248,9 +259,29 @@ class TaskService:
 
         return await self.get_task(task_id)
 
-    async def delete_task(self, task_id: str) -> None:
+    async def delete_task(self, task_id: str, delete_children: bool = False) -> None:
         if not await self._repo.exists(task_id):
             raise TaskNotFoundError(task_id)
+
+        if delete_children:
+            graph = await self._repo.load_graph()
+            for descendant_id in descendant_ids(task_id, graph):
+                await self._repo.delete(descendant_id)
+        else:
+            # "Just this task": children move up to become children of this
+            # task's own parent(s) (a no-op if it had none, so they simply
+            # fall through to TaskRepository.delete's existing "no parents
+            # left -> root" behavior) -- mirrors delete_recurrent_group's
+            # ungroup branch, but across the multi-parent main DAG rather
+            # than the single-parent recurrent hierarchy. No cycle risk: a
+            # parent of task_id can never be a descendant of task_id's own
+            # children.
+            node = await self._repo.load_node(task_id)
+            if node is not None:
+                for parent_id in node.parents:
+                    for child_id in node.children:
+                        await self._repo.add_child_edge(parent_id, child_id)
+
         await self._repo.delete(task_id)
 
     async def add_parent(self, task_id: str, parent_id: str) -> TaskOut:

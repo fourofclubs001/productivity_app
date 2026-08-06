@@ -9,7 +9,7 @@ const deleteMutate = vi.fn()
 const keepAsBacklogMutate = vi.fn()
 
 vi.mock('../../api/tasks', () => ({
-  useDeleteTask: () => ({ mutate: deleteMutate }),
+  useDeleteTask: () => ({ mutate: deleteMutate, isPending: false }),
   useKeepAsBacklog: () => ({ mutate: keepAsBacklogMutate }),
 }))
 
@@ -55,7 +55,66 @@ describe('TaskTreeNode', () => {
     expect(deleteMutate).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
-    expect(deleteMutate).toHaveBeenCalledWith('t1', expect.anything())
+    expect(deleteMutate).toHaveBeenCalledWith({ id: 't1' }, expect.anything())
+  })
+
+  it('offers a just-this-task vs whole-subtree choice for a non-leaf task', () => {
+    const task = makeTask({ id: 't1', name: 'Goal task', is_leaf: false, children_ids: ['c1'] })
+    render(
+      <UndoProvider activeView="plan">
+        <TaskTreeNode
+          taskId={task.id}
+          tasksById={new Map([[task.id, task], ['c1', makeTask({ id: 'c1', parent_ids: ['t1'] })]])}
+          depth={0}
+          selectedId={null}
+          expanded={new Set()}
+          ancestorPath={new Set()}
+          onSelect={() => {}}
+          onToggleExpand={() => {}}
+          onAddChild={() => {}}
+          decisions={{}}
+          onDecide={() => {}}
+          onUndecide={() => {}}
+          dropPreview={null}
+        />
+      </UndoProvider>,
+    )
+
+    fireEvent.contextMenu(screen.getByText('Goal task'))
+    fireEvent.click(screen.getByText('Delete'))
+    expect(screen.queryByText('Delete "Goal task" permanently?')).not.toBeInTheDocument()
+    expect(screen.getByText(/It has sub-tasks/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Just this task' }))
+    expect(deleteMutate).toHaveBeenCalledWith({ id: 't1', deleteChildren: false }, expect.anything())
+  })
+
+  it('"Delete whole subtree" passes deleteChildren: true', () => {
+    const task = makeTask({ id: 't1', name: 'Goal task', is_leaf: false, children_ids: ['c1'] })
+    render(
+      <UndoProvider activeView="plan">
+        <TaskTreeNode
+          taskId={task.id}
+          tasksById={new Map([[task.id, task], ['c1', makeTask({ id: 'c1', parent_ids: ['t1'] })]])}
+          depth={0}
+          selectedId={null}
+          expanded={new Set()}
+          ancestorPath={new Set()}
+          onSelect={() => {}}
+          onToggleExpand={() => {}}
+          onAddChild={() => {}}
+          decisions={{}}
+          onDecide={() => {}}
+          onUndecide={() => {}}
+          dropPreview={null}
+        />
+      </UndoProvider>,
+    )
+
+    fireEvent.contextMenu(screen.getByText('Goal task'))
+    fireEvent.click(screen.getByText('Delete'))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete whole subtree' }))
+    expect(deleteMutate).toHaveBeenCalledWith({ id: 't1', deleteChildren: true }, expect.anything())
   })
 
   it('dismisses the context menu on Cancel without deleting', () => {

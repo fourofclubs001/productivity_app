@@ -25,7 +25,8 @@ const tasksApi = {
     apiFetch<Task>('/tasks', { method: 'POST', body: JSON.stringify(input) }),
   update: (id: string, input: UpdateTaskInput) =>
     apiFetch<Task>(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
-  remove: (id: string) => apiFetch<void>(`/tasks/${id}`, { method: 'DELETE' }),
+  remove: (id: string, deleteChildren = false) =>
+    apiFetch<void>(`/tasks/${id}?delete_children=${deleteChildren}`, { method: 'DELETE' }),
   addParent: (id: string, parentId: string) =>
     apiFetch<Task>(`/tasks/${id}/parents`, {
       method: 'POST',
@@ -85,7 +86,8 @@ export function useUpdateTask() {
 export function useDeleteTask() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => tasksApi.remove(id),
+    mutationFn: ({ id, deleteChildren = false }: { id: string; deleteChildren?: boolean }) =>
+      tasksApi.remove(id, deleteChildren),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TASKS_KEY })
       // Deleting a task prunes its future intervals server-side (v02 item

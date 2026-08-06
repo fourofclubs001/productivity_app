@@ -88,6 +88,7 @@ async def delete_task(
     service: ServiceDep,
     redis: Annotated[Redis, Depends(get_redis)],
     interval_service: Annotated[IntervalService, Depends(get_interval_service)],
+    delete_children: bool = False,
 ) -> None:
     entry_repo = EntryRepository(redis)
     active_id = await entry_repo.get_active_id()
@@ -99,19 +100,30 @@ async def delete_task(
                 detail="This task's timer is currently running — stop it before deleting the task.",
             )
 
-    # A deleted task's future plan no longer makes sense; drop its
-    # not-yet-started reserved intervals before the task itself is gone, so
-    # each delete still goes through IntervalService.delete_interval (Google
-    # sync, not the bare repository) while the task still exists to load.
-    # Past (and in-progress) intervals are left alone as historical record.
-    now = datetime.now(UTC)
-    for interval in await interval_service.list_for_task(task_id):
-        start = interval.start if interval.start.tzinfo else interval.start.replace(tzinfo=UTC)
-        if start > now:
-            await interval_service.delete_interval(interval.id)
-
     try:
-        await service.delete_task(task_id)
+        # A deleted task's future plan no longer makes sense; drop its
+        # not-yet-started reserved intervals before the task itself is gone,
+        # so each delete still goes through IntervalService.delete_interval
+        # (Google sync, not the bare repository) while the task still
+        # exists to load. Past (and in-progress) intervals are left alone
+        # as historical record. Cascading (delete_children) needs the same
+        # cleanup for every leaf descendant too -- only a leaf ever has
+        # intervals, task_id's own future intervals are covered by this
+        # same loop when task_id is itself a leaf (leaf_descendant_ids
+        # returns {task_id} in that case).
+        leaf_ids = (
+            await service.leaf_descendant_ids(task_id) if delete_children else {task_id}
+        )
+        now = datetime.now(UTC)
+        for leaf_id in leaf_ids:
+            for interval in await interval_service.list_for_task(leaf_id):
+                start = (
+                    interval.start if interval.start.tzinfo else interval.start.replace(tzinfo=UTC)
+                )
+                if start > now:
+                    await interval_service.delete_interval(interval.id)
+
+        await service.delete_task(task_id, delete_children=delete_children)
     except TaskNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

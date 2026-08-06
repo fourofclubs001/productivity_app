@@ -111,7 +111,7 @@ function RecurrentItemRow({
           confirmLabel="Delete"
           onCancel={() => setConfirmingDelete(false)}
           onConfirm={() =>
-            deleteTask.mutate(task.id, {
+            deleteTask.mutate({ id: task.id }, {
               onError: (error) => setAlertMessage((error as Error).message),
               onSettled: () => setConfirmingDelete(false),
             })

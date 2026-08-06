@@ -10,6 +10,7 @@ import ConfirmDialog from '../common/ConfirmDialog'
 import ContextMenu from '../calendar/ContextMenu'
 import ColorDots from './ColorDots'
 import StateBadge from './StateBadge'
+import DeleteWithChildrenDialog from './DeleteWithChildrenDialog'
 
 interface TaskTreeNodeProps {
   taskId: string
@@ -233,16 +234,44 @@ export default function TaskTreeNode({
           ]}
         />
       )}
-      {confirmingDelete && (
+      {confirmingDelete && task.is_leaf && (
         <ConfirmDialog
           message={`Delete "${task.name}" permanently?`}
           confirmLabel="Delete"
           onCancel={() => setConfirmingDelete(false)}
           onConfirm={() =>
-            deleteTask.mutate(taskId, {
-              onError: (error) => setAlertMessage((error as Error).message),
-              onSettled: () => setConfirmingDelete(false),
-            })
+            deleteTask.mutate(
+              { id: taskId },
+              {
+                onError: (error) => setAlertMessage((error as Error).message),
+                onSettled: () => setConfirmingDelete(false),
+              },
+            )
+          }
+        />
+      )}
+      {confirmingDelete && !task.is_leaf && (
+        <DeleteWithChildrenDialog
+          taskName={task.name}
+          isPending={deleteTask.isPending}
+          onCancel={() => setConfirmingDelete(false)}
+          onJustThisTask={() =>
+            deleteTask.mutate(
+              { id: taskId, deleteChildren: false },
+              {
+                onError: (error) => setAlertMessage((error as Error).message),
+                onSettled: () => setConfirmingDelete(false),
+              },
+            )
+          }
+          onDeleteChildren={() =>
+            deleteTask.mutate(
+              { id: taskId, deleteChildren: true },
+              {
+                onError: (error) => setAlertMessage((error as Error).message),
+                onSettled: () => setConfirmingDelete(false),
+              },
+            )
           }
         />
       )}
