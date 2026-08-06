@@ -30,14 +30,17 @@ export function descendantIds(taskId: string, tasksById: Map<string, Task>): Set
   return result
 }
 
-// A sprint-done leaf is always hidden from the Plan tree (item 9). A parent
-// is hidden only once the user has confirmed removing it (item 10) -- see
-// qualifiesForRemovalPrompt below for when that's offered.
+// A finished leaf (sprint_done, or done once the weekly rollover has run) is
+// always hidden from the Plan tree (item 9). A parent is hidden only once
+// the user has confirmed removing it (item 10) -- see qualifiesForRemovalPrompt
+// below for when that's offered.
+const FINISHED_LEAF_STATES = new Set(['sprint_done', 'done'])
+
 export function isHiddenFromPlan(
   task: Task,
   decisions: Record<string, ParentDecision>,
 ): boolean {
-  if (task.is_leaf) return task.state === 'sprint_done'
+  if (task.is_leaf) return FINISHED_LEAF_STATES.has(task.state)
   return decisions[task.id] === 'hidden'
 }
 

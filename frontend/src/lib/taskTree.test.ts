@@ -251,6 +251,11 @@ describe('isHiddenFromPlan', () => {
     expect(isHiddenFromPlan(task, {})).toBe(true)
   })
 
+  it('hides a done leaf (rolled over from sprint_done)', () => {
+    const task = makeTask({ id: 'a', is_leaf: true, state: 'done' })
+    expect(isHiddenFromPlan(task, {})).toBe(true)
+  })
+
   it('does not hide a leaf in any other state', () => {
     const task = makeTask({ id: 'a', is_leaf: true, state: 'in_progress' })
     expect(isHiddenFromPlan(task, {})).toBe(false)
