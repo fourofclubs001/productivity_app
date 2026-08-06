@@ -14,17 +14,12 @@ describe('formatFaviconLabel', () => {
 })
 
 describe('faviconState', () => {
-  it('is red whenever idle-stopped, regardless of the active flag', () => {
-    expect(faviconState(true, true)).toBe('red')
-    expect(faviconState(false, true)).toBe('red')
-  })
-
-  it('is green while active and not idle-stopped', () => {
-    expect(faviconState(true, false)).toBe('green')
+  it('is green while active', () => {
+    expect(faviconState(true)).toBe('green')
   })
 
   it('is neutral otherwise', () => {
-    expect(faviconState(false, false)).toBe('neutral')
+    expect(faviconState(false)).toBe('neutral')
   })
 })
 
@@ -43,19 +38,17 @@ function fakeContext() {
 }
 
 describe('drawFavicon', () => {
-  it('draws only a colored background circle for neutral/red, no text', () => {
-    const ctx = fakeContext()
-    drawFavicon(ctx, 'red', '01:00')
+  it('draws only a colored background circle, no text, for either state', () => {
+    const neutral = fakeContext()
+    drawFavicon(neutral, 'neutral')
+    expect(neutral.arc).toHaveBeenCalled()
+    expect(neutral.fill).toHaveBeenCalled()
+    expect(neutral.fillText).not.toHaveBeenCalled()
 
-    expect(ctx.arc).toHaveBeenCalled()
-    expect(ctx.fill).toHaveBeenCalled()
-    expect(ctx.fillText).not.toHaveBeenCalled()
-  })
-
-  it('draws the elapsed-time label for the green state', () => {
-    const ctx = fakeContext()
-    drawFavicon(ctx, 'green', '01:05')
-
-    expect(ctx.fillText).toHaveBeenCalledWith('01:05', expect.any(Number), expect.any(Number))
+    const green = fakeContext()
+    drawFavicon(green, 'green')
+    expect(green.arc).toHaveBeenCalled()
+    expect(green.fill).toHaveBeenCalled()
+    expect(green.fillText).not.toHaveBeenCalled()
   })
 })

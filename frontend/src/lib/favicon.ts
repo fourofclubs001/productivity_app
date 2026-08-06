@@ -1,9 +1,8 @@
-export type FaviconState = 'neutral' | 'green' | 'red'
+export type FaviconState = 'neutral' | 'green'
 
 const FAVICON_SIZE = 32
 const COLORS: Record<Exclude<FaviconState, 'neutral'>, string> = {
   green: '#16a34a',
-  red: '#dc2626',
 }
 
 export function formatFaviconLabel(elapsedMs: number): string {
@@ -13,19 +12,18 @@ export function formatFaviconLabel(elapsedMs: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
-export function faviconState(active: boolean, idleStopped: boolean): FaviconState {
-  if (idleStopped) return 'red'
-  if (active) return 'green'
-  return 'neutral'
+export function faviconState(active: boolean): FaviconState {
+  return active ? 'green' : 'neutral'
 }
 
 // Issues the actual draw calls -- kept separate from `applyFavicon` so it's
 // unit-testable by passing a hand-rolled fake 2D context, since jsdom (this
-// repo's vitest environment) has no real <canvas> implementation.
+// repo's vitest environment) has no real <canvas> implementation. The live
+// elapsed-time digits live in the tab title (see GlobalTimerWatcher), not
+// drawn onto the icon -- this only ever swaps the icon's color.
 export function drawFavicon(
   ctx: CanvasRenderingContext2D,
   state: FaviconState,
-  label: string,
   size: number = FAVICON_SIZE,
 ): void {
   ctx.clearRect(0, 0, size, size)
@@ -33,14 +31,6 @@ export function drawFavicon(
   ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2)
   ctx.fillStyle = state === 'neutral' ? '#94a3b8' : COLORS[state]
   ctx.fill()
-
-  if (state === 'green') {
-    ctx.fillStyle = '#ffffff'
-    ctx.font = `bold ${Math.round(size * 0.26)}px sans-serif`
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(label, size / 2, size / 2 + 1)
-  }
 }
 
 let originalHref: string | null = null
@@ -54,8 +44,8 @@ function faviconLink(): HTMLLinkElement | null {
 // and swaps the <link rel="icon">'s href. Not meaningfully unit-testable
 // (real coverage comes from a Playwright spec reading the actual <link>'s
 // href in a real Chromium tab, which fully implements canvas) -- kept as a
-// thin wrapper around the tested `drawFavicon`/`formatFaviconLabel` above.
-export function applyFavicon(state: FaviconState, elapsedMs = 0): void {
+// thin wrapper around the tested `drawFavicon` above.
+export function applyFavicon(state: FaviconState): void {
   const link = faviconLink()
   if (!link) return
 
@@ -76,7 +66,7 @@ export function applyFavicon(state: FaviconState, elapsedMs = 0): void {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
 
-  drawFavicon(ctx, state, formatFaviconLabel(elapsedMs))
+  drawFavicon(ctx, state)
   // A PNG data URL under the SVG-typed <link> from index.html risks being
   // ignored by some browsers -- update the type alongside the href.
   link.type = 'image/png'

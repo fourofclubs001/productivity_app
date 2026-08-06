@@ -1,5 +1,9 @@
 import { test, expect, type Page } from '@playwright/test'
 
+function faviconHref(page: Page) {
+  return page.locator('link[rel="icon"]').evaluate((el) => (el as HTMLLinkElement).href)
+}
+
 function pickerTrigger(page: Page) {
   return page.getByTestId('task-picker-trigger')
 }
@@ -153,4 +157,40 @@ test('"No, stop the timer" stops without marking done, task selectable again', a
   // Still in_progress, so it remains offered as an option when reopened.
   await pickerTrigger(page).click()
   await expect(pickerOptions(page).getByRole('button', { name: taskName, exact: true })).toBeVisible()
+})
+
+test('tab title shows the live elapsed time while tracking, and the favicon only ever alternates neutral/green', async ({
+  page,
+}) => {
+  const taskName = `Timer title ${Date.now()}`
+
+  await page.goto('/')
+  const neutralHref = await faviconHref(page)
+  await expect(page).toHaveTitle('Productivity App')
+
+  await page.getByTitle('New task').click()
+  await page.getByLabel('Name', { exact: true }).fill(taskName)
+  await page.getByLabel('Definition of done').fill('done')
+  await page.getByRole('button', { name: 'Create' }).click()
+
+  await page.getByRole('button', { name: 'Execute' }).click()
+  await selectExecuteTask(page, taskName)
+  await page.getByRole('button', { name: 'Start' }).click()
+  await expect(page.getByText('Tracking')).toBeVisible()
+
+  // Live mm:ss ahead of the app name while tracking.
+  await expect(page).toHaveTitle(/^\d{2}:\d{2} · Productivity App$/)
+  const trackingHref = await faviconHref(page)
+  expect(trackingHref).toMatch(/^data:image\/png/)
+  expect(trackingHref).not.toBe(neutralHref)
+
+  await page.getByRole('button', { name: 'Stop' }).click()
+  await page.getByRole('button', { name: 'No, stop the timer' }).click()
+  await expect(page.getByText('Tracking')).not.toBeVisible()
+
+  // Reverts to the static title and the original neutral favicon -- never
+  // any state beyond neutral/green, since idle-detection (and its red
+  // state) was removed.
+  await expect(page).toHaveTitle('Productivity App')
+  await expect.poll(() => faviconHref(page)).toBe(neutralHref)
 })
