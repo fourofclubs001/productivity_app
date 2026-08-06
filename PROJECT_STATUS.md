@@ -646,19 +646,35 @@ Entirely frontend-only — no backend/pytest changes anywhere in this pass.
 This has repeated three times now (initial build, v00, v01) and is worth reusing:
 
 1. User drops a plain, unstructured bullet list into `prompts/app_improvements_vNN.md`.
-2. Read it, ask clarifying questions for genuinely ambiguous items via
-   `AskUserQuestion` (not everything — only real ambiguity, and note assumptions for
-   the rest), then write `prompts/interpreted_app_improvements_vNN.md`: an ordered,
-   clarified restatement incorporating the answers.
-3. Commit + push the `prompts/` addition on its own (small, low-risk commit).
-4. Enter plan mode, design an implementation approach — usually one milestone per
+2. Read it, then resolve open items **one by one in conversation** with the user
+   before anything is written — not a single upfront batch dump. Two kinds of
+   open items get resolved here, and both matter:
+   - **Wording ambiguity** — via `AskUserQuestion` (not everything, only real
+     ambiguity; note assumptions for the rest).
+   - **Literal diagnostic questions the user wrote into the file itself**
+     (e.g. "why is this happening?", "what could the problem be?") — these
+     get actually investigated (read the code, root-cause it) and the
+     finding discussed with the user now, in conversation, rather than
+     deferred to "investigate during implementation." The interpreted
+     document (step 3) should already state the diagnosed cause, not just
+     restate the question.
+3. Once the open questions are resolved, write
+   `prompts/interpreted_app_improvements_vNN.md`: an ordered, clarified restatement
+   incorporating the answers.
+3b. Before committing, surface in chat any issues/concerns flagged in that
+    document (e.g. its "Notes for implementation planning" section) that still
+    need a decision — don't let them sit silently in the file. Resolve those
+    with the user first; only once they're settled does the commit in the next
+    step happen.
+4. Commit + push the `prompts/` addition on its own (small, low-risk commit).
+5. Enter plan mode, design an implementation approach — usually one milestone per
    improvement or tightly-related group — and get it approved.
-5. Implement milestone by milestone. Each milestone: backend `pytest` + `ruff check
+6. Implement milestone by milestone. Each milestone: backend `pytest` + `ruff check
    .`, frontend `npm test` + `npm run build` + `npm run lint`, plus a Playwright spec
    exercising the change against the real running stack — all green before
    committing. One commit per milestone, pushed immediately after (this repo's
    established preference: commit at each milestone, push after each).
-6. Use Playwright (`frontend/e2e/`), not claude-in-chrome, for all frontend/
+7. Use Playwright (`frontend/e2e/`), not claude-in-chrome, for all frontend/
    integration verification. It's seconds instead of minutes and leaves a reusable
    regression spec behind. For one-off visual/behavioral debugging (not just
    screenshots — this session also used throwaway specs with `console.log` +

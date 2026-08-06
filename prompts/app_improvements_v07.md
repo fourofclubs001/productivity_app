@@ -1,1 +1,13 @@
 - at prod I see a the leave task "depositar plata alquiler" from Tramites group that is marked as done. This task should not appear in the panel given that is already done. check why is this bug present and fix it.
+- at the favicon, when time tracking, replace the app name with the time and look for a logo similar to the current one but green, and another red for when is tracking and for when the app stopped tracking because of inactivity
+- the time tracker is stopping even though I'm actively using the keyboard and mouse. what could the problem be?
+- add child should let me add an existing task as a child
+- when clicking a google calendar event it should be display in someway on the details panel
+- when removing a task with children on plan task panel, show a dialog that ask if only the task has to be deleted or the whole tree below it too.
+- there are done leaf tasks that are still in the plan panel on production, why is this?
+- when dragging a task on the plan calendar there should be a gosth version of the task that should show where the task would land if drop there. this is not working. See the video at reference firectory
+- when right clicking on a task on the plan left panel there should be an option "mark as done". If it is clicked on a node with childs, it should apply all the task in its subtree too. It should also be "undoable" with ctrl+z
+- when I created a recurrent task with end date on december, it schedule till september 1st. why is this?
+- at execute task selection in prod, there seem to be goal task that are done displaying in that drop down. why is this? can you only show the task that are not done and the ascendants of task that are not done?
+- can you configure the computer run the docker and open the website automatically when computer is turn on
+- every place where the tasks are listed they should appear with it circled color like in the plan view left panel
