@@ -71,6 +71,14 @@ async def revert_done(
     return await task_service.get_task(payload.task_id)
 
 
+@router.post("/timer/mark-subtree-done")
+async def mark_subtree_done(payload: MarkDoneRequest, service: ServiceDep) -> list[str]:
+    try:
+        return await service.mark_subtree_done(payload.task_id)
+    except TaskNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @router.get("/timer/active")
 async def get_active_timer(service: ServiceDep) -> EntryOut | None:
     return await service.get_active()

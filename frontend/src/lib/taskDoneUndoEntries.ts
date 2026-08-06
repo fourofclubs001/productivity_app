@@ -38,3 +38,38 @@ export function makeMarkDoneEntry(taskId: string, mutators: DoneUndoMutators): U
     },
   }
 }
+
+// Right-click "Mark as done" on a task with children (item 9) marks every
+// affected leaf in one bulk backend call -- undoing that must be ONE stack
+// entry too, not one per leaf, so this can't just call makeRevertDoneEntry
+// in a loop with separate pushUndo calls (that would produce N entries).
+// Same symmetric-pair shape as above, just looping the single-task mutators
+// over every affected id instead of acting on just one.
+export function makeMarkSubtreeDoneUndoEntry(
+  affectedIds: string[],
+  mutators: DoneUndoMutators,
+): UndoEntry {
+  return {
+    label: 'Mark subtree done',
+    views: AFFECTED_VIEWS,
+    run: async () => {
+      for (const id of affectedIds) {
+        await mutators.revertDoneAsync(id)
+      }
+      return makeMarkSubtreeRedoEntry(affectedIds, mutators)
+    },
+  }
+}
+
+function makeMarkSubtreeRedoEntry(affectedIds: string[], mutators: DoneUndoMutators): UndoEntry {
+  return {
+    label: 'Revert subtree done',
+    views: AFFECTED_VIEWS,
+    run: async () => {
+      for (const id of affectedIds) {
+        await mutators.markDoneAsync(id)
+      }
+      return makeMarkSubtreeDoneUndoEntry(affectedIds, mutators)
+    },
+  }
+}

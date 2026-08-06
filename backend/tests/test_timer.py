@@ -179,6 +179,60 @@ def test_revert_done_rejects_missing_task(client):
     assert response.status_code == 404
 
 
+def test_mark_subtree_done_on_a_single_leaf_is_a_no_op_subtree_of_itself(client):
+    task = create_leaf(client)
+    response = client.post("/timer/mark-subtree-done", json={"task_id": task["id"]})
+    assert response.status_code == 200
+    assert response.json() == [task["id"]]
+
+    task_after = client.get(f"/tasks/{task['id']}").json()
+    assert task_after["state"] == "sprint_done"
+
+
+def test_mark_subtree_done_forces_backlog_leaves_done_bypassing_in_progress_precondition(client):
+    goal = create_leaf(client, "Goal")
+    leaf_a = create_leaf(client, "Leaf A")
+    leaf_b = create_leaf(client, "Leaf B")
+    client.post(f"/tasks/{leaf_a['id']}/parents", json={"parent_id": goal["id"]})
+    client.post(f"/tasks/{leaf_b['id']}/parents", json={"parent_id": goal["id"]})
+    # Both leaves start in backlog -- mark_done alone would reject this.
+    assert client.get(f"/tasks/{leaf_a['id']}").json()["state"] == "backlog"
+
+    response = client.post("/timer/mark-subtree-done", json={"task_id": goal["id"]})
+    assert response.status_code == 200
+    assert set(response.json()) == {leaf_a["id"], leaf_b["id"]}
+
+    assert client.get(f"/tasks/{leaf_a['id']}").json()["state"] == "sprint_done"
+    assert client.get(f"/tasks/{leaf_b['id']}").json()["state"] == "sprint_done"
+
+
+def test_mark_subtree_done_only_returns_leaves_actually_changed(client):
+    goal = create_leaf(client, "Goal")
+    already_done = create_leaf(client, "Already done")
+    still_backlog = create_leaf(client, "Still backlog")
+    client.post(f"/tasks/{already_done['id']}/parents", json={"parent_id": goal["id"]})
+    client.post(f"/tasks/{still_backlog['id']}/parents", json={"parent_id": goal["id"]})
+    client.post("/timer/start", json={"task_id": already_done["id"]})
+    client.post("/timer/stop")
+    client.post("/timer/mark-done", json={"task_id": already_done["id"]})
+
+    response = client.post("/timer/mark-subtree-done", json={"task_id": goal["id"]})
+    assert response.status_code == 200
+    assert response.json() == [still_backlog["id"]]
+
+
+def test_mark_subtree_done_leaves_the_single_task_mark_done_precondition_unchanged(client):
+    # Confirms the bulk endpoint's bypass doesn't leak into mark-done itself.
+    task = create_leaf(client)
+    response = client.post("/timer/mark-done", json={"task_id": task["id"]})
+    assert response.status_code == 400
+
+
+def test_mark_subtree_done_rejects_missing_task(client):
+    response = client.post("/timer/mark-subtree-done", json={"task_id": "missing"})
+    assert response.status_code == 404
+
+
 def test_list_entries_for_week(client):
     task = create_leaf(client)
     client.post("/timer/start", json={"task_id": task["id"]})

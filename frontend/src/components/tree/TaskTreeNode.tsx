@@ -4,6 +4,8 @@ import type { Task } from '../../types'
 import { isHiddenFromPlan, qualifiesForRemovalPrompt, type DropPreview } from '../../lib/taskTree'
 import type { ParentDecision } from '../../lib/useParentDismissal'
 import { useDeleteTask, useKeepAsBacklog } from '../../api/tasks'
+import { useMarkDone, useMarkSubtreeDone, useRevertDone } from '../../api/timer'
+import { makeMarkSubtreeDoneUndoEntry } from '../../lib/taskDoneUndoEntries'
 import { useUndo, type UndoEntry } from '../../undo/UndoProvider'
 import AlertDialog from '../common/AlertDialog'
 import ConfirmDialog from '../common/ConfirmDialog'
@@ -50,6 +52,9 @@ export default function TaskTreeNode({
   const { pushUndo } = useUndo()
   const keepAsBacklog = useKeepAsBacklog()
   const deleteTask = useDeleteTask()
+  const markSubtreeDone = useMarkSubtreeDone()
+  const markDone = useMarkDone()
+  const revertDone = useRevertDone()
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [alertMessage, setAlertMessage] = useState<string | null>(null)
@@ -226,6 +231,22 @@ export default function TaskTreeNode({
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}
           items={[
+            {
+              label: 'Mark as done',
+              onSelect: () =>
+                markSubtreeDone.mutate(taskId, {
+                  onSuccess: (affectedIds) => {
+                    if (affectedIds.length === 0) return
+                    pushUndo(
+                      makeMarkSubtreeDoneUndoEntry(affectedIds, {
+                        markDoneAsync: markDone.mutateAsync,
+                        revertDoneAsync: revertDone.mutateAsync,
+                      }),
+                    )
+                  },
+                  onError: (error) => setAlertMessage((error as Error).message),
+                }),
+            },
             {
               label: 'Delete',
               danger: true,

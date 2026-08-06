@@ -13,7 +13,10 @@ from app.services.errors import (
     TaskNotLeafError,
     TaskNotSprintDoneError,
 )
+from app.services.graph_utils import leaf_descendants
 from app.services.task_service import TaskService
+
+_FINISHED_STATES = {TaskState.sprint_done, TaskState.done}
 
 
 class TimerService:
@@ -92,6 +95,30 @@ class TimerService:
             raise TaskNotSprintDoneError(task_id)
 
         await self._tasks.update_fields(task_id, {"state": TaskState.in_progress.value})
+
+    async def mark_subtree_done(self, task_id: str) -> list[str]:
+        """Force every not-yet-finished leaf in task_id's subtree straight
+        to sprint_done -- a leaf-task no-op subtree of itself if task_id is
+        already a leaf (see leaf_descendants). Deliberately bypasses
+        mark_done's in_progress-only precondition, since a right-click
+        "mark subtree done" is expected to work regardless of which leaves
+        happen to be actively tracked -- mark_done itself is untouched, its
+        precondition still applies unchanged to its own callers. Returns
+        the leaf ids actually changed, so the caller can build a matching
+        undo entry.
+        """
+        graph = await self._tasks.load_graph()
+        if task_id not in graph:
+            raise TaskNotFoundError(task_id)
+
+        affected: list[str] = []
+        for leaf_id in leaf_descendants(task_id, graph):
+            state = TaskState(graph[leaf_id].fields.get("state", TaskState.backlog.value))
+            if state in _FINISHED_STATES:
+                continue
+            await self._tasks.update_fields(leaf_id, {"state": TaskState.sprint_done.value})
+            affected.append(leaf_id)
+        return affected
 
     async def get_active(self) -> EntryOut | None:
         active_id = await self._entries.get_active_id()

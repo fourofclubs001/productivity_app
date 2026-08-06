@@ -17,6 +17,11 @@ const timerApi = {
       method: 'POST',
       body: JSON.stringify({ task_id: taskId }),
     }),
+  markSubtreeDone: (taskId: string) =>
+    apiFetch<string[]>('/timer/mark-subtree-done', {
+      method: 'POST',
+      body: JSON.stringify({ task_id: taskId }),
+    }),
   listForWeek: (weekStart: string) => apiFetch<Entry[]>(`/entries?week_start=${weekStart}`),
 }
 
@@ -71,6 +76,16 @@ export function useRevertDone() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (taskId: string) => timerApi.revertDone(taskId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: TASKS_KEY })
+    },
+  })
+}
+
+export function useMarkSubtreeDone() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (taskId: string) => timerApi.markSubtreeDone(taskId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TASKS_KEY })
     },

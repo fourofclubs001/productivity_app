@@ -7,15 +7,27 @@ import { UndoProvider } from '../../undo/UndoProvider'
 
 const deleteMutate = vi.fn()
 const keepAsBacklogMutate = vi.fn()
+const markSubtreeDoneMutate = vi.fn()
+const markDoneMutateAsync = vi.fn()
+const revertDoneMutateAsync = vi.fn()
 
 vi.mock('../../api/tasks', () => ({
   useDeleteTask: () => ({ mutate: deleteMutate, isPending: false }),
   useKeepAsBacklog: () => ({ mutate: keepAsBacklogMutate }),
 }))
 
+vi.mock('../../api/timer', () => ({
+  useMarkSubtreeDone: () => ({ mutate: markSubtreeDoneMutate }),
+  useMarkDone: () => ({ mutateAsync: markDoneMutateAsync }),
+  useRevertDone: () => ({ mutateAsync: revertDoneMutateAsync }),
+}))
+
 beforeEach(() => {
   deleteMutate.mockReset()
   keepAsBacklogMutate.mockReset()
+  markSubtreeDoneMutate.mockReset()
+  markDoneMutateAsync.mockReset()
+  revertDoneMutateAsync.mockReset()
 })
 
 function renderNode(task: ReturnType<typeof makeTask>, dropPreview: DropPreview | null = null) {
@@ -41,6 +53,37 @@ function renderNode(task: ReturnType<typeof makeTask>, dropPreview: DropPreview 
 }
 
 describe('TaskTreeNode', () => {
+  it('right-click "Mark as done" calls the bulk mutation and pushes one undo entry when leaves changed', () => {
+    markSubtreeDoneMutate.mockImplementation(
+      (_id: unknown, options?: { onSuccess?: (affectedIds: string[]) => void }) =>
+        options?.onSuccess?.(['c1', 'c2']),
+    )
+    const task = makeTask({ id: 't1', name: 'Row task' })
+    renderNode(task)
+
+    fireEvent.contextMenu(screen.getByText('Row task'))
+    expect(screen.getByText('Mark as done')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('Mark as done'))
+    expect(markSubtreeDoneMutate).toHaveBeenCalledWith('t1', expect.any(Object))
+  })
+
+  it('does not push an undo entry when nothing was affected (already all done)', () => {
+    markSubtreeDoneMutate.mockImplementation(
+      (_id: unknown, options?: { onSuccess?: (affectedIds: string[]) => void }) =>
+        options?.onSuccess?.([]),
+    )
+    const task = makeTask({ id: 't1', name: 'Row task' })
+    renderNode(task)
+
+    fireEvent.contextMenu(screen.getByText('Row task'))
+    fireEvent.click(screen.getByText('Mark as done'))
+
+    // No undo entry was pushed -- Ctrl+Z has nothing of this action's to undo.
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true })
+    expect(revertDoneMutateAsync).not.toHaveBeenCalled()
+  })
+
   it('opens a context menu with Delete on right-click, and confirms before deleting', () => {
     const task = makeTask({ id: 't1', name: 'Row task' })
     renderNode(task)
