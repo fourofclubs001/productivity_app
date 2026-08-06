@@ -4,7 +4,7 @@ Working notes for picking this project back up in a future session. Not user-fac
 docs (see `README.md` for that) — this is "what's true right now and how we work
 here."
 
-## Where things stand (as of M54, post-v06)
+## Where things stand (as of M62, mid-v07)
 
 The app is fully built and working: Plan / Execute / Evaluate views, FastAPI +
 Redis backend, React + Tailwind frontend, Google Workspace/Calendar-styled light
@@ -33,9 +33,12 @@ recreated both containers this time. Verified post-deploy: `/health` ok,
 frontend 200, served bundle's asset hash (`index-DwedjtUy.js`) matches the
 final build.
 
-No `prompts/app_improvements_vNN.md` is currently pending for a *new*
-pass — the next one arrives whenever the user drops one in, per the
-workflow below.
+**v07 is in progress** (13 items, M57–M67 planned; M57–M62 done as of this
+writing — see the v07 milestones section below and
+`prompts/interpreted_app_improvements_v07.md` for the full item list and
+root-caused diagnoses). No further `prompts/app_improvements_vNN.md` is
+pending beyond that — the next one arrives whenever the user drops one in,
+per the workflow below.
 
 ### v02 milestones (M13–M23, one commit each, all pushed)
 
@@ -641,7 +644,68 @@ Entirely frontend-only — no backend/pytest changes anywhere in this pass.
   `TaskTree.test.tsx` case asserting neither a recurrent task nor a
   recurrent group renders as a Plan-tree root.
 
-## The workflow established for this project
+### v07 milestones (M57–…, one commit each, pushed as completed)
+
+Full design rationale, including root-caused diagnoses for every "why is this
+happening?" question in the original list, is in
+`prompts/interpreted_app_improvements_v07.md`. Plan at
+`C:\Users\shimi\.claude\plans\partitioned-moseying-token.md`.
+
+- **M57** (`ad8f58f`) — item 1/7: `frontend/src/lib/taskTree.ts`'s
+  `isHiddenFromPlan` only hid a leaf at `state === 'sprint_done'`, so a leaf
+  that later rolled over to `done` (via the weekly `RolloverService`)
+  reappeared in the Plan tree — confirmed root cause of "depositar plata
+  alquiler" resurfacing in prod. Hide on both finished states now.
+- **M58** (`5a620ed`) — items 2+3: idle-detection auto-stop (M51) removed
+  entirely — it resets its timeout on `window`-scoped events, which only
+  fire for the document with OS focus, so working in a different
+  window/tab still let the timer auto-stop despite real activity elsewhere
+  (confirmed with the user as the cause of item 3's report). Removed: the
+  auto-stop logic, alert tone, acknowledgement dialog, Configuration
+  dialog's toggle/timeout controls, and the favicon's red state (nothing
+  triggers it anymore). Configuration button/dialog stays as an empty
+  shell. Live elapsed-time digits move from the favicon icon (now a plain
+  neutral/green color swap) into the browser tab title instead.
+- **M59** (`17f0ba7`) — item 4: "+ Child task" now opens a chooser between
+  "Create new task" (unchanged) and "Attach existing task" (new
+  `AttachExistingChildDialog.tsx`, reparenting the picked task — detaching
+  it from its previous parent(s), not an additive multi-parent add like
+  Requires). New `ancestorIds()` alongside the existing `descendantIds()`
+  in `lib/taskTree.ts` so the picker excludes any would-be-cyclic pick
+  up front rather than relying on the backend's `CycleError` alone.
+  Extracted the reparent-with-undo sequence `TaskTree.tsx` already used
+  for drag-reparenting into shared `lib/reparentUndo.ts`.
+- **M60** (`0ba58c3`) — item 5: clicking a pulled Google Calendar event now
+  opens a new read-only `GoogleEventDetailPanel` (title/time/description,
+  no editable fields) instead of silently no-op'ing — wired into both
+  `PlanCalendar` and `ExecuteCalendar`'s `onSelectEvent` (Execute had no
+  click handler on any event at all before this). Backend: `description`
+  wasn't surfaced past the Google API response — added to `GoogleEventOut`
+  and threaded through `list_events`.
+- **M61** (`3d39579`) — item 6: deleting a task with children now asks
+  "just this task" (reparents children up to the deleted task's own
+  parent(s), new logic in `TaskService.delete_task`'s `delete_children`
+  param, mirroring M47's recurrent-group ungroup — **not** the same as
+  today's old edge-cleanup-only default) vs "delete whole subtree"
+  (cascades via new `graph_utils.descendant_ids`). Leaf tasks keep the
+  plain confirm dialog. Cascade delete also cleans up future intervals for
+  every leaf descendant being removed, reusing the M42 `IntervalService`
+  path.
+- **M62** — item 8 (Plan calendar drag ghost/preview "not working," video
+  at `prompts/references/bug_moving_tasks_on_plan_calendar.mp4`):
+  investigated, not fixed — extracted and analyzed the video frame-by-frame
+  (top-edge resize, chip vanishes ~1s mid-drag), then wrote two realistic
+  Playwright reproductions matching that exact gesture (one matching the
+  video's timing, one matching the project's own existing bottom-edge-resize
+  test pattern); neither reproduces any flicker against current `main` —
+  resize/preview behavior is clean. **User confirmed** ("mark as not
+  currently reproducible") this resolution before further work. Along the
+  way, closed a real test-coverage gap (no prior spec covered the top edge
+  at all — only bottom-edge resize and body-move) with a new permanent
+  regression test in `calendar-move-resize.spec.ts`, and did a deep-dive
+  into that file's two still-failing pre-existing tests (unrelated to item
+  8 — see "Known limitations" below for the refined, still-unresolved
+  root-cause notes). No app code changed in this milestone.
 
 This has repeated three times now (initial build, v00, v01) and is worth reusing:
 
@@ -770,6 +834,38 @@ This has repeated three times now (initial build, v00, v01) and is worth reusing
   general. Not investigated further or fixed (out of scope for the v06
   improvements list) — worth a real root-cause pass if it's still
   reproducing next session.
+  **Partially root-caused during the v07 pass (M62), still not fully
+  resolved:** re-checked at the start of M62 (item 8's reported "ghost
+  preview not working during drag" bug) — `schedule.spec.ts` and
+  `drag-to-create.spec.ts` now pass cleanly (whatever caused those has
+  since resolved itself, likely a Playwright/Chromium version bump).
+  `calendar-move-resize.spec.ts` still fails, but narrowed down to
+  exactly 2 of its 6 tests: "the source chip is hidden while dragging"
+  and "cancelling a reschedule drag with Escape" — both of which assert
+  on the `.rbc-addons-dnd-dragged-event` class appearing mid-drag. Deep
+  debugging (temporary `console.log` instrumentation directly in
+  `PlanCalendar.tsx`'s mousedown/mousemove listener, since removed) found
+  the app's own drag-arm listener never even fires for these two tests'
+  exact gesture — traced one contributing factor to `todayAt(9)` no
+  longer resolving to a literal 9am once real 9am UTC has already passed
+  for the day (it pushes forward to "now + 30 min" instead, which late in
+  the UTC day lands far down the scrollable time grid, confirmed via
+  `document.elementFromPoint` returning `null` at the computed click
+  coordinates) — but adding `scrollIntoViewIfNeeded()` before every
+  `boundingBox()` call in the file did **not** fix it, so this isn't the
+  complete explanation either. **Confirmed unrelated to item 8's video**:
+  a realistic single-continuous-`mouse.move()` reproduction of the video's
+  exact top-edge-resize gesture (new permanent regression test in
+  `calendar-move-resize.spec.ts`, since no prior spec covered the top edge
+  at all) shows clean behavior with no flicker, and the underlying
+  reschedule-drag mechanics do still functionally work (the interval's
+  time does update) even when the two visual-assertion tests fail to find
+  their expected element — so this looks like a narrower, still-unresolved
+  Playwright-mouse-simulation/DnD-addon interaction bug in the test
+  harness itself, not a product regression. Next session: try instrumenting
+  `withDragAndDrop`'s own internal drag-state (or bisecting its version)
+  rather than the app's listener, since the app-level listener was
+  conclusively ruled out as the cause.
 
 ## Environment notes
 

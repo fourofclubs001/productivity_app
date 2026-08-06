@@ -149,6 +149,53 @@ test("dragging an event's bottom edge resizes its duration", async ({ page, requ
     .not.toBe(end.toISOString())
 })
 
+// v07 item 8 report: dragging a chip's top edge to resize its start time
+// supposedly makes the chip vanish mid-drag rather than showing a live
+// preview. No prior spec covered the top edge at all (only bottom-edge
+// resize and body-move, above) -- this closes that gap. Investigated via
+// frame-by-frame analysis of the reported video plus two targeted Playwright
+// reproductions matching its exact gesture; neither reproduced any flicker
+// against the current dev stack, so this is regression coverage for
+// currently-correct behavior, not a bug fix.
+test("dragging an event's top edge resizes its start time, with no flicker mid-drag", async ({
+  page,
+  request,
+}) => {
+  const start = todayAt(9)
+  const end = new Date(start.getTime() + 60 * 60 * 1000)
+  const task = await createTaskWithInterval(
+    request,
+    `TopResize ${Date.now()}`,
+    start.toISOString(),
+    end.toISOString(),
+  )
+
+  await page.goto('/')
+  const eventEl = page.locator('.rbc-event', { hasText: task.name })
+  await expect(eventEl).toBeVisible()
+  const box = await eventEl.boundingBox()
+  if (!box) throw new Error('event box not found')
+
+  // The resize handle is a thin strip right at the top edge of the event.
+  await page.mouse.move(box.x + box.width / 2, box.y + 2)
+  await page.mouse.down()
+  await page.mouse.move(box.x + box.width / 2, box.y - 30, { steps: 10 })
+
+  // Mid-drag: every matching chip (the unmoved source plus the live resize
+  // preview) stays fully visible -- none ever drops to opacity 0, unlike
+  // the reported bug's ~1s full disappearance.
+  await expect
+    .poll(async () => eventEl.evaluateAll((els) => els.every((el) => getComputedStyle(el).opacity === '1')))
+    .toBe(true)
+
+  await page.mouse.up()
+
+  await expect
+    .poll(async () => (await getIntervalForTask(request, task.id)).start)
+    .not.toBe(start.toISOString())
+  await expect(page.locator('.rbc-event', { hasText: task.name })).toHaveCSS('opacity', '1')
+})
+
 test('clicking a scheduled event opens the task detail view', async ({ page, request }) => {
   const start = todayAt(9)
   const end = new Date(start.getTime() + 60 * 60 * 1000)
