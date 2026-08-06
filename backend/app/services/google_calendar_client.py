@@ -104,6 +104,7 @@ class HttpxGoogleCalendarClient:
                         title=item.get("summary") or "(no title)",
                         start=datetime.fromisoformat(start),
                         end=datetime.fromisoformat(end),
+                        description=item.get("description"),
                     )
                 )
             return events

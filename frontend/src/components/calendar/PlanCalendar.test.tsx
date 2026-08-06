@@ -234,7 +234,7 @@ describe('PlanCalendar', () => {
     expect(deleteMutate).toHaveBeenCalledWith('iv1', expect.any(Object))
   })
 
-  it('renders a pulled Google Calendar event read-only, with no context menu or open-task click', () => {
+  it('renders a pulled Google Calendar event read-only, with no context menu, and clicking opens a read-only detail panel instead of a task', () => {
     useGoogleConnectionStatus.mockReturnValue({ data: { connected: true } })
     useGoogleEventsForWeek.mockReturnValue({
       data: [
@@ -243,6 +243,7 @@ describe('PlanCalendar', () => {
           title: 'Dentist',
           start: '2026-07-15T14:00:00.000Z',
           end: '2026-07-15T15:00:00.000Z',
+          description: 'Bring insurance card',
         },
       ],
     })
@@ -251,11 +252,13 @@ describe('PlanCalendar', () => {
     renderCalendar(new Map(), onOpenTask)
 
     const chip = screen.getByText('Dentist')
-    fireEvent.click(chip)
-    expect(onOpenTask).not.toHaveBeenCalled()
-
     fireEvent.contextMenu(chip)
     expect(screen.queryByText('Delete')).not.toBeInTheDocument()
     expect(screen.queryByText('Edit time')).not.toBeInTheDocument()
+
+    fireEvent.click(chip)
+    expect(onOpenTask).not.toHaveBeenCalled()
+    expect(screen.getByTestId('google-event-detail-panel')).toBeInTheDocument()
+    expect(screen.getByText('Bring insurance card')).toBeInTheDocument()
   })
 })

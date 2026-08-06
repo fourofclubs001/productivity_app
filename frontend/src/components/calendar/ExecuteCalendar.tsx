@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Calendar } from 'react-big-calendar'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import './calendar.css'
-import type { Task } from '../../types'
+import type { GoogleEvent, Task } from '../../types'
 import { useEntriesForWeek } from '../../api/timer'
 import { useIntervalsForWeek } from '../../api/intervals'
 import { useGoogleConnectionStatus } from '../../api/google'
@@ -14,6 +14,7 @@ import { splitAcrossDays } from '../../lib/splitEventAcrossDays'
 import { chipFillStyle, EXTERNAL_EVENT_STYLE } from './eventColor'
 import CalendarDayHeader from './CalendarDayHeader'
 import CalendarTimezoneLabel from './CalendarTimezoneLabel'
+import GoogleEventDetailPanel from './GoogleEventDetailPanel'
 
 interface CalendarEvent {
   id: string
@@ -27,6 +28,7 @@ interface CalendarEvent {
 export default function ExecuteCalendar({ tasksById }: { tasksById: Map<string, Task> }) {
   const [weekAnchor, setWeekAnchor] = useState(() => mondayOf(utcNow()))
   const [now, setNow] = useState(() => new Date())
+  const [selectedGoogleEvent, setSelectedGoogleEvent] = useState<GoogleEvent | null>(null)
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 30_000)
@@ -119,6 +121,11 @@ export default function ExecuteCalendar({ tasksById }: { tasksById: Map<string, 
           onNavigate={() => {}}
           toolbar={false}
           selectable={false}
+          onSelectEvent={(event: CalendarEvent) => {
+            if (!event.isExternal) return
+            const googleEvent = googleEvents.find((e) => `google-${e.id}` === event.id)
+            if (googleEvent) setSelectedGoogleEvent(googleEvent)
+          }}
           eventPropGetter={(event: CalendarEvent) => ({
             style: event.isExternal
               ? EXTERNAL_EVENT_STYLE
@@ -132,6 +139,13 @@ export default function ExecuteCalendar({ tasksById }: { tasksById: Map<string, 
           style={{ height: '100%' }}
         />
       </div>
+
+      {selectedGoogleEvent && (
+        <GoogleEventDetailPanel
+          event={selectedGoogleEvent}
+          onClose={() => setSelectedGoogleEvent(null)}
+        />
+      )}
     </div>
   )
 }

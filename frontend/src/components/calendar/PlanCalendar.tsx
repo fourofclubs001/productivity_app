@@ -8,7 +8,7 @@ import { useDndMonitor, useDroppable } from '@dnd-kit/core'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css'
 import './calendar.css'
-import type { Interval, Task } from '../../types'
+import type { GoogleEvent, Interval, Task } from '../../types'
 import {
   useCreateInterval,
   useDeleteInterval,
@@ -41,6 +41,7 @@ import CalendarTimezoneLabel from './CalendarTimezoneLabel'
 import ContextMenu from './ContextMenu'
 import AlertDialog from '../common/AlertDialog'
 import EditIntervalTimeModal from './EditIntervalTimeModal'
+import GoogleEventDetailPanel from './GoogleEventDetailPanel'
 import NewEventChooserDialog from './NewEventChooserDialog'
 import QuickCreateTaskDialog from './QuickCreateTaskDialog'
 import ScheduleExistingTaskDialog from './ScheduleExistingTaskDialog'
@@ -90,6 +91,7 @@ export default function PlanCalendar({
     interval: Interval
   } | null>(null)
   const [editingInterval, setEditingInterval] = useState<Interval | null>(null)
+  const [selectedGoogleEvent, setSelectedGoogleEvent] = useState<GoogleEvent | null>(null)
   const [now, setNow] = useState(() => new Date())
   const [dragPreview, setDragPreview] = useState<{ rect: PixelRect; task: Task } | null>(null)
   const [draggingEventId, setDraggingEventId] = useState<string | null>(null)
@@ -423,6 +425,11 @@ export default function PlanCalendar({
           onEventDrop={handleEventChange}
           onEventResize={handleEventChange}
           onSelectEvent={(event: CalendarEvent) => {
+            if (event.isExternal) {
+              const googleEvent = googleEvents.find((e) => `google-${e.id}` === event.id)
+              if (googleEvent) setSelectedGoogleEvent(googleEvent)
+              return
+            }
             const interval = intervals.find((i) => i.id === event.id)
             if (interval) onOpenTask(interval.task_id)
           }}
@@ -510,6 +517,13 @@ export default function PlanCalendar({
         <EditIntervalTimeModal
           interval={editingInterval}
           onClose={() => setEditingInterval(null)}
+        />
+      )}
+
+      {selectedGoogleEvent && (
+        <GoogleEventDetailPanel
+          event={selectedGoogleEvent}
+          onClose={() => setSelectedGoogleEvent(null)}
         />
       )}
 

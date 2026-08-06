@@ -55,4 +55,5 @@ export interface GoogleEvent {
   title: string
   start: string
   end: string
+  description?: string | null
 }

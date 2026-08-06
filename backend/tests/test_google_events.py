@@ -29,7 +29,11 @@ def test_list_events_returns_pulled_events(client):
     day = datetime.now(UTC) + timedelta(days=1)
     week_start = week_start_for(day)
     event = GoogleEventOut(
-        id="ext-1", title="Dentist", start=day, end=day + timedelta(hours=1)
+        id="ext-1",
+        title="Dentist",
+        start=day,
+        end=day + timedelta(hours=1),
+        description="Bring insurance card",
     )
     seed_events([event])
     try:
@@ -39,6 +43,23 @@ def test_list_events_returns_pulled_events(client):
         assert len(body) == 1
         assert body[0]["id"] == "ext-1"
         assert body[0]["title"] == "Dentist"
+        assert body[0]["description"] == "Bring insurance card"
+    finally:
+        del app.dependency_overrides[get_google_calendar_client]
+
+
+def test_list_events_description_defaults_to_none(client):
+    connect_google(client)
+    day = datetime.now(UTC) + timedelta(days=1)
+    week_start = week_start_for(day)
+    event = GoogleEventOut(
+        id="ext-3", title="No description", start=day, end=day + timedelta(hours=1)
+    )
+    seed_events([event])
+    try:
+        response = client.get(f"/google/events?week_start={week_start}")
+        assert response.status_code == 200
+        assert response.json()[0]["description"] is None
     finally:
         del app.dependency_overrides[get_google_calendar_client]
 

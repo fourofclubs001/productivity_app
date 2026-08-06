@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ExecuteCalendar from './ExecuteCalendar'
 import { renderWithClient } from '../../test/renderWithClient'
@@ -63,5 +63,26 @@ describe('ExecuteCalendar', () => {
   it('does not fetch Google events while disconnected', () => {
     renderCalendar(new Map([['t1', makeTask({ id: 't1' })]]))
     expect(useGoogleEventsForWeek).toHaveBeenCalledWith(expect.any(String), false)
+  })
+
+  it('clicking a pulled Google Calendar event opens a read-only detail panel', () => {
+    useGoogleConnectionStatus.mockReturnValue({ data: { connected: true } })
+    useGoogleEventsForWeek.mockReturnValue({
+      data: [
+        {
+          id: 'ext-1',
+          title: 'Dentist',
+          start: '2026-07-15T14:00:00.000Z',
+          end: '2026-07-15T15:00:00.000Z',
+          description: 'Bring insurance card',
+        },
+      ],
+    })
+
+    renderCalendar()
+
+    fireEvent.click(screen.getByText('Dentist'))
+    expect(screen.getByTestId('google-event-detail-panel')).toBeInTheDocument()
+    expect(screen.getByText('Bring insurance card')).toBeInTheDocument()
   })
 })

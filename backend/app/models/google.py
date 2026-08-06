@@ -12,3 +12,4 @@ class GoogleEventOut(BaseModel):
     title: str
     start: datetime
     end: datetime
+    description: str | None = None
