@@ -48,6 +48,22 @@ describe('TaskPicker', () => {
     expect(screen.queryByText('Done leaf')).not.toBeInTheDocument()
   })
 
+  it('hides a goal whose every leaf descendant is done', () => {
+    const doneGoal = makeTask({ id: 'g1', name: 'Done goal', is_leaf: false, state: 'done' })
+    render(<TaskPicker tasks={[doneGoal]} selectedId="" onSelect={() => {}} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select a task…' }))
+    expect(screen.queryByText('Done goal')).not.toBeInTheDocument()
+  })
+
+  it('keeps a goal visible while it still has an unfinished descendant (its state stays in_progress/backlog)', () => {
+    const goal = makeTask({ id: 'g1', name: 'Active goal', is_leaf: false, state: 'in_progress' })
+    render(<TaskPicker tasks={[goal]} selectedId="" onSelect={() => {}} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select a task…' }))
+    expect(screen.getByText('Active goal')).toBeInTheDocument()
+  })
+
   it('shows parent rows for navigation but they are not selectable, and expand reveals children', () => {
     const parent = makeTask({ id: 'p', name: 'Parent goal', is_leaf: false, children_ids: ['leaf'] })
     const leaf = makeTask({ id: 'leaf', name: 'Child leaf', parent_ids: ['p'] })

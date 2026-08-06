@@ -3,13 +3,19 @@ import type { Task } from '../../types'
 import { flattenTree, treeChildIds, treeRootIds } from '../../lib/taskTree'
 import { buildRecurrentTree, flattenRecurrentTree, recurrentNodeMap } from '../../lib/recurrentTaskTree'
 
-const UNSELECTABLE_LEAF_STATES = new Set(['sprint_done', 'done'])
+// Finished states to hide by default. Applies to both leaves and goals: a
+// leaf can be sprint_done or done, while a goal's rolled-up state
+// (_compute_state) only ever reaches done once every leaf descendant is
+// done -- never sprint_done directly -- so this one check naturally keeps
+// any goal with an unfinished descendant visible (its computed state stays
+// in_progress/backlog) with no separate ancestor-walk needed.
+const UNSELECTABLE_STATES = new Set(['sprint_done', 'done'])
 
 export default function TaskPicker({
   tasks,
   selectedId,
   onSelect,
-  isHidden = (task) => task.is_leaf && UNSELECTABLE_LEAF_STATES.has(task.state),
+  isHidden = (task) => UNSELECTABLE_STATES.has(task.state),
   isSelectable = (task) => task.is_leaf,
   placeholder = 'Select a task…',
   emptyMessage = 'No tasks available to track',
