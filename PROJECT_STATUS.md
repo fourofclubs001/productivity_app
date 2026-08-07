@@ -4,7 +4,7 @@ Working notes for picking this project back up in a future session. Not user-fac
 docs (see `README.md` for that) — this is "what's true right now and how we work
 here."
 
-## Where things stand (as of M62, mid-v07)
+## Where things stand (as of M67, post-v07)
 
 The app is fully built and working: Plan / Execute / Evaluate views, FastAPI +
 Redis backend, React + Tailwind frontend, Google Workspace/Calendar-styled light
@@ -33,12 +33,16 @@ recreated both containers this time. Verified post-deploy: `/health` ok,
 frontend 200, served bundle's asset hash (`index-DwedjtUy.js`) matches the
 final build.
 
-**v07 is in progress** (13 items, M57–M67 planned; M57–M62 done as of this
-writing — see the v07 milestones section below and
+v07 (13 items, M57–M67: leaf-visibility bugs, idle-detection removal +
+timer-in-title, existing-task reparenting, Google-event detail panel,
+delete-with-children, a drag/resize investigation, cascading mark-done,
+recurrent-generation windowing, Execute picker filtering, a boot script,
+and colored task indicators everywhere) is now fully implemented,
+committed, and pushed — see the v07 milestones section below and
 `prompts/interpreted_app_improvements_v07.md` for the full item list and
-root-caused diagnoses). No further `prompts/app_improvements_vNN.md` is
-pending beyond that — the next one arrives whenever the user drops one in,
-per the workflow below.
+root-caused diagnoses. **Not yet deployed to prod** as of this writing.
+No further `prompts/app_improvements_vNN.md` is pending — the next one
+arrives whenever the user drops one in, per the workflow below.
 
 ### v02 milestones (M13–M23, one commit each, all pushed)
 
@@ -706,6 +710,60 @@ happening?" question in the original list, is in
   into that file's two still-failing pre-existing tests (unrelated to item
   8 — see "Known limitations" below for the refined, still-unresolved
   root-cause notes). No app code changed in this milestone.
+- **M63** (`90b655d`) — item 9: right-click "Mark as done" on the Plan tree
+  now cascades through a task's whole subtree, undoable in one Ctrl+Z. New
+  `TimerService.mark_subtree_done` force-sets every non-finished leaf
+  descendant to `sprint_done`, deliberately bypassing `mark_done`'s
+  `in_progress`-only precondition (most leaves in a right-clicked subtree
+  are still `backlog`) — `mark_done`/`POST /timer/mark-done` itself is
+  untouched, still enforcing that precondition for its existing callers.
+  New `POST /timer/mark-subtree-done` returns the affected leaf ids. New
+  `makeMarkSubtreeDoneUndoEntry` generalizes the existing single-task
+  mark/revert-done undo-entry pair over an array of ids so however many
+  leaves were touched, one Ctrl+Z reverts them all (looping the
+  single-task helpers with separate `pushUndo` calls would have produced
+  one stack entry per leaf instead).
+- **M64** (`c677aa9`) — item 10: recurrent-task generation split by
+  bounded vs. unbounded end conditions. Root cause of "end date December,
+  only scheduled through September 1" (confirmed with the user):
+  `GENERATION_WINDOW_DAYS=28` meant every rule, bounded or not, only ever
+  generated 28 days ahead of whenever `ensure_applied()` last ran,
+  regardless of the rule's own end condition — nothing was stalled,
+  generation just hadn't caught up yet. A bounded rule (`on_date`/
+  `after_count`) now generates every occurrence through its own true end
+  at creation time (new `_initial_generation_window_end`) — no more
+  artificial cap. An unbounded (`never`) rule keeps the same lazy
+  catch-up-on-read mechanism, just with the rolling window raised from 28
+  to 365 days. Synchronous Google Calendar sync for every occurrence
+  generated up front is accepted as-is, no background job introduced.
+  Backend-only milestone.
+- **M65** (`584b880`) — item 11: Execute's `TaskPicker` now also hides a
+  fully-done **goal**, not just a done leaf — its default `isHidden` only
+  ever checked `task.is_leaf && state in {sprint_done, done}`, so a goal
+  whose every leaf descendant had finished still showed in prod. Dropped
+  the `is_leaf` guard: since a goal's computed state only ever reaches
+  `done` once *every* leaf descendant is done (never `sprint_done`
+  directly), this naturally keeps any goal with an unfinished descendant
+  visible with no separate ancestor-walk needed. No e2e coverage added —
+  a goal only computes to `done` after real weekly rollover flips every
+  leaf from `sprint_done` to `done`, not achievable via the public API
+  within a test run (the backend's own suite documents this same
+  constraint); frontend unit tests exercise the fix directly instead.
+- **M66** (`cad7ea6`) — item 12: new `scripts/start-on-boot.ps1` — brings
+  up the prod Docker stack, polls `/health` until reachable, then opens
+  the frontend in the default browser. Not a standard milestone (local
+  machine configuration, not application behavior, no automated test
+  applies). The one-time Task Scheduler registration command is documented
+  in the script's header; attempted from this session but Task Scheduler
+  denied access (both `Register-ScheduledTask` and `schtasks.exe`) — left
+  for the user to run themselves.
+- **M67** (`6eb0013`) — item 13: the colored-circle indicator already used
+  in the Plan tree and Recurrent tasks list (`ColorDots.tsx`) is now also
+  wired into `TaskPicker`'s row renderer (covering Execute's picker, the
+  Requires dropdown, and the Recurrent-tasks section inside `TaskPicker`
+  in one change, since they share a row renderer) and `TaskFilter`'s row
+  renderer (Evaluate Metrics + Excuses). **This completes the v07 pass**
+  (M57–M67, all 13 interpreted items).
 
 This has repeated three times now (initial build, v00, v01) and is worth reusing:
 
@@ -967,12 +1025,19 @@ docker compose -f docker-compose.dev.yml up --build     # dev: isolated data, po
 
 ## Next possible steps
 
-- **Root-cause the calendar-drag Playwright environment issue** flagged
-  above (`schedule.spec.ts` etc. failing even in total isolation, confirmed
-  unrelated to v06 code) — the next session should check whether it's
-  still reproducing before spending time on it; if so, start by diffing
-  this environment's Playwright/Chromium versions against whatever last
-  had these specs passing.
+- **Deploy v07 to prod** — not yet done as of this writing (M57–M67 are
+  committed/pushed to `main` but the prod stack hasn't been rebuilt).
+  Touches both backend and frontend, so `docker compose up --build -d`
+  needs to rebuild/recreate both containers, same as the M55/M56 redeploy.
+- **Root-cause `calendar-move-resize.spec.ts`'s two remaining failing
+  tests** ("the source chip is hidden while dragging," "cancelling a
+  reschedule drag with Escape") — see this file's "Known limitations"
+  entry under the v06-era environment regression for the M62 deep-dive's
+  refined (but still incomplete) findings: the app's own drag-arm listener
+  was conclusively ruled out, `scrollIntoViewIfNeeded()` did not fix it,
+  and the underlying reschedule-drag mechanics still functionally work
+  even when these two visual-assertion tests fail — next step suggested is
+  instrumenting `withDragAndDrop`'s own internal drag-state instead.
 - No `prompts/app_improvements_vNN.md` pending — next one arrives whenever
   the user drops one in.
 - Consider actually fixing the M18 dnd-kit scrolled-container drag bug (currently
@@ -982,15 +1047,15 @@ docker compose -f docker-compose.dev.yml up --build     # dev: isolated data, po
 - Revisit the tree auto-expand-on-add-child gap if it becomes annoying.
 - Consider a per-spec (not per-run) Redis flush for the Playwright suite if the
   crowding-related flakiness noted above gets worse as more specs are added
-  (it has: recurred in the v03, v04, v05, *and now v06* passes across several
-  specs, always resolved by an isolated re-run).
+  (it has: recurred in the v03, v04, v05, v06, *and now v07* passes across
+  several specs, always resolved by an isolated re-run).
 - Editing an existing recurrent task's recurrence rule (v04/v05 limitation
   above) if it turns out to be annoying in practice.
 - Recurrent-task groups (v05 M47) currently have no way to set up nesting at
   *creation* time (only via drag-and-drop, M48, after the fact) — revisit if
   that turns out to be an annoying two-step dance in practice.
-- The main Plan tree currently has no way to configure idle-detection's
-  default timeout beyond the Configuration dialog's plain number input
-  (v06 M51) — revisit if a fixed default (rather than the current
-  off-by-default) turns out to be what the user actually wants after using
-  it a while.
+- Register `scripts/start-on-boot.ps1` in Task Scheduler (v07 M66) — the
+  script and registration command are ready, but registration itself
+  couldn't be completed from within a Claude Code session (Task Scheduler
+  denied access); the user needs to run the command from the script's
+  header comment themselves.
