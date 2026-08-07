@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Task } from '../../types'
 import { flattenTree, treeChildIds, treeRootIds } from '../../lib/taskTree'
 import { buildRecurrentTree, flattenRecurrentTree, recurrentNodeMap } from '../../lib/recurrentTaskTree'
+import ColorDots from '../tree/ColorDots'
 
 // Finished states to hide by default. Applies to both leaves and goals: a
 // leaf can be sprint_done or done, while a goal's rolled-up state
@@ -142,15 +143,17 @@ export default function TaskPicker({
           <button
             type="button"
             onClick={() => select(id)}
-            className={`flex-1 truncate text-left ${
+            className={`flex flex-1 items-center gap-1.5 truncate text-left ${
               selectedId === id ? 'font-medium text-accent' : 'text-text-primary hover:text-accent'
             }`}
           >
-            {task.name}
+            <ColorDots colors={task.effective_colors} />
+            <span className="truncate">{task.name}</span>
           </button>
         ) : (
-          <span className="flex-1 truncate text-text-secondary">
-            {task.name}
+          <span className="flex flex-1 items-center gap-1.5 truncate text-text-secondary">
+            <ColorDots colors={task.effective_colors} />
+            <span className="truncate">{task.name}</span>
             <span className="ml-1.5 text-[10px]">{task.is_recurrent_group ? '(group)' : '(goal)'}</span>
           </span>
         )}

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Task } from '../../types'
 import { flattenTree, rootIds as computeRootIds, treeChildIds } from '../../lib/taskTree'
 import { buildRecurrentTree, flattenRecurrentTree, recurrentNodeMap } from '../../lib/recurrentTaskTree'
+import ColorDots from '../tree/ColorDots'
 
 export default function TaskFilter({
   tasks,
@@ -98,6 +99,7 @@ export default function TaskFilter({
         </button>
         <label className="flex flex-1 cursor-pointer items-center gap-1.5 text-text-primary">
           <input type="checkbox" checked={selectedIds.includes(id)} onChange={() => toggle(id)} />
+          <ColorDots colors={task.effective_colors} />
           <span className="truncate">{task.name}</span>
           {task.is_recurrent_group ? (
             <span className="shrink-0 text-text-secondary">(group)</span>

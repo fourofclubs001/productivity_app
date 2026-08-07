@@ -48,6 +48,21 @@ describe('TaskPicker', () => {
     expect(screen.queryByText('Done leaf')).not.toBeInTheDocument()
   })
 
+  it('shows a colored dot for a task with an effective color, for both selectable and non-selectable rows', () => {
+    const leaf = makeTask({ id: 'leaf', name: 'Red leaf', effective_colors: ['red'] })
+    const goal = makeTask({
+      id: 'goal',
+      name: 'Blue goal',
+      is_leaf: false,
+      effective_colors: ['blue'],
+    })
+    render(<TaskPicker tasks={[leaf, goal]} selectedId="" onSelect={() => {}} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select a task…' }))
+    expect(screen.getByTitle('red')).toBeInTheDocument()
+    expect(screen.getByTitle('blue')).toBeInTheDocument()
+  })
+
   it('hides a goal whose every leaf descendant is done', () => {
     const doneGoal = makeTask({ id: 'g1', name: 'Done goal', is_leaf: false, state: 'done' })
     render(<TaskPicker tasks={[doneGoal]} selectedId="" onSelect={() => {}} />)

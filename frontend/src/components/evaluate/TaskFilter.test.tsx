@@ -31,6 +31,14 @@ describe('TaskFilter', () => {
     expect(onChange).toHaveBeenCalledWith(['leaf'])
   })
 
+  it('shows a colored dot for a task with an effective color', () => {
+    const leaf = makeTask({ id: 'leaf', name: 'Red leaf', effective_colors: ['red'] })
+    render(<TaskFilter tasks={[leaf]} selectedIds={[]} onChange={() => {}} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Tasks:/ }))
+    expect(screen.getByTitle('red')).toBeInTheDocument()
+  })
+
   it('a parent task can be selected too (backend expands it to its descendant leaves)', () => {
     const parent = makeTask({ id: 'p', name: 'Parent goal', is_leaf: false, children_ids: [] })
     const onChange = vi.fn()
