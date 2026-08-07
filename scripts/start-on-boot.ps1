@@ -20,6 +20,24 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $healthUrl = "http://localhost:8000/health"
 $appUrl = "http://localhost:5173"
+$dockerDesktopExe = "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+
+if (-not (Get-Process "Docker Desktop" -ErrorAction SilentlyContinue)) {
+    Write-Host "Starting Docker Desktop..."
+    Start-Process $dockerDesktopExe
+}
+
+Write-Host "Waiting for the Docker daemon to become ready..."
+$maxDockerAttempts = 90
+for ($i = 0; $i -lt $maxDockerAttempts; $i++) {
+    try {
+        docker info 2>&1 | Out-Null
+        if ($LASTEXITCODE -eq 0) {
+            break
+        }
+    } catch {}
+    Start-Sleep -Seconds 2
+}
 
 Set-Location $repoRoot
 docker compose up --build -d

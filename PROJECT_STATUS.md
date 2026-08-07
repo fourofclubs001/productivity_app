@@ -51,6 +51,37 @@ final build.
 No further `prompts/app_improvements_vNN.md` is pending — the next one
 arrives whenever the user drops one in, per the workflow below.
 
+### Post-M66 follow-up: start-on-boot task registered and cold-boot tested (2026-08-07)
+
+Context: M66 (`cad7ea6`) added `scripts/start-on-boot.ps1` and documented the
+`Register-ScheduledTask` command in its header, but registration itself was
+left for the user (Task Scheduler denied it mid-session, both from the
+assistant and, at first, from the user too). Resolved across two sessions on
+2026-08-07:
+
+1. Registered the task (`ProductivityAppStartOnBoot`, `AtLogOn` trigger,
+   `RunLevel Limited`) — the earlier "access denied" turned out to be
+   session-specific, not a real blocker. New `scripts/register-start-on-boot.ps1`
+   wraps the registration command (and its `Unregister-ScheduledTask`
+   counterpart) so it doesn't only live in a header comment.
+2. Found Docker Desktop wasn't running, so a warm trigger of the task
+   couldn't reach the daemon. **Modified `scripts/start-on-boot.ps1`**: it
+   now checks `Get-Process "Docker Desktop"` and `Start-Process`'s it if not
+   already running, then polls `docker info` (wrapped in try/catch — a
+   native command's stderr under `$ErrorActionPreference = "Stop"` can
+   otherwise abort the script) before proceeding to `docker compose up`.
+3. Verified with Docker Desktop already warm: manual script run and
+   `Start-ScheduledTask` both succeed end-to-end (`LastTaskResult: 0`, all
+   three containers up, `/health` returns `{"status":"ok","redis":true}`).
+4. **Verified the real cold-boot path** in a follow-up session after the user
+   rebooted the machine: `Get-ScheduledTaskInfo` showed `LastRunTime` at
+   login time with `LastTaskResult: 0`; `docker compose -f docker-compose.yml
+   ps` showed all three of redis/backend/frontend `Up`; `/health` returned
+   `{"status":"ok","redis":true}`; and the user confirmed the browser opened
+   to `http://localhost:5173` on its own. Docker Desktop starting cold at
+   `AtLogOn` and the app coming up unattended is now confirmed working
+   end-to-end, not just from a warm-Docker trigger.
+
 ### v02 milestones (M13–M23, one commit each, all pushed)
 
 - **M13** (`f60e1e4`) — reusable `AlertDialog`, replacing inline error banners/text
@@ -1057,8 +1088,6 @@ docker compose -f docker-compose.dev.yml up --build     # dev: isolated data, po
 - Recurrent-task groups (v05 M47) currently have no way to set up nesting at
   *creation* time (only via drag-and-drop, M48, after the fact) — revisit if
   that turns out to be an annoying two-step dance in practice.
-- Register `scripts/start-on-boot.ps1` in Task Scheduler (v07 M66) — the
-  script and registration command are ready, but registration itself
-  couldn't be completed from within a Claude Code session (Task Scheduler
-  denied access); the user needs to run the command from the script's
-  header comment themselves.
+- `scripts/start-on-boot.ps1` is registered in Task Scheduler and the
+  cold-boot path is verified end-to-end (see "Post-M66 follow-up" above) —
+  no further action needed here.
