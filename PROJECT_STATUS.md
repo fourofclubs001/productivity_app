@@ -40,7 +40,14 @@ recurrent-generation windowing, Execute picker filtering, a boot script,
 and colored task indicators everywhere) is now fully implemented,
 committed, and pushed — see the v07 milestones section below and
 `prompts/interpreted_app_improvements_v07.md` for the full item list and
-root-caused diagnoses. **Not yet deployed to prod** as of this writing.
+root-caused diagnoses.
+
+**Redeployed to prod as of 2026-08-06** (M57–M67) — this pass touched both
+backend and frontend, so `docker compose up --build -d` rebuilt/recreated
+both containers. Verified post-deploy: `/health` ok (`redis: true`),
+frontend 200, served bundle's asset hash (`index-BxjEmCtc.js`) matches the
+final build.
+
 No further `prompts/app_improvements_vNN.md` is pending — the next one
 arrives whenever the user drops one in, per the workflow below.
 
@@ -1025,10 +1032,6 @@ docker compose -f docker-compose.dev.yml up --build     # dev: isolated data, po
 
 ## Next possible steps
 
-- **Deploy v07 to prod** — not yet done as of this writing (M57–M67 are
-  committed/pushed to `main` but the prod stack hasn't been rebuilt).
-  Touches both backend and frontend, so `docker compose up --build -d`
-  needs to rebuild/recreate both containers, same as the M55/M56 redeploy.
 - **Root-cause `calendar-move-resize.spec.ts`'s two remaining failing
   tests** ("the source chip is hidden while dragging," "cancelling a
   reschedule drag with Escape") — see this file's "Known limitations"
