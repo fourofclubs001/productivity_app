@@ -359,17 +359,26 @@ UX-11 + UX-14 + UX-15. Optional 6th: UX-29.
 
 ## Notes for implementation planning
 
-- **Item 1 is the whole pass's risk.** Suggested milestone breakdown to
-  settle in plan mode: (a) Firebase project + Auth on the frontend + the
-  backend token-verification dependency, still on Redis, single-user data
-  keyed by the one UID; (b) Firestore repository rewrite, entity type by
-  entity type, behind the existing repository interfaces, with the test
-  suite ported to the Firestore emulator; (c) per-user scoping switched on
-  across all routers; (d) Firebase Hosting + Cloud Run + Firestore
-  deployment (project setup, container deploy, `firebase.json`, deploy
-  script/CI); (e) prod Redis backup + one-time migration script + cutover;
-  (f) Redis removal (containers, `docker-compose.yml` prod stack, config,
-  dead code).
+**Plan approved** — full milestone breakdown, exploration findings, and the
+Firestore data model are in `C:\Users\shimi\.claude\plans\curried-tumbling-pebble.md`.
+Decisions settled during planning:
+
+- **Phase order:** Phase A (items 3/4/5 + all 30 UX items, frontend + a tiny
+  `PATCH`/`DELETE /entries` backend on Redis) ships first; Phase B (the
+  Firebase Auth + Redis→Firestore + deploy epic) second. Only ~2 h of rework
+  (two `EntryRepository` Redis methods migrated in B2).
+- **Deploy:** Firebase Hosting `/api/** → Cloud Run` rewrite, so the frontend
+  is same-origin `/api` — `VITE_API_BASE_URL` becomes the constant `/api`,
+  **CORS goes away**, and the "URL known at build time" problem disappears.
+  FastAPI gains a `/api` prefix (`root_path`).
+- **GCP:** a **new** Firebase/GCP project on the default `*.web.app` domain
+  (custom domain deferred); a **separate** second project for staging.
+- **Auth:** Google + email magic link only.
+- **Item 1 milestones:** B1 auth (still on Redis, single-tenant, deploy to
+  staging) → B2 Firestore repo rewrite behind unchanged interfaces + emulator
+  test suite → B3 per-user scoping + catch-up throttle → B4 Cloud Run +
+  `firebase.json` + rules/indexes + deploy script + CI → B5 prod Redis backup
+  + one-time migration script + cutover → B6 Redis removal.
 - **Public hosting — decided: Firebase Hosting + Cloud Run + Firestore**,
   and the deploy is in scope for v08 (see item 1). Cloud Run wants a
   billing account on file (no charge at this volume); the frontend's
