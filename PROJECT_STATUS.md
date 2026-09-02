@@ -4,6 +4,82 @@ Working notes for picking this project back up in a future session. Not user-fac
 docs (see `README.md` for that) — this is "what's true right now and how we work
 here."
 
+## v08 IN PROGRESS — Phase A complete, Phase B (Firebase/Firestore epic) not started
+
+v08 is the biggest pass yet. Full interpretation + the Fable UX proposal are in
+`prompts/interpreted_app_improvements_v08.md` / `prompts/v08_fable_ux_proposal.md`;
+the approved implementation plan is
+`C:\Users\shimi\.claude\plans\curried-tumbling-pebble.md`.
+
+**Phase A (items 3/4/5 + all 30 Fable UX items) is DONE and pushed** — 14
+commits, `9686658`..`54127c9`:
+
+- **A1** `9686658` — timer tab-title `mm:ss` under 1h / `h:mm:ss` from 1h (item 3).
+- **A2** `da81b78` — design tokens: `--shadow-1/-2`, radius, scrim,
+  `--color-text-tertiary/-border-subtle/-warning-text`, 13px `--text-ui` +
+  11px `--text-2xs`, global transitions + `:focus-visible` + reduced-motion,
+  nav de-magic-numbered.
+- **A3** `93dfb81` — `components/common/Button` + `Menu` + `StateBadge`
+  restyle + global input recipe.
+- **A4** `25414f5` — `components/common/Dialog`; converted ~19 modal scaffolds.
+- **A4b** `eb22a94` — `components/common/icons` (hand-rolled SVG set).
+- **A5a** `28ca59d` — tracked-time (`Entry`) chips merged into `PlanCalendar`
+  (`kind: 'interval' | 'entry' | 'google'`), `trackedChipStyle`.
+- **A5b** `5347f1b` — **Execute tab/view/`ExecuteCalendar`/`TimerControl`/
+  `GlobalTimerWatcher` deleted.** `ViewKey = 'plan' | 'evaluate'`. `NavTimer`
+  (running readout + Stop + favicon/title) in the nav; `TaskTimerButton`
+  (Start/Stop) in the detail panel; shared `useTimerStopFlow`. 7 e2e specs
+  rewritten off the Execute tab.
+- **A7** `453ee40` — `POST`/`PATCH`/`DELETE /entries/{id}` +
+  `GET /entries/by-task/{id}` (backend on Redis — migrated in Phase B).
+  Editable tracked chips on the calendar (drag/resize/delete/context-menu,
+  `lib/entryUndoEntries.ts`), `EditEntryTimeModal`, `TrackedTimeList` in the
+  detail panel. 223 pytest.
+- **A8** `a1f8586` — detail-panel action bar (timer/calendar/sub-task/save
+  in one row), section rhythm, "Estimated time"→"On calendar".
+- **A8b** `71cda5b` — merged the Plan left tab strip with the "TASKS +"
+  header row into one row (`+` follows the active tab).
+- **A9** `9ceafa2` — tree rows: `h-7`, cursor-grab, rotating `ChevronRight`
+  SVG, ring-based reparent preview, hover `+`/kebab; hide the `backlog`-leaf
+  and any `done` StateBadge; empty detail column collapses to 0.
+- **A10** `7c842d0` — calendar: today = header circle (no column tint),
+  48px hours, scroll to 07:00, current-time dot, chip refinements +
+  `chipTextColor`, toolbar → chevron icons + Today + promoted label,
+  grid-tint drop target.
+- **A11** `e7130fb` — Evaluate: `components/common/SegmentedControl`, the two
+  stacked tab rows collapse to one toolbar, stat-tile restyle +
+  threshold-coloured %, right-aligned `tabular-nums` table columns.
+- **A12** `54127c9` — undo snackbar (`UndoProvider` → bottom-left toast),
+  `components/common/EmptyState`, `Button` `loading` prop, nav wordmark.
+
+**Test state:** frontend 258 vitest + backend 223 pytest, all green.
+`npm run build` / `ruff` / `oxlint` clean. E2E: every spec passes in
+isolation / small batches; the **full-suite run flakes ~15 specs** — this is
+the long-documented crowding issue (`global-setup.ts` flushes Redis once per
+run, not per spec), NOT a v08 regression (`timer.spec.ts` etc. pass 7/7 alone
+after a flush). The 2 genuinely-failing `calendar-move-resize.spec.ts` cases
+(`:52`, `:89`) are the pre-existing v07 baseline failures.
+
+**Dev stack note:** must be started with
+`GOOGLE_CLIENT_ID= GOOGLE_CLIENT_SECRET= docker compose -f docker-compose.dev.yml up -d`
+(the root `.env`'s real Google creds otherwise leak into dev and break the
+Google e2e specs).
+
+**Phase B (item 1 — Firebase Auth + Redis→Firestore + per-user scoping +
+Firebase Hosting + Cloud Run deploy + prod data migration) has NOT started.**
+Milestones B1–B6 are in the plan file. Decisions on record: full Firestore
+(not Auth-only); Google + email-link auth only; a NEW GCP/Firebase project on
+the default `*.web.app` domain + a SEPARATE staging project; the Firebase
+Hosting `/api/** → Cloud Run` rewrite (frontend calls same-origin `/api`, no
+CORS). The user must create the two Firebase projects + enable providers/APIs
+before B1 (checklist in the plan file's "What the user does by hand").
+
+**Also uncommitted-then-committed pre-v08:** `e15dbe1` (Google invalid-grant
+token cleanup), `4cbc9e4` (recurrent-task duplicate-occurrence guard) — small
+ad-hoc fixes, on `main`.
+
+---
+
 ## Where things stand (as of M67, post-v07)
 
 The app is fully built and working: Plan / Execute / Evaluate views, FastAPI +
