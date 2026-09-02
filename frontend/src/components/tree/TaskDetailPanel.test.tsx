@@ -49,6 +49,9 @@ const revertDoneMutateAsync = vi.fn()
 vi.mock('../../api/timer', () => ({
   useMarkDone: () => ({ mutate: markDoneMutate, mutateAsync: markDoneMutateAsync, isPending: false }),
   useRevertDone: () => ({ mutateAsync: revertDoneMutateAsync, isPending: false }),
+  useActiveTimer: () => ({ data: null }),
+  useStartTimer: () => ({ mutate: vi.fn(), isPending: false }),
+  useStopTimer: () => ({ mutate: vi.fn(), isPending: false }),
 }))
 
 beforeEach(() => {

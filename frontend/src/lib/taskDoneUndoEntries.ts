@@ -10,12 +10,10 @@ export interface DoneUndoMutators {
  * two known values), so a simple symmetric pair suffices. Pushed after
  * mark-done succeeds: running it reverts back to in_progress and returns
  * the entry that re-marks it done. */
-// Pushed from both Execute (TimerControl, after stopping a timer) and Plan
-// (TaskDetailPanel's "Mark sprint done" button) -- either way it flips the
-// task's state field, which both views' displays (StateBadge, timer
-// eligibility) depend on, so it's tagged for both regardless of which one
-// triggered it (v03 item 8's cross-view carve-out).
-const AFFECTED_VIEWS: ViewKey[] = ['plan', 'execute']
+// Pushed from the nav timer's stop-confirm flow and from the Plan detail
+// panel (the timer button / "Mark sprint done"). Since v08 removed the
+// Execute view, everything that flips a task's state lives under Plan.
+const AFFECTED_VIEWS: ViewKey[] = ['plan']
 
 export function makeRevertDoneEntry(taskId: string, mutators: DoneUndoMutators): UndoEntry {
   return {

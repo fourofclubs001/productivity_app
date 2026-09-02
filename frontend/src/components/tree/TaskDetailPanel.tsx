@@ -29,6 +29,7 @@ import IntervalTimeFields, {
   type IntervalTimeValue,
 } from '../calendar/IntervalTimeFields'
 import DoneConfirmModal from '../timer/DoneConfirmModal'
+import TaskTimerButton from '../timer/TaskTimerButton'
 import TaskPicker from '../timer/TaskPicker'
 import ColorSwatchPicker from './ColorSwatchPicker'
 import StateBadge from './StateBadge'
@@ -181,6 +182,8 @@ export default function TaskDetailPanel({
           </button>
         </div>
       </div>
+
+      {task.is_leaf && <TaskTimerButton task={task} />}
 
       <input
         aria-label="Task name"

@@ -34,11 +34,11 @@ describe('makeMarkSubtreeDoneUndoEntry', () => {
     expect(undoAgainEntry.label).toBe('Mark subtree done')
   })
 
-  it('tags both plan and execute views, matching the single-task entries', () => {
+  it('tags the plan view, matching the single-task entries', () => {
     const entry = makeMarkSubtreeDoneUndoEntry(['a'], {
       markDoneAsync: vi.fn(),
       revertDoneAsync: vi.fn(),
     })
-    expect(entry.views).toEqual(['plan', 'execute'])
+    expect(entry.views).toEqual(['plan'])
   })
 })

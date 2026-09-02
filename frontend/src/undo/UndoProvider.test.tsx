@@ -172,10 +172,10 @@ function MultiViewHarness({ onLog }: { onLog: (message: string) => void }) {
       <button type="button" onClick={() => push('plan-action', ['plan'])}>
         Push plan action
       </button>
-      <button type="button" onClick={() => push('execute-action', ['execute'])}>
-        Push execute action
+      <button type="button" onClick={() => push('evaluate-action', ['evaluate'])}>
+        Push evaluate action
       </button>
-      <button type="button" onClick={() => push('cross-action', ['plan', 'execute'])}>
+      <button type="button" onClick={() => push('cross-action', ['plan', 'evaluate'])}>
         Push cross-view action
       </button>
     </div>
@@ -323,27 +323,27 @@ describe('UndoProvider', () => {
       )
 
       fireEvent.click(screen.getByText('Push plan action'))
-      fireEvent.click(screen.getByText('Push execute action'))
+      fireEvent.click(screen.getByText('Push evaluate action'))
 
-      // On Plan, ctrl+z should skip over the top "execute-action" entry and
+      // On Plan, ctrl+z should skip over the top "evaluate-action" entry and
       // pop "plan-action" instead -- not discarding the skipped entry.
       await pressUndo()
       expect(log).toEqual(['undo plan-action'])
 
-      // Switch to Execute: its entry is still there, untouched by the above.
+      // Switch to Evaluate: its entry is still there, untouched by the above.
       rerender(
-        <UndoProvider activeView="execute">
+        <UndoProvider activeView="evaluate">
           <MultiViewHarness onLog={(m) => log.push(m)} />
         </UndoProvider>,
       )
       await pressUndo()
-      expect(log).toEqual(['undo plan-action', 'undo execute-action'])
+      expect(log).toEqual(['undo plan-action', 'undo evaluate-action'])
     })
 
     it('a cross-view entry is poppable from either of its tagged views', async () => {
       const log: string[] = []
       render(
-        <UndoProvider activeView="execute">
+        <UndoProvider activeView="evaluate">
           <MultiViewHarness onLog={(m) => log.push(m)} />
         </UndoProvider>,
       )
@@ -362,25 +362,26 @@ describe('UndoProvider', () => {
         </UndoProvider>,
       )
 
+      // Only a Plan-scoped entry exists; ctrl+z while on Evaluate must not
+      // touch it.
       fireEvent.click(screen.getByText('Push plan action'))
-      fireEvent.click(screen.getByText('Push execute action'))
       await pressUndo()
 
       expect(log).toEqual([])
     })
 
-    it('pushing a new Plan action does not clear Execute\'s pending redo', async () => {
-      const onExecuteUndo = vi.fn()
-      const onExecuteRedo = vi.fn()
+    it('pushing a new Plan action does not clear Evaluate\'s pending redo', async () => {
+      const onEvaluateUndo = vi.fn()
+      const onEvaluateRedo = vi.fn()
       const onPlanUndo = vi.fn()
       const { rerender } = render(
-        <UndoProvider activeView="execute">
-          <TestHarness onUndo={onExecuteUndo} onRedo={onExecuteRedo} views={['execute']} />
+        <UndoProvider activeView="evaluate">
+          <TestHarness onUndo={onEvaluateUndo} onRedo={onEvaluateRedo} views={['evaluate']} />
         </UndoProvider>,
       )
 
       fireEvent.click(screen.getByText('Do something undoable'))
-      await pressUndo() // Execute now has a pending redo entry
+      await pressUndo() // Evaluate now has a pending redo entry
 
       rerender(
         <UndoProvider activeView="plan">
@@ -388,17 +389,17 @@ describe('UndoProvider', () => {
         </UndoProvider>,
       )
       fireEvent.click(screen.getByText('Do something undoable'))
-      await pressUndo() // Plan's own action, unrelated to Execute's redo entry
+      await pressUndo() // Plan's own action, unrelated to Evaluate's redo entry
 
       rerender(
-        <UndoProvider activeView="execute">
-          <TestHarness onUndo={onExecuteUndo} onRedo={onExecuteRedo} views={['execute']} />
+        <UndoProvider activeView="evaluate">
+          <TestHarness onUndo={onEvaluateUndo} onRedo={onEvaluateRedo} views={['evaluate']} />
         </UndoProvider>,
       )
       await pressRedo()
 
-      // Execute's redo entry survived the unrelated Plan push/undo above.
-      expect(onExecuteRedo).toHaveBeenCalledTimes(1)
+      // Evaluate's redo entry survived the unrelated Plan push/undo above.
+      expect(onEvaluateRedo).toHaveBeenCalledTimes(1)
     })
   })
 })

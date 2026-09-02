@@ -1,16 +1,14 @@
 import { useState, type ComponentType } from 'react'
 import PlanView from './views/PlanView'
-import ExecuteView from './views/ExecuteView'
 import EvaluateView from './views/EvaluateView'
 import GoogleConnectButton from './components/nav/GoogleConnectButton'
 import ConfigButton from './components/nav/ConfigButton'
-import GlobalTimerWatcher from './components/timer/GlobalTimerWatcher'
+import NavTimer from './components/timer/NavTimer'
 import { UndoProvider } from './undo/UndoProvider'
 import type { ViewKey } from './lib/views'
 
 const VIEWS: Record<ViewKey, { label: string; Component: ComponentType }> = {
   plan: { label: 'Plan', Component: PlanView },
-  execute: { label: 'Execute', Component: ExecuteView },
   evaluate: { label: 'Evaluate', Component: EvaluateView },
 }
 
@@ -38,7 +36,8 @@ function App() {
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <NavTimer />
             <GoogleConnectButton />
             <ConfigButton />
           </div>
@@ -46,7 +45,6 @@ function App() {
         <main className="min-h-0 flex-1">
           <ActiveComponent />
         </main>
-        <GlobalTimerWatcher />
       </div>
     </UndoProvider>
   )

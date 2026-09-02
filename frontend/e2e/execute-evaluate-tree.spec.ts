@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 
-test('Execute picker and Evaluate lists mirror the Plan panel tree shape', async ({ page }) => {
+test('Evaluate lists mirror the Plan panel tree shape', async ({ page }) => {
   const parentName = `TreeM12 Parent ${Date.now()}`
   const childName = `TreeM12 Child ${Date.now()}`
 
@@ -17,29 +17,12 @@ test('Execute picker and Evaluate lists mirror the Plan panel tree shape', async
   await page.getByLabel('Definition of done').fill('done')
   await page.getByRole('button', { name: 'Create' }).click()
 
-  // --- Execute: item 25 ---
-  await page.getByRole('button', { name: 'Execute' }).click()
-  const trigger = page.getByTestId('task-picker-trigger')
-  const options = page.getByTestId('task-picker-options')
-
-  await trigger.click()
-  await expect(options.getByText(parentName)).toBeVisible()
-  // Parent rows are shown for navigation only -- not a clickable leaf option.
-  await expect(options.getByRole('button', { name: parentName, exact: true })).not.toBeVisible()
-  await expect(options.getByRole('button', { name: childName, exact: true })).not.toBeVisible()
-
-  // Expand the parent's chevron to reveal the child leaf.
-  const parentRow = options.locator('div', { hasText: parentName }).first()
-  await parentRow.getByRole('button').first().click()
-  await expect(options.getByRole('button', { name: childName, exact: true })).toBeVisible()
-
-  await options.getByRole('button', { name: childName, exact: true }).click()
-  await expect(trigger).toHaveText(childName)
-  await page.getByRole('button', { name: 'Start' }).click()
-  await page.getByRole('button', { name: 'Stop' }).click()
+  // Track the child briefly so the parent shows up in Metrics.
+  await page.getByRole('button', { name: 'Start timer' }).click()
+  await page.getByRole('button', { name: 'Stop', exact: true }).click()
   await page.getByRole('button', { name: 'No, stop the timer' }).click()
 
-  // --- Evaluate Metrics: items 26/28 ---
+  // --- Evaluate Metrics: tree shape mirrors Plan ---
   await page.getByRole('button', { name: 'Evaluate' }).click()
   await page.getByRole('button', { name: 'Metrics', exact: true }).click()
 
@@ -51,7 +34,7 @@ test('Execute picker and Evaluate lists mirror the Plan panel tree shape', async
   await parentCell.getByRole('button').first().click()
   await expect(page.getByRole('cell', { name: childName })).toBeVisible()
 
-  // --- Evaluate task filter: item 29 ---
+  // --- Evaluate task filter: parent shown for navigation, child nested ---
   await page.getByRole('button', { name: /Tasks:/ }).click()
   const filterPanel = page.locator('div.absolute', { hasText: parentName })
   await expect(filterPanel.getByText(parentName)).toBeVisible()

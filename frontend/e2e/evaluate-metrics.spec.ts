@@ -17,11 +17,10 @@ test('Evaluate Metrics subtab: granularity switch and task filter', async ({ pag
   await page.getByLabel('Definition of done').fill('done')
   await page.getByRole('button', { name: 'Create' }).click()
 
-  await page.getByRole('button', { name: 'Execute' }).click()
-  await page.getByTestId('task-picker-trigger').click()
-  await page.getByTestId('task-picker-options').getByRole('button', { name: taskAName, exact: true }).click()
-  await page.getByRole('button', { name: 'Start' }).click()
-  await page.getByRole('button', { name: 'Stop' }).click()
+  // Track task A briefly (executed time, no plan) from its detail panel.
+  await page.getByTestId('task-tree').getByText(taskAName).click()
+  await page.getByRole('button', { name: 'Start timer' }).click()
+  await page.getByRole('button', { name: 'Stop', exact: true }).click()
   await page.getByRole('button', { name: 'No, stop the timer' }).click()
 
   await page.getByRole('button', { name: 'Evaluate' }).click()

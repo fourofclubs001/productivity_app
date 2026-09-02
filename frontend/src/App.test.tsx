@@ -30,15 +30,17 @@ vi.mock('./api/googleEvents', () => ({
 vi.mock('./api/timer', () => ({
   useActiveTimer: () => ({ data: null }),
   useStopTimer: () => ({ mutate: vi.fn(), isPending: false }),
+  useMarkDone: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
+  useRevertDone: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useEntriesForWeek: () => ({ data: [] }),
 }))
 
 describe('App', () => {
-  it('renders the three view tabs and defaults to Plan', () => {
+  it('renders the Plan and Evaluate tabs and defaults to Plan', () => {
     render(<App />)
     expect(screen.getByRole('button', { name: 'Plan' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Execute' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Evaluate' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Execute' })).not.toBeInTheDocument()
     expect(screen.getByText(/no tasks yet/i)).toBeInTheDocument()
   })
 })

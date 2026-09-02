@@ -1,1 +1,1 @@
-export type ViewKey = 'plan' | 'execute' | 'evaluate'
+export type ViewKey = 'plan' | 'evaluate'

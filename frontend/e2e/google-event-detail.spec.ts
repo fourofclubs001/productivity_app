@@ -29,7 +29,7 @@ async function mockPulledEvent(page: import('@playwright/test').Page, title: str
   })
 }
 
-test('clicking a pulled Google Calendar event opens a read-only detail panel on Plan and Execute', async ({
+test('clicking a pulled Google Calendar event opens a read-only detail panel', async ({
   page,
   request,
 }) => {
@@ -44,7 +44,8 @@ test('clicking a pulled Google Calendar event opens a read-only detail panel on 
   await page.getByRole('link', { name: 'Connect Google Calendar' }).click()
   await expect(page.getByRole('button', { name: 'Google Calendar connected' })).toBeVisible()
 
-  // Plan: clicking the chip opens the read-only panel.
+  // Clicking the pulled-in chip on the Plan calendar opens the read-only
+  // panel (no editable controls).
   await expect(page.getByText(title)).toBeVisible()
   await page.getByText(title).click()
   await expect(page.getByTestId('google-event-detail-panel')).toBeVisible()
@@ -52,11 +53,4 @@ test('clicking a pulled Google Calendar event opens a read-only detail panel on 
   await expect(page.getByRole('button', { name: 'Delete' })).not.toBeVisible()
   await page.getByRole('button', { name: 'Close' }).click()
   await expect(page.getByTestId('google-event-detail-panel')).not.toBeVisible()
-
-  // Execute: same event, same panel.
-  await page.getByRole('button', { name: 'Execute' }).click()
-  await expect(page.getByText(title)).toBeVisible()
-  await page.getByText(title).click()
-  await expect(page.getByTestId('google-event-detail-panel')).toBeVisible()
-  await expect(page.getByText('Bring insurance card')).toBeVisible()
 })

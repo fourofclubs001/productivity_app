@@ -28,28 +28,22 @@ test('blocks deleting a task while its timer is running', async ({ page }) => {
   await deleteViaOptionsMenu(page)
   await expect(tree().getByText(taskName)).not.toBeVisible()
 
-  // Recreate it and start its timer this time.
+  // Recreate it and start its timer this time (from the detail panel).
   await createTask(page, taskName)
-  await page.getByRole('button', { name: 'Execute' }).click()
-  await page.getByTestId('task-picker-trigger').click()
-  await page.getByTestId('task-picker-options').getByRole('button', { name: taskName, exact: true }).click()
-  await page.getByRole('button', { name: 'Start' }).click()
+  await tree().getByText(taskName).click()
+  await page.getByRole('button', { name: 'Start timer' }).click()
   await expect(page.getByText('Tracking')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Plan' }).click()
-  await tree().getByText(taskName).click()
   await deleteViaOptionsMenu(page)
 
   await expect(page.getByText(/timer is currently running/i)).toBeVisible()
   await page.getByRole('button', { name: 'OK' }).click()
   await expect(tree().getByText(taskName)).toBeVisible()
 
-  // Stop the timer, then deletion should succeed.
-  await page.getByRole('button', { name: 'Execute' }).click()
-  await page.getByRole('button', { name: 'Stop' }).click()
+  // Stop the timer (from the nav), then deletion should succeed.
+  await page.getByRole('button', { name: 'Stop', exact: true }).click()
   await page.getByRole('button', { name: 'No, stop the timer' }).click()
 
-  await page.getByRole('button', { name: 'Plan' }).click()
   await tree().getByText(taskName).click()
   await deleteViaOptionsMenu(page)
   await expect(tree().getByText(taskName)).not.toBeVisible()
@@ -76,7 +70,7 @@ test('right-clicking a Plan tree row opens a Delete context menu', async ({ page
   await expect(tree().getByText(taskName)).not.toBeVisible()
 })
 
-test('deleting a task keeps its tracked-time chip name on Execute and Evaluate', async ({
+test('deleting a task keeps its tracked-time chip name on the Plan calendar and Evaluate', async ({
   page,
 }) => {
   const taskName = `Snapshot survives deletion ${Date.now()}`
@@ -85,22 +79,19 @@ test('deleting a task keeps its tracked-time chip name on Execute and Evaluate',
   await page.goto('/')
   await createTask(page, taskName)
 
-  await page.getByRole('button', { name: 'Execute' }).click()
-  await page.getByTestId('task-picker-trigger').click()
-  await page.getByTestId('task-picker-options').getByRole('button', { name: taskName, exact: true }).click()
-  await page.getByRole('button', { name: 'Start' }).click()
+  await tree().getByText(taskName).click()
+  await page.getByRole('button', { name: 'Start timer' }).click()
   await expect(page.getByText('Tracking')).toBeVisible()
-  await page.getByRole('button', { name: 'Stop' }).click()
+  await page.getByRole('button', { name: 'Stop', exact: true }).click()
   await page.getByRole('button', { name: 'No, stop the timer' }).click()
 
   await expect(page.locator('.rbc-event', { hasText: taskName })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Plan' }).click()
   await tree().getByText(taskName).click()
   await deleteViaOptionsMenu(page)
   await expect(tree().getByText(taskName)).not.toBeVisible()
 
-  await page.getByRole('button', { name: 'Execute' }).click()
+  // The tracked-time chip keeps the snapshotted name on the Plan calendar.
   await expect(page.locator('.rbc-event', { hasText: taskName })).toBeVisible()
   await expect(page.locator('.rbc-event', { hasText: 'Unknown task' })).not.toBeVisible()
 
