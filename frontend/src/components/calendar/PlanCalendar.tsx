@@ -29,13 +29,14 @@ import { isFullyPast, isInProgress, resolveDragRescheduleAction } from '../../li
 import { splitAcrossDays } from '../../lib/splitEventAcrossDays'
 import { useGoogleConnectionStatus, usePushIntervalToGoogle } from '../../api/google'
 import { useGoogleEventsForWeek } from '../../api/googleEvents'
+import { useEntriesForWeek } from '../../api/timer'
 import {
   makeCreateIntervalEntry,
   makeDeleteIntervalEntry,
   makeUpdateTimeEntry,
 } from '../../lib/intervalUndoEntries'
 import { useUndo } from '../../undo/UndoProvider'
-import { chipFillStyle, EXTERNAL_EVENT_STYLE } from './eventColor'
+import { chipFillStyle, EXTERNAL_EVENT_STYLE, trackedChipStyle } from './eventColor'
 import CalendarDayHeader from './CalendarDayHeader'
 import CalendarTimezoneLabel from './CalendarTimezoneLabel'
 import Menu from '../common/Menu'
@@ -60,9 +61,13 @@ interface CalendarEvent {
   // interval stays possible via the "Edit time" modal's typed fields
   // (independent start/end dates, from M27) instead.
   isMultiDaySegment: boolean
-  // True for a pulled-in Google Calendar event that isn't backed by a local
-  // interval at all -- read-only here, no drag/resize/context-menu.
-  isExternal: boolean
+  // 'interval' -- a planned time block, fully interactive (drag/resize/menu).
+  // 'entry'    -- tracked time (Execute merged into Plan, v08 item 4).
+  //               Display-only until v08 A7 makes entry chips editable.
+  // 'google'   -- a pulled-in Google Calendar event, read-only.
+  kind: 'interval' | 'entry' | 'google'
+  // A tracked entry with no end yet -- the timer is still running.
+  isLive: boolean
 }
 
 // Vite's dev-server esbuild pre-bundling double-wraps this addon's default
@@ -115,6 +120,7 @@ export default function PlanCalendar({
   const isCurrentWeek = weekStart === weekStartKey(utcNow())
 
   const { data: intervals = [] } = useIntervalsForWeek(weekStart)
+  const { data: entries = [] } = useEntriesForWeek(weekStart)
   const createInterval = useCreateInterval()
   const updateInterval = useUpdateInterval()
   const deleteInterval = useDeleteInterval()
@@ -347,7 +353,26 @@ export default function PlanCalendar({
       return segments.map((segment) => ({
         ...segment,
         isMultiDaySegment: segments.length > 1,
-        isExternal: false,
+        kind: 'interval' as const,
+        isLive: false,
+      }))
+    })
+
+    const tracked = entries.flatMap((entry) => {
+      const task = tasksById.get(entry.task_id)
+      const isLive = !entry.end
+      const segments = splitAcrossDays({
+        id: `entry-${entry.id}`,
+        title: entry.task_name ?? task?.name ?? 'Unknown task',
+        start: new Date(entry.start),
+        end: entry.end ? new Date(entry.end) : now,
+        colors: task?.effective_colors ?? [],
+      })
+      return segments.map((segment) => ({
+        ...segment,
+        isMultiDaySegment: segments.length > 1,
+        kind: 'entry' as const,
+        isLive,
       }))
     })
 
@@ -362,12 +387,13 @@ export default function PlanCalendar({
       return segments.map((segment) => ({
         ...segment,
         isMultiDaySegment: segments.length > 1,
-        isExternal: true,
+        kind: 'google' as const,
+        isLive: false,
       }))
     })
 
-    return [...own, ...external]
-  }, [intervals, googleEvents, tasksById])
+    return [...own, ...tracked, ...external]
+  }, [intervals, entries, googleEvents, tasksById, now])
 
   return (
     <div className="flex h-full flex-col p-4">
@@ -393,7 +419,16 @@ export default function PlanCalendar({
             {isCurrentWeek && <span className="ml-1 text-text-secondary">(current)</span>}
           </span>
         </div>
-        <span className="text-xs text-text-secondary">Drag a task here to schedule it</span>
+        <div className="flex items-center gap-3 text-2xs text-text-tertiary">
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-2 w-3 rounded-[2px] bg-text-tertiary" /> Planned
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-2 w-3 rounded-[2px] border-l-2 border-text-tertiary bg-surface-hover" />{' '}
+            Tracked
+          </span>
+          <span className="text-text-secondary">Drag a task here to schedule it</span>
+        </div>
       </div>
 
       {scheduleError && (
@@ -418,39 +453,55 @@ export default function PlanCalendar({
             setCreationMode('choosing')
           }}
           resizable
-          draggableAccessor={(event: CalendarEvent) => !event.isMultiDaySegment && !event.isExternal}
+          draggableAccessor={(event: CalendarEvent) =>
+            event.kind === 'interval' && !event.isMultiDaySegment
+          }
           resizableAccessor={(event: CalendarEvent) =>
-            !isFullyPast(event, now) && !event.isMultiDaySegment && !event.isExternal
+            event.kind === 'interval' && !event.isMultiDaySegment && !isFullyPast(event, now)
           }
           onEventDrop={handleEventChange}
           onEventResize={handleEventChange}
           onSelectEvent={(event: CalendarEvent) => {
-            if (event.isExternal) {
+            if (event.kind === 'google') {
               const googleEvent = googleEvents.find((e) => `google-${e.id}` === event.id)
               if (googleEvent) setSelectedGoogleEvent(googleEvent)
+              return
+            }
+            if (event.kind === 'entry') {
+              const entry = entries.find((e) => `entry-${e.id}` === event.id)
+              if (entry) onOpenTask(entry.task_id)
               return
             }
             const interval = intervals.find((i) => i.id === event.id)
             if (interval) onOpenTask(interval.task_id)
           }}
-          eventPropGetter={(event: CalendarEvent) => ({
-            style: event.isExternal
-              ? EXTERNAL_EVENT_STYLE
-              : {
-                  ...chipFillStyle(event.colors),
-                  border: 'none',
-                  opacity: event.id === draggingEventId ? 0 : isFullyPast(event, now) ? 0.55 : 1,
+          eventPropGetter={(event: CalendarEvent) => {
+            if (event.kind === 'google') return { style: EXTERNAL_EVENT_STYLE }
+            if (event.kind === 'entry') {
+              return {
+                style: {
+                  ...trackedChipStyle(event.colors),
+                  outline: event.isLive ? '2px solid var(--color-accent)' : undefined,
                 },
-          })}
+              }
+            }
+            return {
+              style: {
+                ...chipFillStyle(event.colors),
+                border: 'none',
+                opacity: event.id === draggingEventId ? 0 : isFullyPast(event, now) ? 0.55 : 1,
+              },
+            }
+          }}
           components={{
             header: CalendarDayHeader,
             timeGutterHeader: CalendarTimezoneLabel,
             event: ({ event, title }: { event: CalendarEvent; title: string }) => (
               <div
                 className="h-full w-full truncate"
-                data-interval-id={event.isExternal ? undefined : event.id}
+                data-interval-id={event.kind === 'interval' ? event.id : undefined}
                 onContextMenu={(domEvent) => {
-                  if (event.isExternal) return
+                  if (event.kind !== 'interval') return
                   domEvent.preventDefault()
                   const interval = intervals.find((i) => i.id === event.id)
                   if (!interval) return

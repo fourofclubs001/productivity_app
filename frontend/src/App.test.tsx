@@ -30,6 +30,7 @@ vi.mock('./api/googleEvents', () => ({
 vi.mock('./api/timer', () => ({
   useActiveTimer: () => ({ data: null }),
   useStopTimer: () => ({ mutate: vi.fn(), isPending: false }),
+  useEntriesForWeek: () => ({ data: [] }),
 }))
 
 describe('App', () => {

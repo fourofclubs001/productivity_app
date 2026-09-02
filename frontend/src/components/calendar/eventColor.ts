@@ -20,6 +20,19 @@ export function primaryChipColor(colors: string[]): string {
   return COLOR_HEX[colors[0]] ?? FALLBACK_HEX
 }
 
+// Tracked-time (Entry) chips on the merged Plan calendar: same hue as the
+// task, but a pale tint with a solid left-border, drawn on top of the
+// planned chip so "did what was planned" reads as an overlap. Distinct from
+// chipFillStyle's solid planned fill (v08 item 4 / UX-20).
+export function trackedChipStyle(colors: string[]): CSSProperties {
+  const hex = primaryChipColor(colors)
+  return {
+    backgroundColor: `color-mix(in srgb, ${hex} 20%, white)`,
+    borderLeft: `3px solid ${hex}`,
+    color: 'var(--color-text-primary)',
+  }
+}
+
 // Pulled-in Google Calendar events aren't tied to a task, so they can't use
 // chipFillStyle's color logic -- a fixed neutral/outlined look keeps them
 // visually distinct from the user's own scheduled work. Applied as an inline

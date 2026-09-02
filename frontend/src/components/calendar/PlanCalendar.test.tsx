@@ -10,6 +10,7 @@ const createMutateAsync = vi.fn().mockResolvedValue(undefined)
 const updateMutate = vi.fn()
 const updateMutateAsync = vi.fn().mockResolvedValue(undefined)
 const useIntervalsForWeek = vi.fn(() => ({ data: [] as unknown[] }))
+const useEntriesForWeek = vi.fn(() => ({ data: [] as unknown[] }))
 const useGoogleConnectionStatus = vi.fn(() => ({ data: { connected: false } }))
 const useGoogleEventsForWeek = vi.fn(() => ({ data: [] as unknown[] }))
 const pushIntervalToGoogleMutate = vi.fn()
@@ -19,6 +20,10 @@ vi.mock('../../api/intervals', () => ({
   useCreateInterval: () => ({ mutate: vi.fn(), mutateAsync: createMutateAsync }),
   useUpdateInterval: () => ({ mutate: updateMutate, mutateAsync: updateMutateAsync }),
   useDeleteInterval: () => ({ mutate: deleteMutate }),
+}))
+
+vi.mock('../../api/timer', () => ({
+  useEntriesForWeek: () => useEntriesForWeek(),
 }))
 
 vi.mock('../../api/google', () => ({
@@ -42,6 +47,7 @@ beforeEach(() => {
   updateMutateAsync.mockClear()
   pushIntervalToGoogleMutate.mockClear()
   useIntervalsForWeek.mockReturnValue({ data: [] })
+  useEntriesForWeek.mockReturnValue({ data: [] })
   useGoogleConnectionStatus.mockReturnValue({ data: { connected: false } })
   useGoogleEventsForWeek.mockReturnValue({ data: [] })
 })
@@ -232,6 +238,32 @@ describe('PlanCalendar', () => {
     fireEvent.contextMenu(chips[1])
     fireEvent.click(screen.getByText('Delete'))
     expect(deleteMutate).toHaveBeenCalledWith('iv1', expect.any(Object))
+  })
+
+  it('renders a tracked-time entry chip, display-only (no context menu), click opens the task', () => {
+    const task = makeTask({ id: 't1', name: 'Tracked task', is_leaf: true })
+    useEntriesForWeek.mockReturnValue({
+      data: [
+        {
+          id: 'e1',
+          task_id: 't1',
+          task_name: 'Tracked task',
+          start: '2026-07-15T10:00:00.000Z',
+          end: '2026-07-15T11:00:00.000Z',
+        },
+      ],
+    })
+    const onOpenTask = vi.fn()
+
+    renderCalendar(new Map([[task.id, task]]), onOpenTask)
+
+    const chip = screen.getByText('Tracked task')
+    fireEvent.contextMenu(chip)
+    expect(screen.queryByText('Delete')).not.toBeInTheDocument()
+    expect(screen.queryByText('Edit time')).not.toBeInTheDocument()
+
+    fireEvent.click(chip)
+    expect(onOpenTask).toHaveBeenCalledWith('t1')
   })
 
   it('renders a pulled Google Calendar event read-only, with no context menu, and clicking opens a read-only detail panel instead of a task', () => {
