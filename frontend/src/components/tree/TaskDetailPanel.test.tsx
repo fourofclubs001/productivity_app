@@ -52,6 +52,10 @@ vi.mock('../../api/timer', () => ({
   useActiveTimer: () => ({ data: null }),
   useStartTimer: () => ({ mutate: vi.fn(), isPending: false }),
   useStopTimer: () => ({ mutate: vi.fn(), isPending: false }),
+  useEntriesForTask: () => ({ data: [] }),
+  useCreateEntry: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
+  useUpdateEntry: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
+  useDeleteEntry: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
 }))
 
 beforeEach(() => {

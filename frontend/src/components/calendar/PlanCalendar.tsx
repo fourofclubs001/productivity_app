@@ -8,7 +8,7 @@ import { useDndMonitor, useDroppable } from '@dnd-kit/core'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css'
 import './calendar.css'
-import type { GoogleEvent, Interval, Task } from '../../types'
+import type { Entry, GoogleEvent, Interval, Task } from '../../types'
 import {
   useCreateInterval,
   useDeleteInterval,
@@ -29,7 +29,11 @@ import { isFullyPast, isInProgress, resolveDragRescheduleAction } from '../../li
 import { splitAcrossDays } from '../../lib/splitEventAcrossDays'
 import { useGoogleConnectionStatus, usePushIntervalToGoogle } from '../../api/google'
 import { useGoogleEventsForWeek } from '../../api/googleEvents'
-import { useEntriesForWeek } from '../../api/timer'
+import { useCreateEntry, useDeleteEntry, useEntriesForWeek, useUpdateEntry } from '../../api/timer'
+import {
+  makeCreateEntryUndoEntry,
+  makeUpdateEntryTimeEntry,
+} from '../../lib/entryUndoEntries'
 import {
   makeCreateIntervalEntry,
   makeDeleteIntervalEntry,
@@ -42,6 +46,7 @@ import CalendarTimezoneLabel from './CalendarTimezoneLabel'
 import Menu from '../common/Menu'
 import AlertDialog from '../common/AlertDialog'
 import EditIntervalTimeModal from './EditIntervalTimeModal'
+import EditEntryTimeModal from './EditEntryTimeModal'
 import GoogleEventDetailPanel from './GoogleEventDetailPanel'
 import NewEventChooserDialog from './NewEventChooserDialog'
 import QuickCreateTaskDialog from './QuickCreateTaskDialog'
@@ -90,17 +95,20 @@ export default function PlanCalendar({
 }) {
   const [weekAnchor, setWeekAnchor] = useState(() => mondayOf(utcNow()))
   const [scheduleError, setScheduleError] = useState<string | null>(null)
-  const [contextMenu, setContextMenu] = useState<{
-    x: number
-    y: number
-    interval: Interval
-  } | null>(null)
+  const [contextMenu, setContextMenu] = useState<
+    | { x: number; y: number; kind: 'interval'; interval: Interval }
+    | { x: number; y: number; kind: 'entry'; entry: Entry }
+    | null
+  >(null)
   const [editingInterval, setEditingInterval] = useState<Interval | null>(null)
+  const [editingEntry, setEditingEntry] = useState<Entry | null>(null)
   const [selectedGoogleEvent, setSelectedGoogleEvent] = useState<GoogleEvent | null>(null)
   const [now, setNow] = useState(() => new Date())
   const [dragPreview, setDragPreview] = useState<{ rect: PixelRect; task: Task } | null>(null)
   const [draggingEventId, setDraggingEventId] = useState<string | null>(null)
-  const dragCandidateRef = useRef<{ id: string; x: number; y: number } | null>(null)
+  const dragCandidateRef = useRef<{ id: string; x: number; y: number; isEntry: boolean } | null>(
+    null,
+  )
   const wrapperRef = useRef<HTMLDivElement>(null)
   // Drag-select on empty calendar space (item 9): a picked range awaits a
   // "recurring / not / existing" choice, then routes to the matching
@@ -124,6 +132,9 @@ export default function PlanCalendar({
   const createInterval = useCreateInterval()
   const updateInterval = useUpdateInterval()
   const deleteInterval = useDeleteInterval()
+  const createEntry = useCreateEntry()
+  const updateEntry = useUpdateEntry()
+  const deleteEntry = useDeleteEntry()
   const { data: googleStatus } = useGoogleConnectionStatus()
   const pushIntervalToGoogle = usePushIntervalToGoogle()
   const { data: googleEvents = [] } = useGoogleEventsForWeek(
@@ -147,12 +158,16 @@ export default function PlanCalendar({
     const MOVE_THRESHOLD_PX = 5
 
     function onMouseDown(domEvent: MouseEvent) {
-      const eventEl = (domEvent.target as HTMLElement).closest<HTMLElement>('[data-interval-id]')
+      const eventEl = (domEvent.target as HTMLElement).closest<HTMLElement>(
+        '[data-interval-id], [data-entry-id]',
+      )
       if (!eventEl) return
+      const isEntry = eventEl.dataset.entryId != null
       dragCandidateRef.current = {
-        id: eventEl.dataset.intervalId!,
+        id: (eventEl.dataset.intervalId ?? eventEl.dataset.entryId)!,
         x: domEvent.clientX,
         y: domEvent.clientY,
+        isEntry,
       }
     }
 
@@ -163,6 +178,17 @@ export default function PlanCalendar({
       const dy = domEvent.clientY - candidate.y
       if (Math.hypot(dx, dy) <= MOVE_THRESHOLD_PX) return
       dragCandidateRef.current = null
+      if (candidate.isEntry) {
+        const entry = entries.find((e) => e.id === candidate.id)
+        if (!entry) return
+        const start = new Date(entry.start)
+        const end = entry.end ? new Date(entry.end) : now
+        // Tracked time is always "past" -- editing history is the point, so
+        // no past-lock. Cross-midnight entries still can't be body-dragged.
+        if (!isSameDay(start, end)) return
+        setDraggingEventId(`entry-${candidate.id}`)
+        return
+      }
       const interval = intervals.find((i) => i.id === candidate.id)
       if (!interval) return
       const range = { start: new Date(interval.start), end: new Date(interval.end) }
@@ -189,7 +215,7 @@ export default function PlanCalendar({
       window.removeEventListener('mouseup', clear)
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [intervals, now])
+  }, [intervals, entries, now])
 
   const { setNodeRef, isOver } = useDroppable({ id: 'plan-calendar' })
   function setCalendarRef(node: HTMLDivElement | null) {
@@ -294,8 +320,41 @@ export default function PlanCalendar({
     })
   }
 
+  const entryMutators = {
+    createEntryAsync: createEntry.mutateAsync,
+    deleteEntryAsync: deleteEntry.mutateAsync,
+  }
+
+  function deleteEntryWithUndo(entry: Entry) {
+    deleteEntry.mutate(entry.id, {
+      onSuccess: () => pushUndo(makeCreateEntryUndoEntry(entry, entryMutators)),
+      onError: (error) => setScheduleError((error as Error).message),
+    })
+  }
+
+  function handleEntryChange(entry: Entry, start: Date, end: Date) {
+    // Tracked time is a correction of history -- no past-lock, no
+    // "create a copy" branch, and never synced to Google.
+    const next = { start: start.toISOString(), end: end.toISOString() }
+    const prev = { start: entry.start, end: entry.end ?? entry.start }
+    setScheduleError(null)
+    updateEntry.mutate(
+      { id: entry.id, input: next },
+      {
+        onSuccess: () =>
+          pushUndo(makeUpdateEntryTimeEntry(entry.id, prev, next, updateEntry.mutateAsync)),
+        onError: (error) => setScheduleError((error as Error).message),
+      },
+    )
+  }
+
   function handleEventChange({ event, start, end }: EventInteractionArgs<CalendarEvent>) {
     setDraggingEventId(null)
+    if (event.kind === 'entry') {
+      const entry = entries.find((e) => `entry-${e.id}` === event.id)
+      if (entry) handleEntryChange(entry, new Date(start), new Date(end))
+      return
+    }
     const interval = intervals.find((i) => i.id === event.id)
     if (!interval) return
     const previousStart = interval.start
@@ -454,11 +513,16 @@ export default function PlanCalendar({
           }}
           resizable
           draggableAccessor={(event: CalendarEvent) =>
-            event.kind === 'interval' && !event.isMultiDaySegment
+            (event.kind === 'interval' || (event.kind === 'entry' && !event.isLive)) &&
+            !event.isMultiDaySegment
           }
-          resizableAccessor={(event: CalendarEvent) =>
-            event.kind === 'interval' && !event.isMultiDaySegment && !isFullyPast(event, now)
-          }
+          resizableAccessor={(event: CalendarEvent) => {
+            if (event.isMultiDaySegment) return false
+            // A tracked entry is a record of history -- editable regardless of
+            // being "past" (the whole point). The live one is not.
+            if (event.kind === 'entry') return !event.isLive
+            return event.kind === 'interval' && !isFullyPast(event, now)
+          }}
           onEventDrop={handleEventChange}
           onEventResize={handleEventChange}
           onSelectEvent={(event: CalendarEvent) => {
@@ -482,6 +546,7 @@ export default function PlanCalendar({
                 style: {
                   ...trackedChipStyle(event.colors),
                   outline: event.isLive ? '2px solid var(--color-accent)' : undefined,
+                  opacity: event.id === draggingEventId ? 0 : 1,
                 },
               }
             }
@@ -500,12 +565,32 @@ export default function PlanCalendar({
               <div
                 className="h-full w-full truncate"
                 data-interval-id={event.kind === 'interval' ? event.id : undefined}
+                data-entry-id={
+                  event.kind === 'entry' && !event.isLive
+                    ? event.id.replace('entry-', '')
+                    : undefined
+                }
                 onContextMenu={(domEvent) => {
-                  if (event.kind !== 'interval') return
                   domEvent.preventDefault()
-                  const interval = intervals.find((i) => i.id === event.id)
-                  if (!interval) return
-                  setContextMenu({ x: domEvent.clientX, y: domEvent.clientY, interval })
+                  if (event.kind === 'interval') {
+                    const interval = intervals.find((i) => i.id === event.id)
+                    if (interval)
+                      setContextMenu({
+                        x: domEvent.clientX,
+                        y: domEvent.clientY,
+                        kind: 'interval',
+                        interval,
+                      })
+                  } else if (event.kind === 'entry' && !event.isLive) {
+                    const entry = entries.find((e) => `entry-${e.id}` === event.id)
+                    if (entry)
+                      setContextMenu({
+                        x: domEvent.clientX,
+                        y: domEvent.clientY,
+                        kind: 'entry',
+                        entry,
+                      })
+                  }
                 }}
               >
                 {title}
@@ -533,7 +618,7 @@ export default function PlanCalendar({
         </div>
       )}
 
-      {contextMenu && (
+      {contextMenu?.kind === 'interval' && (
         <Menu
           x={contextMenu.x}
           y={contextMenu.y}
@@ -564,11 +649,31 @@ export default function PlanCalendar({
         />
       )}
 
+      {contextMenu?.kind === 'entry' && (
+        <Menu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          items={[
+            { label: 'Edit tracked time', onSelect: () => setEditingEntry(contextMenu.entry) },
+            {
+              label: 'Delete',
+              danger: true,
+              onSelect: () => deleteEntryWithUndo(contextMenu.entry),
+            },
+          ]}
+        />
+      )}
+
       {editingInterval && (
         <EditIntervalTimeModal
           interval={editingInterval}
           onClose={() => setEditingInterval(null)}
         />
+      )}
+
+      {editingEntry && (
+        <EditEntryTimeModal entry={editingEntry} onClose={() => setEditingEntry(null)} />
       )}
 
       {selectedGoogleEvent && (

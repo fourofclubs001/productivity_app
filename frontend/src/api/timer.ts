@@ -23,6 +23,12 @@ const timerApi = {
       body: JSON.stringify({ task_id: taskId }),
     }),
   listForWeek: (weekStart: string) => apiFetch<Entry[]>(`/entries?week_start=${weekStart}`),
+  listForTask: (taskId: string) => apiFetch<Entry[]>(`/entries/by-task/${taskId}`),
+  createEntry: (input: { task_id: string; start: string; end: string }) =>
+    apiFetch<Entry>('/entries', { method: 'POST', body: JSON.stringify(input) }),
+  updateEntry: (id: string, input: { start?: string; end?: string }) =>
+    apiFetch<Entry>(`/entries/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  deleteEntry: (id: string) => apiFetch<void>(`/entries/${id}`, { method: 'DELETE' }),
 }
 
 const TASKS_KEY = ['tasks']
@@ -36,6 +42,13 @@ export function useEntriesForWeek(weekStart: string) {
   return useQuery({
     queryKey: ['entries', 'week', weekStart],
     queryFn: () => timerApi.listForWeek(weekStart),
+  })
+}
+
+export function useEntriesForTask(taskId: string) {
+  return useQuery({
+    queryKey: ['entries', 'task', taskId],
+    queryFn: () => timerApi.listForTask(taskId),
   })
 }
 
@@ -89,5 +102,36 @@ export function useMarkSubtreeDone() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TASKS_KEY })
     },
+  })
+}
+
+function invalidateEntries(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: ['entries'] })
+  queryClient.invalidateQueries({ queryKey: ['evaluate'] })
+}
+
+export function useCreateEntry() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { task_id: string; start: string; end: string }) =>
+      timerApi.createEntry(input),
+    onSuccess: () => invalidateEntries(queryClient),
+  })
+}
+
+export function useUpdateEntry() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: { start?: string; end?: string } }) =>
+      timerApi.updateEntry(id, input),
+    onSuccess: () => invalidateEntries(queryClient),
+  })
+}
+
+export function useDeleteEntry() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => timerApi.deleteEntry(id),
+    onSuccess: () => invalidateEntries(queryClient),
   })
 }

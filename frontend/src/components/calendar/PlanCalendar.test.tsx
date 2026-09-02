@@ -22,8 +22,18 @@ vi.mock('../../api/intervals', () => ({
   useDeleteInterval: () => ({ mutate: deleteMutate }),
 }))
 
+const deleteEntryMutate = vi.fn((_id: string, opts?: { onSuccess?: () => void }) =>
+  opts?.onSuccess?.(),
+)
+const createEntryMutateAsync = vi.fn().mockResolvedValue({ id: 'new-entry' })
+const updateEntryMutate = vi.fn()
+const updateEntryMutateAsync = vi.fn().mockResolvedValue(undefined)
+
 vi.mock('../../api/timer', () => ({
   useEntriesForWeek: () => useEntriesForWeek(),
+  useCreateEntry: () => ({ mutate: vi.fn(), mutateAsync: createEntryMutateAsync }),
+  useUpdateEntry: () => ({ mutate: updateEntryMutate, mutateAsync: updateEntryMutateAsync }),
+  useDeleteEntry: () => ({ mutate: deleteEntryMutate }),
 }))
 
 vi.mock('../../api/google', () => ({
@@ -240,7 +250,7 @@ describe('PlanCalendar', () => {
     expect(deleteMutate).toHaveBeenCalledWith('iv1', expect.any(Object))
   })
 
-  it('renders a tracked-time entry chip, display-only (no context menu), click opens the task', () => {
+  it('a tracked-time entry chip is editable: right-click Delete removes it, ctrl+z restores it', () => {
     const task = makeTask({ id: 't1', name: 'Tracked task', is_leaf: true })
     useEntriesForWeek.mockReturnValue({
       data: [
@@ -259,11 +269,39 @@ describe('PlanCalendar', () => {
 
     const chip = screen.getByText('Tracked task')
     fireEvent.contextMenu(chip)
-    expect(screen.queryByText('Delete')).not.toBeInTheDocument()
-    expect(screen.queryByText('Edit time')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('Delete'))
+    expect(deleteEntryMutate).toHaveBeenCalledWith('e1', expect.any(Object))
 
-    fireEvent.click(chip)
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true })
+    expect(createEntryMutateAsync).toHaveBeenCalledWith({
+      task_id: 't1',
+      start: '2026-07-15T10:00:00.000Z',
+      end: '2026-07-15T11:00:00.000Z',
+    })
+
+    // Left-click still opens the task.
+    fireEvent.click(screen.getByText('Tracked task'))
     expect(onOpenTask).toHaveBeenCalledWith('t1')
+  })
+
+  it('right-click "Edit tracked time" on an entry chip opens the entry time modal', () => {
+    const task = makeTask({ id: 't1', name: 'Tracked task', is_leaf: true })
+    useEntriesForWeek.mockReturnValue({
+      data: [
+        {
+          id: 'e1',
+          task_id: 't1',
+          task_name: 'Tracked task',
+          start: '2026-07-15T10:00:00.000Z',
+          end: '2026-07-15T11:00:00.000Z',
+        },
+      ],
+    })
+
+    renderCalendar(new Map([[task.id, task]]))
+    fireEvent.contextMenu(screen.getByText('Tracked task'))
+    fireEvent.click(screen.getByText('Edit tracked time'))
+    expect(screen.getByText('Edit tracked time', { selector: 'h2' })).toBeInTheDocument()
   })
 
   it('renders a pulled Google Calendar event read-only, with no context menu, and clicking opens a read-only detail panel instead of a task', () => {

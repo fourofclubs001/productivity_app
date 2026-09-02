@@ -37,6 +37,33 @@ class EntryRepository:
         data["end"] = end.isoformat()
         return data
 
+    async def update(
+        self, entry_id: str, *, start: datetime | None = None, end: datetime | None = None
+    ) -> dict[str, Any] | None:
+        data = await self.get(entry_id)
+        if data is None:
+            return None
+        fields: dict[str, str] = {}
+        if start is not None:
+            fields["start"] = start.isoformat()
+        if end is not None:
+            fields["end"] = end.isoformat()
+        if fields:
+            await self._redis.hset(entry_key(entry_id), mapping=fields)
+        if start is not None:
+            # keep the by-start index score in sync (mirrors IntervalRepository)
+            await self._redis.zadd(ENTRIES_BY_START_KEY, {entry_id: start.timestamp()})
+        return {**data, **fields}
+
+    async def delete(self, entry_id: str) -> dict[str, Any] | None:
+        data = await self.get(entry_id)
+        if data is None:
+            return None
+        await self._redis.delete(entry_key(entry_id))
+        await self._redis.zrem(ENTRIES_BY_START_KEY, entry_id)
+        await self._redis.srem(task_entries_key(data["task_id"]), entry_id)
+        return data
+
     async def get(self, entry_id: str) -> dict[str, Any] | None:
         data = await self._redis.hgetall(entry_key(entry_id))
         return data or None
@@ -57,4 +84,14 @@ class EntryRepository:
             data = await self.get(entry_id)
             if data:
                 results.append({"id": entry_id, **data})
+        return results
+
+    async def list_for_task(self, task_id: str) -> list[dict[str, Any]]:
+        ids = await self._redis.smembers(task_entries_key(task_id))
+        results = []
+        for entry_id in ids:
+            data = await self.get(entry_id)
+            if data:
+                results.append({"id": entry_id, **data})
+        results.sort(key=lambda entry: entry["start"])
         return results

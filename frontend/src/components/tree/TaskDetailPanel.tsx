@@ -30,6 +30,7 @@ import IntervalTimeFields, {
 } from '../calendar/IntervalTimeFields'
 import DoneConfirmModal from '../timer/DoneConfirmModal'
 import TaskTimerButton from '../timer/TaskTimerButton'
+import TrackedTimeList from '../timer/TrackedTimeList'
 import TaskPicker from '../timer/TaskPicker'
 import ColorSwatchPicker from './ColorSwatchPicker'
 import StateBadge from './StateBadge'
@@ -370,6 +371,8 @@ export default function TaskDetailPanel({
           )}
         </div>
       )}
+
+      {task.is_leaf && <TrackedTimeList taskId={task.id} />}
 
       {!task.is_recurrent_task && (
         <div className="mt-6">

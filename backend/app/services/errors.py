@@ -117,6 +117,22 @@ class NoActiveTimerError(Exception):
         super().__init__("No timer is currently running")
 
 
+class EntryNotFoundError(Exception):
+    def __init__(self, entry_id: str) -> None:
+        self.entry_id = entry_id
+        super().__init__(f"Time entry {entry_id!r} not found")
+
+
+class EntryEndBeforeStartError(Exception):
+    def __init__(self) -> None:
+        super().__init__("Tracked time end must be after start")
+
+
+class ActiveEntryEndLockedError(Exception):
+    def __init__(self) -> None:
+        super().__init__("The running timer's end can't be edited -- stop the timer instead")
+
+
 class TaskNotInProgressError(Exception):
     def __init__(self, task_id: str) -> None:
         self.task_id = task_id

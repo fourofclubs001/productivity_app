@@ -33,6 +33,9 @@ vi.mock('./api/timer', () => ({
   useMarkDone: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
   useRevertDone: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useEntriesForWeek: () => ({ data: [] }),
+  useCreateEntry: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
+  useUpdateEntry: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
+  useDeleteEntry: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
 }))
 
 describe('App', () => {

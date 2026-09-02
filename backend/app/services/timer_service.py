@@ -6,6 +6,9 @@ from app.models.task import TaskState
 from app.repositories.entry_repository import EntryRepository
 from app.repositories.task_repository import TaskRepository
 from app.services.errors import (
+    ActiveEntryEndLockedError,
+    EntryEndBeforeStartError,
+    EntryNotFoundError,
     NoActiveTimerError,
     PrerequisiteNotSprintDoneError,
     TaskNotFoundError,
@@ -120,6 +123,51 @@ class TimerService:
             affected.append(leaf_id)
         return affected
 
+    async def create_entry(self, task_id: str, start: datetime, end: datetime) -> EntryOut:
+        """Record a historical tracked-time entry directly (both start and
+        end known) -- for manually adding time on the merged Plan calendar,
+        and to make an entry-delete undoable. Does not touch the active
+        timer or task state."""
+        if end <= start:
+            raise EntryEndBeforeStartError
+        task_node = await self._tasks.load_node(task_id)
+        if task_node is None:
+            raise TaskNotFoundError(task_id)
+
+        task_name = task_node.fields.get("name", "")
+        entry_id = str(uuid4())
+        await self._entries.create(entry_id, task_id, start, task_name)
+        await self._entries.set_end(entry_id, end)
+        return EntryOut(id=entry_id, task_id=task_id, start=start, end=end, task_name=task_name)
+
+    async def update_entry(
+        self, entry_id: str, start: datetime | None, end: datetime | None
+    ) -> EntryOut:
+        data = await self._entries.get(entry_id)
+        if data is None:
+            raise EntryNotFoundError(entry_id)
+
+        is_active = await self._entries.get_active_id() == entry_id
+        if is_active and end is not None:
+            raise ActiveEntryEndLockedError
+
+        new_start = start or datetime.fromisoformat(data["start"])
+        stored_end = data.get("end")
+        new_end = end or (datetime.fromisoformat(stored_end) if stored_end else None)
+        if new_end is not None and new_end <= new_start:
+            raise EntryEndBeforeStartError
+
+        updated = await self._entries.update(entry_id, start=start, end=end)
+        assert updated is not None
+        return self._to_out(entry_id, updated)
+
+    async def delete_entry(self, entry_id: str) -> None:
+        data = await self._entries.delete(entry_id)
+        if data is None:
+            raise EntryNotFoundError(entry_id)
+        if await self._entries.get_active_id() == entry_id:
+            await self._entries.set_active_id(None)
+
     async def get_active(self) -> EntryOut | None:
         active_id = await self._entries.get_active_id()
         if active_id is None:
@@ -128,6 +176,10 @@ class TimerService:
         if data is None:
             return None
         return self._to_out(active_id, data)
+
+    async def list_for_task(self, task_id: str) -> list[EntryOut]:
+        entries = await self._entries.list_for_task(task_id)
+        return [self._to_out(entry["id"], entry) for entry in entries]
 
     async def list_for_week(self, week_start: str) -> list[EntryOut]:
         start_date = date.fromisoformat(week_start)

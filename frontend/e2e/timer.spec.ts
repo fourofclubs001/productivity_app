@@ -1,4 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
+import { todayAt } from './helpers/time'
+
+const API_BASE = 'http://localhost:8001'
 
 function faviconHref(page: Page) {
   return page.locator('link[rel="icon"]').evaluate((el) => (el as HTMLLinkElement).href)
@@ -114,6 +117,34 @@ test('"No, stop the timer" stops without marking done', async ({ page }) => {
   // Still in_progress, so Start is offered again.
   await page.getByTestId('task-tree').getByText(taskName).click()
   await expect(page.getByRole('button', { name: 'Start timer' })).toBeVisible()
+})
+
+test('a tracked-time chip can be deleted from the Plan calendar, and ctrl+z restores it', async ({
+  page,
+  request,
+}) => {
+  const taskName = `Track edit ${Date.now()}`
+  const task = await (
+    await request.post(`${API_BASE}/tasks`, { data: { name: taskName, definition_of_done: 'd' } })
+  ).json()
+  // A real-duration completed entry earlier today (a few-second live-timer
+  // entry would render as an un-clickable sliver).
+  const start = todayAt(8)
+  const end = new Date(start.getTime() + 90 * 60 * 1000)
+  await request.post(`${API_BASE}/entries`, {
+    data: { task_id: task.id, start: start.toISOString(), end: end.toISOString() },
+  })
+
+  await page.goto('/')
+  const chip = page.locator('.rbc-event', { hasText: taskName })
+  await expect(chip).toBeVisible()
+
+  await chip.click({ button: 'right' })
+  await page.getByRole('button', { name: 'Delete', exact: true }).click()
+  await expect(page.locator('.rbc-event', { hasText: taskName })).not.toBeVisible()
+
+  await page.keyboard.press('Control+z')
+  await expect(page.locator('.rbc-event', { hasText: taskName })).toBeVisible()
 })
 
 test('tab title shows the live elapsed time while tracking, and the favicon only ever alternates neutral/green', async ({

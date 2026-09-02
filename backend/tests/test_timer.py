@@ -252,6 +252,132 @@ def test_list_entries_for_week(client):
     assert body[0]["task_id"] == task["id"]
 
 
+def test_create_historical_entry_records_tracked_time_without_touching_the_timer(client):
+    task = create_leaf(client, "Manual entry")
+    response = client.post(
+        "/entries",
+        json={
+            "task_id": task["id"],
+            "start": "2020-01-01T09:00:00+00:00",
+            "end": "2020-01-01T10:30:00+00:00",
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["task_id"] == task["id"]
+    assert body["task_name"] == "Manual entry"
+    assert body["end"] is not None
+    # No active timer was started.
+    assert client.get("/timer/active").json() is None
+
+
+def test_create_entry_rejects_end_before_start_and_missing_task(client):
+    task = create_leaf(client)
+    bad = client.post(
+        "/entries",
+        json={
+            "task_id": task["id"],
+            "start": "2020-01-01T10:00:00+00:00",
+            "end": "2020-01-01T09:00:00+00:00",
+        },
+    )
+    assert bad.status_code == 400
+    missing = client.post(
+        "/entries",
+        json={
+            "task_id": "nope",
+            "start": "2020-01-01T09:00:00+00:00",
+            "end": "2020-01-01T10:00:00+00:00",
+        },
+    )
+    assert missing.status_code == 404
+
+
+def test_update_entry_changes_start_and_end_and_reindexes_by_start(client):
+    task = create_leaf(client)
+    created = client.post(
+        "/entries",
+        json={
+            "task_id": task["id"],
+            "start": "2021-06-07T09:00:00+00:00",
+            "end": "2021-06-07T10:00:00+00:00",
+        },
+    ).json()
+
+    response = client.patch(
+        f"/entries/{created['id']}",
+        json={"start": "2021-06-07T08:15:00+00:00", "end": "2021-06-07T09:45:00+00:00"},
+    )
+    assert response.status_code == 200
+    assert response.json()["start"] == "2021-06-07T08:15:00Z"
+
+    week = client.get("/entries", params={"week_start": "2021-06-07"}).json()
+    assert len(week) == 1
+    assert week[0]["start"] == "2021-06-07T08:15:00Z"
+
+
+def test_update_entry_rejects_end_before_start_and_missing_entry(client):
+    task = create_leaf(client)
+    created = client.post(
+        "/entries",
+        json={
+            "task_id": task["id"],
+            "start": "2021-06-07T09:00:00+00:00",
+            "end": "2021-06-07T10:00:00+00:00",
+        },
+    ).json()
+    bad = client.patch(f"/entries/{created['id']}", json={"end": "2021-06-07T08:00:00+00:00"})
+    assert bad.status_code == 400
+    missing = client.patch("/entries/nope", json={"start": "2021-06-07T09:00:00+00:00"})
+    assert missing.status_code == 404
+
+
+def test_cannot_edit_the_running_entrys_end(client):
+    task = create_leaf(client)
+    entry_id = client.post("/timer/start", json={"task_id": task["id"]}).json()["id"]
+    response = client.patch(f"/entries/{entry_id}", json={"end": "2099-01-01T00:00:00+00:00"})
+    assert response.status_code == 400
+    assert "running timer" in response.json()["detail"].lower()
+
+
+def test_list_entries_for_a_task_returns_only_that_tasks_entries_sorted_by_start(client):
+    task_a = create_leaf(client, "A")
+    task_b = create_leaf(client, "B")
+    for task, start in [(task_b, "09:00"), (task_a, "11:00"), (task_a, "08:00")]:
+        client.post(
+            "/entries",
+            json={
+                "task_id": task["id"],
+                "start": f"2021-06-07T{start}:00+00:00",
+                "end": f"2021-06-07T{start[:2]}:30:00+00:00",
+            },
+        )
+    rows = client.get(f"/entries/by-task/{task_a['id']}").json()
+    assert [r["start"] for r in rows] == ["2021-06-07T08:00:00Z", "2021-06-07T11:00:00Z"]
+
+
+def test_delete_entry_removes_it_from_the_week_list(client):
+    task = create_leaf(client)
+    created = client.post(
+        "/entries",
+        json={
+            "task_id": task["id"],
+            "start": "2021-06-07T09:00:00+00:00",
+            "end": "2021-06-07T10:00:00+00:00",
+        },
+    ).json()
+    assert client.delete(f"/entries/{created['id']}").status_code == 204
+    assert client.get("/entries", params={"week_start": "2021-06-07"}).json() == []
+    assert client.delete(f"/entries/{created['id']}").status_code == 404
+
+
+def test_deleting_the_active_entry_clears_the_running_timer(client):
+    task = create_leaf(client)
+    entry_id = client.post("/timer/start", json={"task_id": task["id"]}).json()["id"]
+    assert client.delete(f"/entries/{entry_id}").status_code == 204
+    assert client.get("/timer/active").json() is None
+
+
 def test_deleting_a_task_with_a_running_timer_is_blocked(client):
     task = create_leaf(client)
     client.post("/timer/start", json={"task_id": task["id"]})
