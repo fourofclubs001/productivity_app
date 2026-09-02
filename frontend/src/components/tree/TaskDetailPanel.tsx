@@ -22,7 +22,7 @@ import { descendantIds } from '../../lib/taskTree'
 import { makeRevertDoneEntry } from '../../lib/taskDoneUndoEntries'
 import { useUndo } from '../../undo/UndoProvider'
 import AddToCalendarModal from '../calendar/AddToCalendarModal'
-import ContextMenu from '../calendar/ContextMenu'
+import Menu from '../common/Menu'
 import IntervalTimeFields, {
   intervalTimeToDates,
   intervalToTimeValue,
@@ -501,7 +501,7 @@ export default function TaskDetailPanel({
       </div>
 
       {optionsMenuAnchor && (
-        <ContextMenu
+        <Menu
           x={optionsMenuAnchor.x}
           y={optionsMenuAnchor.y}
           onClose={() => setOptionsMenuAnchor(null)}

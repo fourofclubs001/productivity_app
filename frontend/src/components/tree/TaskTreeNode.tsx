@@ -9,7 +9,7 @@ import { makeMarkSubtreeDoneUndoEntry } from '../../lib/taskDoneUndoEntries'
 import { useUndo, type UndoEntry } from '../../undo/UndoProvider'
 import AlertDialog from '../common/AlertDialog'
 import ConfirmDialog from '../common/ConfirmDialog'
-import ContextMenu from '../calendar/ContextMenu'
+import Menu from '../common/Menu'
 import ColorDots from './ColorDots'
 import StateBadge from './StateBadge'
 import DeleteWithChildrenDialog from './DeleteWithChildrenDialog'
@@ -226,7 +226,7 @@ export default function TaskTreeNode({
         </div>
       )}
       {contextMenu && (
-        <ContextMenu
+        <Menu
           x={contextMenu.x}
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}

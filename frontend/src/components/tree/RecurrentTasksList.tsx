@@ -19,7 +19,7 @@ import {
 import { buildRecurrentTree, resolveRecurrentDropAction, type RecurrentNode } from '../../lib/recurrentTaskTree'
 import AlertDialog from '../common/AlertDialog'
 import ConfirmDialog from '../common/ConfirmDialog'
-import ContextMenu from '../calendar/ContextMenu'
+import Menu from '../common/Menu'
 import ColorDots from './ColorDots'
 import GroupDeleteDialog from './GroupDeleteDialog'
 import NewRecurrentGroupDialog from './NewRecurrentGroupDialog'
@@ -92,7 +92,7 @@ function RecurrentItemRow({
         {!isGroup && <StateBadge state={task.state} />}
       </div>
       {contextMenu && (
-        <ContextMenu
+        <Menu
           x={contextMenu.x}
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}

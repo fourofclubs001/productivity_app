@@ -61,6 +61,34 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+input:not([type="checkbox"], [type="radio"]),
+select,
+textarea {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  padding: 0 10px;
+  height: 2rem;
+  font-size: 0.875rem;
+}
+
+textarea {
+  height: auto;
+  padding: 6px 10px;
+}
+
+:is(input, select, textarea):focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--color-accent);
+}
+
 button,
 a,
 [role="button"],

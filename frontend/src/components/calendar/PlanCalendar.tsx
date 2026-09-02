@@ -38,7 +38,7 @@ import { useUndo } from '../../undo/UndoProvider'
 import { chipFillStyle, EXTERNAL_EVENT_STYLE } from './eventColor'
 import CalendarDayHeader from './CalendarDayHeader'
 import CalendarTimezoneLabel from './CalendarTimezoneLabel'
-import ContextMenu from './ContextMenu'
+import Menu from '../common/Menu'
 import AlertDialog from '../common/AlertDialog'
 import EditIntervalTimeModal from './EditIntervalTimeModal'
 import GoogleEventDetailPanel from './GoogleEventDetailPanel'
@@ -483,7 +483,7 @@ export default function PlanCalendar({
       )}
 
       {contextMenu && (
-        <ContextMenu
+        <Menu
           x={contextMenu.x}
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}
