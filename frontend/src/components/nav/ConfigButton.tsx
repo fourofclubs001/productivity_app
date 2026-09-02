@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import Button from '../common/Button'
+import { Settings } from '../common/icons'
 import ConfigDialog from './ConfigDialog'
 
 export default function ConfigButton() {
@@ -6,15 +8,14 @@ export default function ConfigButton() {
 
   return (
     <>
-      <button
-        type="button"
+      <Button
+        variant="icon"
         title="Configuration"
         aria-label="Configuration"
         onClick={() => setOpen(true)}
-        className="rounded border border-border px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary"
       >
-        ⚙
-      </button>
+        <Settings className="h-[18px] w-[18px]" />
+      </Button>
       {open && <ConfigDialog onClose={() => setOpen(false)} />}
     </>
   )
