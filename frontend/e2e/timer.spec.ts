@@ -178,8 +178,9 @@ test('tab title shows the live elapsed time while tracking, and the favicon only
   await page.getByRole('button', { name: 'Start' }).click()
   await expect(page.getByText('Tracking')).toBeVisible()
 
-  // Live mm:ss ahead of the app name while tracking.
-  await expect(page).toHaveTitle(/^\d{2}:\d{2} · Productivity App$/)
+  // Live elapsed time ahead of the app name while tracking -- mm:ss below an
+  // hour, h:mm:ss from an hour on (this short session stays in mm:ss).
+  await expect(page).toHaveTitle(/^\d{1,2}:\d{2}(:\d{2})? · Productivity App$/)
   const trackingHref = await faviconHref(page)
   expect(trackingHref).toMatch(/^data:image\/png/)
   expect(trackingHref).not.toBe(neutralHref)

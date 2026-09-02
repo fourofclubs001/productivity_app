@@ -5,11 +5,16 @@ const COLORS: Record<Exclude<FaviconState, 'neutral'>, string> = {
   green: '#16a34a',
 }
 
+// mm:ss below one hour, h:mm:ss from one hour on -- the tab-title timer
+// readout (GlobalTimerWatcher), no longer drawn onto the favicon itself.
 export function formatFaviconLabel(elapsedMs: number): string {
   const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000))
-  const minutes = Math.floor(totalSeconds / 60)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
   const seconds = totalSeconds % 60
-  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+  const mm = String(minutes).padStart(2, '0')
+  const ss = String(seconds).padStart(2, '0')
+  return hours > 0 ? `${hours}:${mm}:${ss}` : `${mm}:${ss}`
 }
 
 export function faviconState(active: boolean): FaviconState {

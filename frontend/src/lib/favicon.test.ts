@@ -2,10 +2,16 @@ import { describe, expect, it, vi } from 'vitest'
 import { drawFavicon, faviconState, formatFaviconLabel } from './favicon'
 
 describe('formatFaviconLabel', () => {
-  it('formats elapsed time as mm:ss, not capped at 59 minutes', () => {
+  it('formats as mm:ss below one hour', () => {
     expect(formatFaviconLabel(0)).toBe('00:00')
     expect(formatFaviconLabel(65_000)).toBe('01:05')
-    expect(formatFaviconLabel(61 * 60_000)).toBe('61:00')
+    expect(formatFaviconLabel(59 * 60_000 + 59_000)).toBe('59:59')
+  })
+
+  it('formats as h:mm:ss from one hour on', () => {
+    expect(formatFaviconLabel(60 * 60_000)).toBe('1:00:00')
+    expect(formatFaviconLabel(61 * 60_000 + 5_000)).toBe('1:01:05')
+    expect(formatFaviconLabel(10 * 3_600_000 + 4 * 60_000 + 9_000)).toBe('10:04:09')
   })
 
   it('never goes negative', () => {
