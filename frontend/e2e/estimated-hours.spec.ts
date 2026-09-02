@@ -26,7 +26,7 @@ test('a leaf estimate (set server-side) rolls up to its parent', async ({ page, 
   await page.goto('/')
 
   await page.getByTestId('task-tree').getByText(parent.name, { exact: true }).click()
-  await expect(page.getByText('3.5h (sum of sub-tasks)')).toBeVisible()
+  await expect(page.getByText(/3\.5h estimated \(sum of sub-tasks\)/)).toBeVisible()
 })
 
 test('hours covered reflects a scheduled interval', async ({ page, request }) => {
@@ -40,5 +40,5 @@ test('hours covered reflects a scheduled interval', async ({ page, request }) =>
   await page.goto('/')
   await page.getByTestId('task-tree').getByText(task.name, { exact: true }).click()
 
-  await expect(page.getByText('1.5h currently on the calendar')).toBeVisible()
+  await expect(page.getByText('1.5h scheduled')).toBeVisible()
 })

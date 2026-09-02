@@ -34,7 +34,7 @@ export default function TaskTimerButton({ task }: { task: Task }) {
   if (!isTracking && isFinished) return null
 
   return (
-    <div className="mb-3">
+    <>
       {isTracking ? (
         <Button
           variant="danger"
@@ -75,6 +75,6 @@ export default function TaskTimerButton({ task }: { task: Task }) {
         />
       )}
       {alertMessage && <AlertDialog message={alertMessage} onClose={() => setAlertMessage(null)} />}
-    </div>
+    </>
   )
 }

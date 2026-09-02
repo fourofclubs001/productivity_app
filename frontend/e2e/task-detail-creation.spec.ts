@@ -38,7 +38,7 @@ test('creating a task auto-selects it, and a child task can be created from the 
   await expect(tree.getByText(childName)).toBeVisible()
 })
 
-test('Save/Discard render top-right next to Options, and Discard reverts an unsaved edit', async ({
+test('Save/Discard appear when the panel is dirty, and Discard reverts an unsaved edit', async ({
   page,
 }) => {
   await page.goto('/')
@@ -57,19 +57,19 @@ test('Save/Discard render top-right next to Options, and Discard reverts an unsa
   const newName = `${taskName} edited`
   await page.getByLabel('Task name').fill(newName)
 
-  const header = panel.locator('.mb-4.flex.items-center.justify-between')
-  await expect(header.getByText('Save changes')).toBeVisible()
-  await expect(header.getByText('Discard')).toBeVisible()
-  await expect(header.getByTitle('Options')).toBeVisible()
+  // Save / Discard appear in the action row when the panel is dirty.
+  await expect(panel.getByRole('button', { name: 'Save changes' })).toBeVisible()
+  await expect(panel.getByRole('button', { name: 'Discard' })).toBeVisible()
+  await expect(panel.getByTitle('Options')).toBeVisible()
 
-  await header.getByText('Discard').click()
+  await panel.getByRole('button', { name: 'Discard' }).click()
   await expect(page.getByLabel('Task name')).toHaveValue(taskName)
-  await expect(panel.getByText('Save changes')).not.toBeVisible()
-  await expect(panel.getByText('Discard')).not.toBeVisible()
+  await expect(panel.getByRole('button', { name: 'Save changes' })).not.toBeVisible()
+  await expect(panel.getByRole('button', { name: 'Discard' })).not.toBeVisible()
 
   await page.getByLabel('Task name').fill(newName)
-  await header.getByText('Save changes').click()
-  await expect(panel.getByText('Save changes')).not.toBeVisible()
+  await panel.getByRole('button', { name: 'Save changes' }).click()
+  await expect(panel.getByRole('button', { name: 'Save changes' })).not.toBeVisible()
 
   // Confirm the save actually persisted server-side by re-selecting the task from the tree.
   const tree = page.getByTestId('task-tree')

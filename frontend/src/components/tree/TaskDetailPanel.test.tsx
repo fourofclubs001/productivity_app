@@ -346,9 +346,9 @@ describe('TaskDetailPanel', () => {
       <TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} onAddChild={() => {}} />,
     )
 
-    expect(screen.queryByText('Add to calendar')).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     fireEvent.click(screen.getByTitle('Add to calendar'))
-    expect(screen.getByText('Add to calendar')).toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 
   it('edits a scheduled interval inline and saves the new time', () => {
@@ -457,7 +457,7 @@ describe('TaskDetailPanel', () => {
       <TaskDetailPanel task={task} tasksById={new Map([[task.id, task]])} onAddChild={() => {}} />,
     )
 
-    expect(screen.getByText(/0\.0h currently on the calendar/)).toBeInTheDocument()
+    expect(screen.getByText(/0\.0h scheduled/)).toBeInTheDocument()
   })
 
   it('shows "Mark sprint done" only for an in-progress leaf task', () => {

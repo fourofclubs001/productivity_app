@@ -23,6 +23,8 @@ import { makeRevertDoneEntry } from '../../lib/taskDoneUndoEntries'
 import { useUndo } from '../../undo/UndoProvider'
 import AddToCalendarModal from '../calendar/AddToCalendarModal'
 import Menu from '../common/Menu'
+import Button from '../common/Button'
+import { MoreVertical } from '../common/icons'
 import IntervalTimeFields, {
   intervalTimeToDates,
   intervalToTimeValue,
@@ -136,65 +138,98 @@ export default function TaskDetailPanel({
   }
 
   return (
-    <div className="h-full overflow-y-auto p-6" data-testid="task-detail-panel">
-      <div className="mb-4 flex items-center justify-between gap-2">
+    <div className="h-full overflow-y-auto p-5" data-testid="task-detail-panel">
+      <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <StateBadge state={task.state} />
           {!task.is_leaf && (
-            <span className="text-xs text-text-secondary">
+            <span className="text-xs text-text-tertiary">
               derived from {task.children_ids.length} sub-task
               {task.children_ids.length === 1 ? '' : 's'}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          {isDirty && (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  setName(task.name)
-                  setDod(task.definition_of_done)
-                }}
-                className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-alt hover:text-text-primary"
-              >
-                Discard
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={updateTask.isPending || name.trim().length === 0}
-                className="rounded bg-accent px-2 py-1 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
-              >
-                Save changes
-              </button>
-            </>
-          )}
-          <button
-            type="button"
-            title="Options"
-            onClick={(event) => {
-              const rect = event.currentTarget.getBoundingClientRect()
-              setOptionsMenuAnchor({ x: rect.left, y: rect.bottom })
-            }}
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-text-secondary hover:bg-surface-alt hover:text-text-primary"
-          >
-            ⋮
-          </button>
-        </div>
+        <Button
+          variant="icon"
+          size="sm"
+          title="Options"
+          aria-label="Options"
+          onClick={(event) => {
+            const rect = event.currentTarget.getBoundingClientRect()
+            setOptionsMenuAnchor({ x: rect.left, y: rect.bottom })
+          }}
+        >
+          <MoreVertical className="h-[18px] w-[18px]" />
+        </Button>
       </div>
-
-      {task.is_leaf && <TaskTimerButton task={task} />}
 
       <input
         aria-label="Task name"
         value={name}
         onChange={(event) => setName(event.target.value)}
-        className="w-full border-none bg-transparent text-xl font-semibold text-text-primary focus:outline-none"
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.currentTarget.blur()
+            if (isDirty) handleSave()
+          } else if (event.key === 'Escape') {
+            setName(task.name)
+          }
+        }}
+        className="-mx-1.5 mt-3 w-full rounded-sm border-none bg-transparent px-1.5 py-1 text-xl font-medium text-text-primary hover:bg-surface-alt focus:bg-surface-alt focus:outline-none"
       />
 
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        {task.is_leaf && <TaskTimerButton task={task} />}
+        {task.is_leaf && task.state === 'in_progress' && (
+          <Button variant="outlined" size="sm" onClick={() => setShowDoneConfirm(true)}>
+            Mark sprint done
+          </Button>
+        )}
+        {task.is_leaf && (
+          <Button
+            variant="outlined"
+            size="sm"
+            title="Add to calendar"
+            onClick={() => setShowAddToCalendar(true)}
+          >
+            Add to calendar
+          </Button>
+        )}
+        {!task.is_recurrent_task && (
+          <Button
+            variant="ghost"
+            size="sm"
+            title="Add child task"
+            onClick={() => setShowAddChildChooser(true)}
+          >
+            + Sub-task
+          </Button>
+        )}
+        {isDirty && (
+          <div className="ml-auto flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setName(task.name)
+                setDod(task.definition_of_done)
+              }}
+            >
+              Discard
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={updateTask.isPending || name.trim().length === 0}
+            >
+              Save changes
+            </Button>
+          </div>
+        )}
+      </div>
+
       <div className="mt-4">
-        <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
+        <label className="block text-2xs font-medium uppercase tracking-wider text-text-secondary">
           Definition of done
         </label>
         <textarea
@@ -206,64 +241,40 @@ export default function TaskDetailPanel({
       </div>
 
       <div className="mt-4">
-        <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
-          Estimated time
+        <label className="block text-2xs font-medium uppercase tracking-wider text-text-secondary">
+          On calendar
         </label>
         <p className="mt-1 text-sm text-text-primary">
           {coverage
-            ? `${coverage.covered_hours.toFixed(1)}h currently on the calendar`
+            ? `${coverage.covered_hours.toFixed(1)}h scheduled`
             : 'Loading calendar coverage…'}
+          {!task.is_leaf && (
+            <span className="text-text-tertiary"> · {task.estimated_hours ?? 0}h estimated (sum of sub-tasks)</span>
+          )}
         </p>
-        {!task.is_leaf && (
-          <p className="mt-1 text-xs text-text-secondary">
-            {task.estimated_hours ?? 0}h (sum of sub-tasks)
-          </p>
-        )}
       </div>
 
       <div className="mt-6">
-        <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
+        <label className="block text-2xs font-medium uppercase tracking-wider text-text-secondary">
           Colors
         </label>
         <div className="mt-2">
           <ColorSwatchPicker palette={palette} selected={task.colors} onToggle={toggleColor} />
         </div>
         {task.colors.length === 0 && task.effective_colors.length > 0 && (
-          <p className="mt-1 text-xs text-text-secondary">
+          <p className="mt-1 text-xs text-text-tertiary">
             Inherited from parent{task.parent_ids.length === 1 ? '' : 's'}
           </p>
         )}
       </div>
 
-      {task.is_leaf && task.state === 'in_progress' && (
-        <div className="mt-6">
-          <button
-            type="button"
-            onClick={() => setShowDoneConfirm(true)}
-            className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-alt hover:text-text-primary"
-          >
-            Mark sprint done
-          </button>
-        </div>
-      )}
-
       {task.is_leaf && (
         <div className="mt-6">
-          <div className="flex items-center justify-between">
-            <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
-              Sprint schedule
-            </label>
-            <button
-              type="button"
-              title="Add to calendar"
-              onClick={() => setShowAddToCalendar(true)}
-              className="rounded border border-border px-2 py-0.5 text-xs text-text-secondary hover:bg-surface-alt hover:text-text-primary"
-            >
-              + Add to calendar
-            </button>
-          </div>
+          <label className="block text-2xs font-medium uppercase tracking-wider text-text-secondary">
+            Sprint schedule
+          </label>
           {intervals.length === 0 ? (
-            <p className="mt-1 text-xs text-text-secondary">
+            <p className="mt-1 text-xs text-text-tertiary">
               Not scheduled. Drag this task onto the calendar, or use "Add to calendar" above.
             </p>
           ) : (
@@ -376,7 +387,7 @@ export default function TaskDetailPanel({
 
       {!task.is_recurrent_task && (
         <div className="mt-6">
-          <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
+          <label className="block text-2xs font-medium uppercase tracking-wider text-text-secondary">
             Parents
           </label>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -435,26 +446,8 @@ export default function TaskDetailPanel({
         </div>
       )}
 
-      {!task.is_recurrent_task && (
-        <div className="mt-6">
-          <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
-            Add child task
-          </label>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <button
-              type="button"
-              title="Add child task"
-              onClick={() => setShowAddChildChooser(true)}
-              className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-alt hover:text-text-primary"
-            >
-              + Child task
-            </button>
-          </div>
-        </div>
-      )}
-
       <div className="mt-6">
-        <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
+        <label className="block text-2xs font-medium uppercase tracking-wider text-text-secondary">
           Requires
         </label>
         <p className="mt-1 text-xs text-text-secondary">
