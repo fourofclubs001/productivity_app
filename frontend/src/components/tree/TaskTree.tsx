@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useDndMonitor, type DragEndEvent, type DragMoveEvent } from '@dnd-kit/core'
 import type { Task } from '../../types'
 import TaskTreeNode from './TaskTreeNode'
+import EmptyState from '../common/EmptyState'
 import {
   isHiddenFromPlan,
   rootIds as computeRootIds,
@@ -164,9 +165,7 @@ export default function TaskTree({
     <div className="flex h-full flex-col" data-testid="task-tree">
       <div className="flex-1 overflow-y-auto p-1">
         {rootIds.length === 0 && (
-          <p className="px-2 py-6 text-center text-xs text-text-tertiary">
-            No tasks yet. Use + above to create one.
-          </p>
+          <EmptyState title="No tasks yet" hint="Use + above to create your first task." />
         )}
         {rootIds.map((id) => (
           <TaskTreeNode

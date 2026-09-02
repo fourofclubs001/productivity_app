@@ -21,6 +21,7 @@ import AlertDialog from '../common/AlertDialog'
 import ConfirmDialog from '../common/ConfirmDialog'
 import Menu from '../common/Menu'
 import ColorDots from './ColorDots'
+import EmptyState from '../common/EmptyState'
 import GroupDeleteDialog from './GroupDeleteDialog'
 import StateBadge from './StateBadge'
 
@@ -250,9 +251,10 @@ export default function RecurrentTasksList({
     <div className="flex h-full flex-col" data-testid="recurrent-tasks-list">
       <div className="flex-1 overflow-y-auto p-1">
         {tree.length === 0 && (
-          <p className="px-2 py-6 text-center text-xs text-text-tertiary">
-            No recurrent tasks yet. Use + above to create a repeating task.
-          </p>
+          <EmptyState
+            title="No recurrent tasks yet"
+            hint="Use + above to create a repeating task or a group."
+          />
         )}
         <DndContext sensors={sensors}>
           <RecurrentTasksTree

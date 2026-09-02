@@ -20,7 +20,10 @@ function App() {
     <UndoProvider activeView={activeView}>
       <div className="flex h-full min-h-screen flex-col bg-surface">
         <nav className="flex h-12 items-center justify-between gap-1 border-b border-border bg-surface px-4">
-          <div className="flex h-full items-center gap-1">
+          <div className="flex h-full items-center gap-4">
+            <span className="text-[15px] font-semibold tracking-tight text-text-secondary">
+              Productivity
+            </span>
             {(Object.keys(VIEWS) as ViewKey[]).map((key) => (
               <button
                 key={key}

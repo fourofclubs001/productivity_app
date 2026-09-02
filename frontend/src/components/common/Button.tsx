@@ -40,6 +40,7 @@ const ICON_SIZES: Record<ButtonSize, string> = {
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant
   size?: ButtonSize
+  loading?: boolean
   children?: ReactNode
 }
 
@@ -47,13 +48,23 @@ export default function Button({
   variant = 'primary',
   size = 'md',
   type = 'button',
+  loading = false,
+  disabled,
   className = '',
   children,
   ...rest
 }: ButtonProps) {
   const sizing = variant === 'icon' ? ICON_SIZES[size] : TEXT_SIZES[size]
   return (
-    <button type={type} className={`${BASE} ${VARIANTS[variant]} ${sizing} ${className}`.trim()} {...rest}>
+    <button
+      type={type}
+      disabled={disabled || loading}
+      className={`${BASE} ${VARIANTS[variant]} ${sizing} ${className}`.trim()}
+      {...rest}
+    >
+      {loading && (
+        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" />
+      )}
       {children}
     </button>
   )
