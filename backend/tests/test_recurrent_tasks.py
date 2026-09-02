@@ -353,6 +353,36 @@ async def test_biweekly_recurrence_keeps_generating_across_many_catchup_calls(se
     assert len(actual_dates) > 2
 
 
+async def test_generation_does_not_duplicate_when_watermark_falls_behind(services):
+    """Regression test: the `recurrent_task_generated_until` watermark can end
+    up behind already-materialized occurrences -- an older/narrower generation
+    window (this app shipped a 28-day one before M64), a partial run, a
+    concurrent catch-up. When that happens, the next ensure_applied() must
+    NOT re-create every occurrence in the gap as an exact duplicate. This
+    reproduces the real prod incident where biweekly "Escritura/Grabación/
+    Edición" recurrent tasks ended up with 2-3 copies of every slot on both
+    the app calendar and Google Calendar.
+    """
+    anchor = _future_anchor(7)
+    task_id = await seed_recurrent_task(services, anchor, RecurrenceUnit.day)
+
+    now = datetime.combine(anchor + timedelta(days=30), time(8, 0), tzinfo=UTC)
+    await services["recurrent_tasks"].ensure_applied(now=now)
+    baseline = await services["intervals"].list_for_task(task_id)
+
+    # Rewind the watermark well behind what's already been generated, as a
+    # stale 28-day window or a partial run would leave it.
+    await services["task_repo"].update_fields(
+        task_id,
+        {"recurrent_task_generated_until": (anchor + timedelta(days=5)).isoformat()},
+    )
+    await services["recurrent_tasks"].ensure_applied(now=now)
+
+    after = await services["intervals"].list_for_task(task_id)
+    assert sorted(i.start for i in after) == sorted(i.start for i in baseline)
+    assert len({i.start for i in after}) == len(after)  # no duplicate slots
+
+
 async def test_sprint_done_resets_to_backlog_once_an_occurrence_concludes(services):
     anchor = _future_anchor(7)
     task_id = await seed_recurrent_task(services, anchor, RecurrenceUnit.day)

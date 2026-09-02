@@ -271,9 +271,25 @@ class RecurrentTaskService:
         start_time = time.fromisoformat(fields["recurrent_task_start_time"])
         duration = timedelta(minutes=int(fields["recurrent_task_duration_minutes"]))
 
+        # Defence-in-depth against duplicate occurrences: the `generated_until`
+        # watermark alone can't be trusted to mean "everything before here is
+        # materialized" -- an older/narrower window (this app shipped a 28-day
+        # one before M64), a partial run, or a watermark that ends up behind
+        # already-created intervals would otherwise make this loop blindly
+        # re-create every occurrence in the gap. Skip any slot that already
+        # has an interval for this task at the exact same start instant.
+        existing_starts = {
+            interval.start
+            if interval.start.tzinfo
+            else interval.start.replace(tzinfo=UTC)
+            for interval in await self._intervals.list_for_task(task_id)
+        }
+
         for occurrence_date in dates:
             start_dt = datetime.combine(occurrence_date, start_time, tzinfo=UTC)
             end_dt = start_dt + duration
+            if start_dt in existing_starts:
+                continue
             try:
                 await self._intervals.create_interval(
                     IntervalCreate(task_id=task_id, start=start_dt, end=end_dt)
