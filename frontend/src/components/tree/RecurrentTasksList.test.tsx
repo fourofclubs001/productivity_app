@@ -39,7 +39,6 @@ describe('RecurrentTasksList', () => {
         tasks={[recurrentA, normalTask, recurrentB]}
         selectedId={null}
         onSelect={() => {}}
-        onOpenNewRecurrentTask={() => {}}
       />,
     )
 
@@ -54,45 +53,14 @@ describe('RecurrentTasksList', () => {
         tasks={[]}
         selectedId={null}
         onSelect={() => {}}
-        onOpenNewRecurrentTask={() => {}}
       />,
     )
     expect(screen.getByText(/no recurrent tasks yet/i)).toBeInTheDocument()
   })
 
-  it('the + button opens a chooser, and picking "Recurrent task" delegates to the parent', () => {
-    const onOpenNewRecurrentTask = vi.fn()
-    render(
-      <RecurrentTasksList
-        tasks={[]}
-        selectedId={null}
-        onSelect={() => {}}
-        onOpenNewRecurrentTask={onOpenNewRecurrentTask}
-      />,
-    )
-    fireEvent.click(screen.getByTitle('New recurrent item'))
-    expect(screen.getByText('New…')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Recurrent task' }))
-    expect(onOpenNewRecurrentTask).toHaveBeenCalled()
-  })
-
-  it('picking "Recurrent group" from the chooser opens the group-name dialog and creates it', () => {
-    render(
-      <RecurrentTasksList
-        tasks={[]}
-        selectedId={null}
-        onSelect={() => {}}
-        onOpenNewRecurrentTask={() => {}}
-      />,
-    )
-    fireEvent.click(screen.getByTitle('New recurrent item'))
-    fireEvent.click(screen.getByRole('button', { name: 'Recurrent group' }))
-    expect(screen.getByText('New recurrent group')).toBeInTheDocument()
-
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Chores' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
-    expect(createGroupMutate).toHaveBeenCalledWith({ name: 'Chores' }, expect.anything())
-  })
+  // The "+ -> chooser -> Recurrent task / group" creation flow moved to
+  // PlanView's merged tab strip in v08; it's covered end-to-end by
+  // e2e/recurrent-tasks.spec.ts.
 
   it('right-click deletes a recurrent task via the same confirm flow as a normal task row', () => {
     const recurrentTask = makeTask({ id: 'r1', name: 'Water plants', is_recurrent_task: true })
@@ -102,7 +70,6 @@ describe('RecurrentTasksList', () => {
         tasks={[recurrentTask]}
         selectedId={null}
         onSelect={onSelect}
-        onOpenNewRecurrentTask={() => {}}
       />,
     )
 
@@ -129,7 +96,6 @@ describe('RecurrentTasksList', () => {
         tasks={[group, child]}
         selectedId={null}
         onSelect={onSelect}
-        onOpenNewRecurrentTask={() => {}}
       />,
     )
 
@@ -151,7 +117,6 @@ describe('RecurrentTasksList', () => {
         tasks={[group]}
         selectedId={null}
         onSelect={() => {}}
-        onOpenNewRecurrentTask={() => {}}
       />,
     )
 
@@ -173,7 +138,6 @@ describe('RecurrentTasksList', () => {
         tasks={[group]}
         selectedId={null}
         onSelect={() => {}}
-        onOpenNewRecurrentTask={() => {}}
       />,
     )
 

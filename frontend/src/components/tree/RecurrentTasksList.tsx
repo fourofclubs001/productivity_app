@@ -22,8 +22,6 @@ import ConfirmDialog from '../common/ConfirmDialog'
 import Menu from '../common/Menu'
 import ColorDots from './ColorDots'
 import GroupDeleteDialog from './GroupDeleteDialog'
-import NewRecurrentGroupDialog from './NewRecurrentGroupDialog'
-import NewRecurrentItemChooserDialog from './NewRecurrentItemChooserDialog'
 import StateBadge from './StateBadge'
 
 function RecurrentItemRow({
@@ -223,16 +221,12 @@ export default function RecurrentTasksList({
   tasks,
   selectedId,
   onSelect,
-  onOpenNewRecurrentTask,
 }: {
   tasks: Task[]
   selectedId: string | null
   onSelect: (id: string) => void
-  onOpenNewRecurrentTask: () => void
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [showChooser, setShowChooser] = useState(false)
-  const [showNewGroup, setShowNewGroup] = useState(false)
   // A second, independent DndContext scoped to just this panel -- dnd-kit
   // scopes drop targets to a DndContext's own children, which trivially
   // keeps this hierarchy's drags from ever interacting with the main task
@@ -254,23 +248,10 @@ export default function RecurrentTasksList({
 
   return (
     <div className="flex h-full flex-col" data-testid="recurrent-tasks-list">
-      <div className="flex items-center justify-between border-b border-border px-3 py-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-          Recurrent tasks
-        </span>
-        <button
-          type="button"
-          title="New recurrent item"
-          onClick={() => setShowChooser(true)}
-          className="flex h-5 w-5 items-center justify-center rounded text-text-secondary hover:bg-surface-hover hover:text-text-primary"
-        >
-          +
-        </button>
-      </div>
       <div className="flex-1 overflow-y-auto p-1">
         {tree.length === 0 && (
-          <p className="px-2 py-4 text-center text-xs text-text-secondary">
-            No recurrent tasks yet. Click + to create a repeating task.
+          <p className="px-2 py-6 text-center text-xs text-text-tertiary">
+            No recurrent tasks yet. Use + above to create a repeating task.
           </p>
         )}
         <DndContext sensors={sensors}>
@@ -284,28 +265,6 @@ export default function RecurrentTasksList({
           />
         </DndContext>
       </div>
-      {showChooser && (
-        <NewRecurrentItemChooserDialog
-          onClose={() => setShowChooser(false)}
-          onChooseTask={() => {
-            setShowChooser(false)
-            onOpenNewRecurrentTask()
-          }}
-          onChooseGroup={() => {
-            setShowChooser(false)
-            setShowNewGroup(true)
-          }}
-        />
-      )}
-      {showNewGroup && (
-        <NewRecurrentGroupDialog
-          onClose={() => setShowNewGroup(false)}
-          onCreated={(task) => {
-            setShowNewGroup(false)
-            setExpanded((prev) => new Set(prev).add(task.id))
-          }}
-        />
-      )}
     </div>
   )
 }

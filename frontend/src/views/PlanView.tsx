@@ -6,7 +6,11 @@ import RecurrentTasksList from '../components/tree/RecurrentTasksList'
 import TaskDetailPanel from '../components/tree/TaskDetailPanel'
 import NewTaskDialog from '../components/tree/NewTaskDialog'
 import NewRecurrentTaskDialog from '../components/tree/NewRecurrentTaskDialog'
+import NewRecurrentGroupDialog from '../components/tree/NewRecurrentGroupDialog'
+import NewRecurrentItemChooserDialog from '../components/tree/NewRecurrentItemChooserDialog'
 import PlanCalendar from '../components/calendar/PlanCalendar'
+import Button from '../components/common/Button'
+import { Plus } from '../components/common/icons'
 import { useResizableWidth } from '../lib/useResizableWidth'
 
 type LeftTab = 'tasks' | 'recurrent-tasks'
@@ -17,6 +21,8 @@ export default function PlanView() {
   const [dialogParentId, setDialogParentId] = useState<string | null>()
   const [leftTab, setLeftTab] = useState<LeftTab>('tasks')
   const [showNewRecurrentTask, setShowNewRecurrentTask] = useState(false)
+  const [showRecurrentChooser, setShowRecurrentChooser] = useState(false)
+  const [showNewRecurrentGroup, setShowNewRecurrentGroup] = useState(false)
 
   const tasksById = useMemo(() => new Map((tasks ?? []).map((task) => [task.id, task])), [tasks])
   const selectedTask = selectedId ? tasksById.get(selectedId) : undefined
@@ -44,26 +50,39 @@ export default function PlanView() {
           className="relative flex shrink-0 flex-col border-r border-border"
           style={{ width: treePanel.width }}
         >
-          <div className="flex border-b border-border">
-            {(
-              [
-                ['tasks', 'Tasks'],
-                ['recurrent-tasks', 'Recurrent tasks'],
-              ] as [LeftTab, string][]
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setLeftTab(key)}
-                className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors ${
-                  leftTab === key
-                    ? 'border-b-2 border-accent text-accent'
-                    : 'text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="flex items-center border-b border-border pr-1">
+            <div className="flex flex-1">
+              {(
+                [
+                  ['tasks', 'Tasks'],
+                  ['recurrent-tasks', 'Recurrent tasks'],
+                ] as [LeftTab, string][]
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setLeftTab(key)}
+                  className={`px-2 py-2 text-xs font-medium transition-colors ${
+                    leftTab === key
+                      ? 'border-b-2 border-accent text-accent'
+                      : 'text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <Button
+              variant="icon"
+              size="sm"
+              title={leftTab === 'tasks' ? 'New task' : 'New recurrent item'}
+              aria-label={leftTab === 'tasks' ? 'New task' : 'New recurrent item'}
+              onClick={() =>
+                leftTab === 'tasks' ? setDialogParentId(null) : setShowRecurrentChooser(true)
+              }
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
           </div>
           <div className="min-h-0 flex-1">
             {leftTab === 'tasks' ? (
@@ -78,7 +97,6 @@ export default function PlanView() {
                 tasks={tasks ?? []}
                 selectedId={selectedId}
                 onSelect={setSelectedId}
-                onOpenNewRecurrentTask={() => setShowNewRecurrentTask(true)}
               />
             )}
           </div>
@@ -122,6 +140,19 @@ export default function PlanView() {
             }}
           />
         )}
+        {showRecurrentChooser && (
+          <NewRecurrentItemChooserDialog
+            onClose={() => setShowRecurrentChooser(false)}
+            onChooseTask={() => {
+              setShowRecurrentChooser(false)
+              setShowNewRecurrentTask(true)
+            }}
+            onChooseGroup={() => {
+              setShowRecurrentChooser(false)
+              setShowNewRecurrentGroup(true)
+            }}
+          />
+        )}
         {showNewRecurrentTask && (
           <NewRecurrentTaskDialog
             onClose={() => setShowNewRecurrentTask(false)}
@@ -129,6 +160,12 @@ export default function PlanView() {
               setSelectedId(task.id)
               setShowNewRecurrentTask(false)
             }}
+          />
+        )}
+        {showNewRecurrentGroup && (
+          <NewRecurrentGroupDialog
+            onClose={() => setShowNewRecurrentGroup(false)}
+            onCreated={() => setShowNewRecurrentGroup(false)}
           />
         )}
       </div>
