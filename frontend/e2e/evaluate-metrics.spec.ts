@@ -27,9 +27,9 @@ test('Evaluate Metrics subtab: granularity switch and task filter', async ({ pag
   await page.getByRole('button', { name: 'Metrics', exact: true }).click()
 
   // Both subtab controls are present.
-  await expect(page.getByRole('button', { name: 'Day' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Week' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Month' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Day', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Week', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Month', exact: true })).toBeVisible()
 
   const taskACell = page.getByRole('cell', { name: taskAName })
   await expect(taskACell).toBeVisible()
@@ -51,6 +51,6 @@ test('Evaluate Metrics subtab: granularity switch and task filter', async ({ pag
 
   // Switching granularity shouldn't error, and "today" still includes the
   // entry tracked moments ago.
-  await page.getByRole('button', { name: 'Day' }).click()
+  await page.getByRole('button', { name: 'Day', exact: true }).click()
   await expect(taskACell).toBeVisible()
 })

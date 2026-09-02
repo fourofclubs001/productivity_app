@@ -21,6 +21,9 @@ import {
   type Granularity,
 } from '../lib/period'
 import { utcNow } from '../lib/time'
+import Button from '../components/common/Button'
+import SegmentedControl from '../components/common/SegmentedControl'
+import { ChevronLeft, ChevronRight } from '../components/common/icons'
 
 const CALENDAR_MODES: { key: EvaluateMode; label: string }[] = [
   { key: 'planned', label: 'Planned' },
@@ -81,77 +84,123 @@ export default function EvaluateView() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto">
-      <div className="flex items-center gap-1 border-b border-border px-4 pt-2">
-        {SUBTABS.map(({ key, label }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setSubtab(key)}
-            className={`rounded-t px-3 py-2 text-sm font-medium ${
-              subtab === key
-                ? 'border-b-2 border-accent text-accent'
-                : 'text-text-secondary hover:text-text-primary'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+    <div className="flex h-full flex-col">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-3">
+        <div className="flex items-center gap-3">
+          <SegmentedControl
+            ariaLabel="Evaluate view"
+            segments={SUBTABS}
+            value={subtab}
+            onChange={setSubtab}
+          />
+          {subtab === 'calendar' ? (
+            <>
+              <Button
+                variant="icon"
+                size="sm"
+                aria-label="Previous week"
+                onClick={() => setWeekAnchor((prev) => shiftWeek(prev, -1))}
+              >
+                <ChevronLeft />
+              </Button>
+              <Button
+                variant="icon"
+                size="sm"
+                aria-label="Next week"
+                disabled={isCurrentWeek}
+                onClick={() => setWeekAnchor((prev) => shiftWeek(prev, 1))}
+              >
+                <ChevronRight />
+              </Button>
+              <Button
+                variant="outlined"
+                size="sm"
+                disabled={isCurrentWeek}
+                onClick={() => setWeekAnchor(mondayOf(utcNow()))}
+              >
+                Today
+              </Button>
+              <span className="text-base font-medium text-text-primary">
+                {formatWeekLabel(weekAnchor)}
+              </span>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="icon"
+                size="sm"
+                aria-label="Previous period"
+                onClick={() => setPeriodAnchor((prev) => shiftPeriod(granularity, prev, -1))}
+              >
+                <ChevronLeft />
+              </Button>
+              <Button
+                variant="icon"
+                size="sm"
+                aria-label="Next period"
+                disabled={isCurrentPeriod(granularity, periodAnchor)}
+                onClick={() => setPeriodAnchor((prev) => shiftPeriod(granularity, prev, 1))}
+              >
+                <ChevronRight />
+              </Button>
+              <Button
+                variant="outlined"
+                size="sm"
+                disabled={isCurrentPeriod(granularity, periodAnchor)}
+                onClick={() => setPeriodAnchor(utcNow())}
+              >
+                Today
+              </Button>
+              <span className="text-base font-medium text-text-primary">
+                {formatPeriodLabel(granularity, periodAnchor)}
+              </span>
+            </>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          {subtab === 'calendar' ? (
+            <>
+              {mode === 'diff' && (
+                <span className="hidden text-2xs text-text-tertiary lg:inline">
+                  dashed = planned · solid = tracked · bold = missed
+                </span>
+              )}
+              <SegmentedControl
+                ariaLabel="Calendar mode"
+                segments={CALENDAR_MODES.map((m) => ({ key: m.key, label: m.label }))}
+                value={mode}
+                onChange={setMode}
+              />
+            </>
+          ) : (
+            <>
+              <SegmentedControl
+                ariaLabel="Granularity"
+                segments={GRANULARITIES.map((g) => ({ key: g.key, label: g.label }))}
+                value={granularity}
+                onChange={handleGranularityChange}
+              />
+              <TaskFilter
+                tasks={tasks ?? []}
+                selectedIds={selectedTaskIds}
+                onChange={setSelectedTaskIds}
+              />
+            </>
+          )}
+        </div>
       </div>
 
       {subtab === 'calendar' && (
-        <>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setWeekAnchor((prev) => shiftWeek(prev, -1))}
-                className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-hover"
-              >
-                ← Prev
-              </button>
-              <button
-                type="button"
-                disabled={isCurrentWeek}
-                onClick={() => setWeekAnchor((prev) => shiftWeek(prev, 1))}
-                className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-hover disabled:opacity-30"
-              >
-                Next →
-              </button>
-              <span className="text-sm text-text-secondary">
-                Week of {formatWeekLabel(weekAnchor)}
-                {isCurrentWeek && <span className="ml-1 text-text-secondary">(current)</span>}
-              </span>
-            </div>
-            <div className="flex gap-1">
-              {CALENDAR_MODES.map(({ key, label }) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setMode(key)}
-                  className={`rounded px-3 py-1 text-xs font-medium ${
-                    mode === key
-                      ? 'bg-accent text-white'
-                      : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="h-[500px] shrink-0 p-4">
-            <EvaluateCalendar
-              mode={mode}
-              weekAnchor={weekAnchor}
-              intervals={intervals}
-              entries={entries}
-              tasksById={tasksById}
-              onExplainGap={setExplainGap}
-            />
-          </div>
-        </>
+        <div className="min-h-0 flex-1 p-4">
+          <EvaluateCalendar
+            mode={mode}
+            weekAnchor={weekAnchor}
+            intervals={intervals}
+            entries={entries}
+            tasksById={tasksById}
+            onExplainGap={setExplainGap}
+          />
+        </div>
       )}
 
       {explainGap && (
@@ -170,56 +219,7 @@ export default function EvaluateView() {
       )}
 
       {(subtab === 'metrics' || subtab === 'excuses') && (
-        <>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPeriodAnchor((prev) => shiftPeriod(granularity, prev, -1))}
-                className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-hover"
-              >
-                ← Prev
-              </button>
-              <button
-                type="button"
-                disabled={isCurrentPeriod(granularity, periodAnchor)}
-                onClick={() => setPeriodAnchor((prev) => shiftPeriod(granularity, prev, 1))}
-                className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-hover disabled:opacity-30"
-              >
-                Next →
-              </button>
-              <span className="text-sm text-text-secondary">
-                {formatPeriodLabel(granularity, periodAnchor)}
-                {isCurrentPeriod(granularity, periodAnchor) && (
-                  <span className="ml-1 text-text-secondary">(current)</span>
-                )}
-              </span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex gap-1">
-                {GRANULARITIES.map(({ key, label }) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => handleGranularityChange(key)}
-                    className={`rounded px-3 py-1 text-xs font-medium ${
-                      granularity === key
-                        ? 'bg-accent text-white'
-                        : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <TaskFilter
-                tasks={tasks ?? []}
-                selectedIds={selectedTaskIds}
-                onChange={setSelectedTaskIds}
-              />
-            </div>
-          </div>
-
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {subtab === 'metrics' && (
             <>
               {isLoading && (
@@ -247,7 +247,7 @@ export default function EvaluateView() {
               {excuseFrequency && <ExcusesPanel result={excuseFrequency} />}
             </>
           )}
-        </>
+        </div>
       )}
     </div>
   )

@@ -111,8 +111,7 @@ describe('StatsPanel', () => {
     render(<StatsPanel result={result} tasks={[parent, leaf]} />)
 
     expect(screen.queryByText('Leaf task')).not.toBeInTheDocument()
-    const toggles = screen.getAllByRole('button')
-    fireEvent.click(toggles.find((btn) => btn.textContent === '▸')!)
+    fireEvent.click(screen.getByRole('button', { name: 'Expand' }))
     expect(screen.getByText('Leaf task')).toBeInTheDocument()
   })
 

@@ -11,6 +11,8 @@ import { chipFillStyle, primaryChipColor } from './eventColor'
 import CalendarDayHeader from './CalendarDayHeader'
 import CalendarTimezoneLabel from './CalendarTimezoneLabel'
 
+const SCROLL_TO = new Date(1970, 0, 1, 7, 0, 0)
+
 export type EvaluateMode = 'planned' | 'real' | 'diff'
 
 export interface ExplainGapParams {
@@ -118,6 +120,7 @@ export default function EvaluateCalendar({
       views={['week']}
       date={weekAnchor}
       onNavigate={() => {}}
+      scrollToTime={SCROLL_TO}
       toolbar={false}
       selectable={false}
       onSelectEvent={(event: CalendarEvent) => {
