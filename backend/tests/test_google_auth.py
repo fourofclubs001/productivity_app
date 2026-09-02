@@ -1,9 +1,12 @@
+from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qs, urlparse
 
 import httpx
 import respx
 
+from app.repositories.google_repository import GoogleRepository
 from app.services.errors import GoogleAuthError
+from app.services.google_auth_service import GoogleAuthService
 from app.services.google_oauth_client import (
     GOOGLE_TOKEN_URL,
     HttpxGoogleOAuthClient,
@@ -125,3 +128,30 @@ async def test_httpx_client_refresh_hits_expected_endpoint():
 
 def test_google_auth_error_message():
     assert "expired" in str(GoogleAuthError())
+
+
+async def test_get_valid_access_token_clears_tokens_on_invalid_grant(redis_client):
+    class RaisingOAuthClient:
+        def build_auth_url(self, state: str, redirect_uri: str) -> str:
+            raise NotImplementedError
+
+        async def exchange_code(self, code: str, redirect_uri: str):
+            raise NotImplementedError
+
+        async def refresh(self, refresh_token: str):
+            request = httpx.Request("POST", GOOGLE_TOKEN_URL)
+            response = httpx.Response(400, json={"error": "invalid_grant"}, request=request)
+            raise httpx.HTTPStatusError("Bad Request", request=request, response=response)
+
+    repo = GoogleRepository(redis_client)
+    expired_at = (datetime.now(UTC) - timedelta(minutes=5)).isoformat()
+    await repo.save_tokens("stale-access", "dead-refresh-token", expired_at)
+
+    service = GoogleAuthService(
+        repo, RaisingOAuthClient(), "http://localhost:8000/auth/google/callback"
+    )
+
+    token = await service.get_valid_access_token()
+
+    assert token is None
+    assert await repo.get_tokens() is None

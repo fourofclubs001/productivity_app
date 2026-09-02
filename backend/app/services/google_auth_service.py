@@ -1,6 +1,8 @@
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+import httpx
+
 from app.models.google import GoogleConnectionStatusOut
 from app.repositories.google_repository import GoogleRepository
 from app.services.errors import GoogleAuthError
@@ -53,7 +55,15 @@ class GoogleAuthService:
         refresh_token = tokens.get("refresh_token")
         if not refresh_token:
             return None
-        refreshed = await self._oauth.refresh(refresh_token)
+        try:
+            refreshed = await self._oauth.refresh(refresh_token)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 400:
+                # invalid_grant: the refresh token itself is dead (revoked/expired)
+                # and will never succeed again -- clear it so status correctly
+                # reports disconnected instead of retrying every request forever.
+                await self._repo.clear_tokens()
+            return None
         new_expires_at = (datetime.now(UTC) + timedelta(seconds=refreshed.expires_in)).isoformat()
         await self._repo.update_access_token(refreshed.access_token, new_expires_at)
         return refreshed.access_token
