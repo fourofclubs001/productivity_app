@@ -1,7 +1,7 @@
 export default function ConfigDialog({ onClose }: { onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-96 rounded-lg border border-border bg-surface p-4 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim">
+      <div className="w-96 rounded-lg border border-border bg-surface p-4 shadow-2">
         <h2 className="mb-3 text-sm font-semibold text-text-primary">Configuration</h2>
 
         <p className="text-sm text-text-secondary">No settings yet.</p>

@@ -11,9 +11,9 @@ export default function GoogleEventDetailPanel({
   onClose: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim">
       <div
-        className="w-96 rounded-lg border border-border bg-surface p-4 shadow-xl"
+        className="w-96 rounded-lg border border-border bg-surface p-4 shadow-2"
         data-testid="google-event-detail-panel"
       >
         <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-text-secondary">

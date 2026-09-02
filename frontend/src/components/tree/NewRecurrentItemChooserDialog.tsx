@@ -8,8 +8,8 @@ export default function NewRecurrentItemChooserDialog({
   onClose: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-72 rounded-lg border border-border bg-surface p-4 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim">
+      <div className="w-72 rounded-lg border border-border bg-surface p-4 shadow-2">
         <h2 className="mb-3 text-sm font-semibold text-text-primary">New…</h2>
         <div className="flex flex-col gap-2">
           <button

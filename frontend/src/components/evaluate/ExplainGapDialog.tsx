@@ -46,10 +46,10 @@ export default function ExplainGapDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim">
       <form
         onSubmit={handleSubmit}
-        className="w-96 rounded-lg border border-border bg-surface p-4 shadow-xl"
+        className="w-96 rounded-lg border border-border bg-surface p-4 shadow-2"
       >
         <h2 className="mb-1 text-sm font-semibold text-text-primary">Explain this gap</h2>
         <p className="mb-3 text-xs text-text-secondary">

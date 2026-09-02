@@ -39,7 +39,7 @@ export default function PlanView() {
 
   return (
     <DndContext sensors={sensors}>
-      <div className="flex h-[calc(100vh-49px)]">
+      <div className="flex h-full">
         <div
           className="relative flex shrink-0 flex-col border-r border-border"
           style={{ width: treePanel.width }}

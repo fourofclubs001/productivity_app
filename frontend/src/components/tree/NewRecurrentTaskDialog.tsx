@@ -104,10 +104,10 @@ export default function NewRecurrentTaskDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim">
       <form
         onSubmit={handleSubmit}
-        className="max-h-[90vh] w-96 overflow-y-auto rounded-lg border border-border bg-surface p-4 shadow-xl"
+        className="max-h-[90vh] w-96 overflow-y-auto rounded-lg border border-border bg-surface p-4 shadow-2"
       >
         <h2 className="mb-3 text-sm font-semibold text-text-primary">New recurrent task</h2>
         <label className="mb-2 block text-xs text-text-secondary">

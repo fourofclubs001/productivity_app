@@ -12,8 +12,8 @@ export default function DeleteWithChildrenDialog({
   isPending: boolean
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-96 rounded-lg border border-border bg-surface p-4 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim">
+      <div className="w-96 rounded-lg border border-border bg-surface p-4 shadow-2">
         <p className="text-sm text-text-primary">
           Delete &ldquo;{taskName}&rdquo;? It has sub-tasks — choose what happens to them.
         </p>

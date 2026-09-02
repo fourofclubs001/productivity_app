@@ -10,8 +10,8 @@ export default function ConfirmDialog({
   onCancel: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-96 rounded-lg border border-border bg-surface p-4 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim">
+      <div className="w-96 rounded-lg border border-border bg-surface p-4 shadow-2">
         <p className="text-sm text-text-primary">{message}</p>
         <div className="mt-4 flex justify-end gap-2">
           <button

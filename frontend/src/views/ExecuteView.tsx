@@ -20,7 +20,7 @@ export default function ExecuteView() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-49px)] flex-col">
+    <div className="flex h-full flex-col">
       <TimerControl tasks={tasks ?? []} />
       <div className="min-h-0 flex-1">
         <ExecuteCalendar tasksById={tasksById} />

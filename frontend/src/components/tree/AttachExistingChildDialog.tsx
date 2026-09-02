@@ -59,10 +59,10 @@ export default function AttachExistingChildDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim"
       data-testid="attach-existing-child-dialog"
     >
-      <div className="w-96 rounded-lg border border-border bg-surface p-4 shadow-xl">
+      <div className="w-96 rounded-lg border border-border bg-surface p-4 shadow-2">
         <h2 className="mb-1 text-sm font-semibold text-text-primary">Attach existing task</h2>
         <p className="mb-3 text-xs text-text-secondary">
           Move an existing task to become a child of "{parentTask.name}".

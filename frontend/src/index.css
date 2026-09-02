@@ -5,8 +5,14 @@
   --color-surface-alt: #f8f9fa;
   --color-surface-hover: #f1f3f4;
   --color-border: #dadce0;
+  /* hairlines *inside* a panel (table rows, list items) -- keep --color-border
+     for panel dividers / structure */
+  --color-border-subtle: #e8eaed;
   --color-text-primary: #202124;
   --color-text-secondary: #5f6368;
+  /* placeholders, "(current)", helper captions -- one step quieter than
+     --color-text-secondary so hierarchy doesn't flatten */
+  --color-text-tertiary: #80868b;
   --color-accent: #1a73e8;
   --color-accent-hover: #1765cc;
   --color-accent-soft: #e8f0fe;
@@ -18,6 +24,25 @@
   --color-success-soft: #e6f4ea;
   --color-warning: #f9ab00;
   --color-warning-soft: #fef7e0;
+  /* readable amber text on --color-warning-soft (the raw --color-warning is
+     ~1.9:1 there) */
+  --color-warning-text: #b06000;
+  /* modal backdrop */
+  --color-scrim: rgba(32, 33, 36, 0.4);
+
+  /* Google-style two-layer elevation */
+  --shadow-1: 0 1px 2px rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+  --shadow-2: 0 1px 3px rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
+
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+
+  /* dense UI size -- rows, buttons, menu items, table cells */
+  --text-ui: 0.8125rem;
+  --text-ui--line-height: 1.25rem;
+  /* caps labels, badges, gutter, captions */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
 }
 
 html,
@@ -32,4 +57,52 @@ body {
   color: var(--color-text-primary);
   font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  /* align timer digits / hours / percentages in tables */
+  font-variant-numeric: tabular-nums;
+}
+
+button,
+a,
+[role="button"],
+[role="menuitem"] {
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    opacity 0.15s ease;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

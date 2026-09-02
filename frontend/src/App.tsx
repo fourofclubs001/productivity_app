@@ -21,14 +21,14 @@ function App() {
   return (
     <UndoProvider activeView={activeView}>
       <div className="flex h-full min-h-screen flex-col bg-surface">
-        <nav className="flex items-center justify-between gap-1 border-b border-border bg-surface px-4">
-          <div className="flex items-center gap-1">
+        <nav className="flex h-12 items-center justify-between gap-1 border-b border-border bg-surface px-4">
+          <div className="flex h-full items-center gap-1">
             {(Object.keys(VIEWS) as ViewKey[]).map((key) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => setActiveView(key)}
-                className={`px-4 py-3 text-sm font-medium transition-colors ${
+                className={`flex h-full items-center px-4 text-sm font-medium ${
                   activeView === key
                     ? 'border-b-2 border-accent text-accent'
                     : 'text-text-secondary hover:text-text-primary'
@@ -43,7 +43,7 @@ function App() {
             <ConfigButton />
           </div>
         </nav>
-        <main className="flex-1">
+        <main className="min-h-0 flex-1">
           <ActiveComponent />
         </main>
         <GlobalTimerWatcher />

@@ -81,7 +81,7 @@ export default function EvaluateView() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-49px)] flex-col overflow-y-auto">
+    <div className="flex h-full flex-col overflow-y-auto">
       <div className="flex items-center gap-1 border-b border-border px-4 pt-2">
         {SUBTABS.map(({ key, label }) => (
           <button

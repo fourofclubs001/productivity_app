@@ -1,8 +1,11 @@
 export type FaviconState = 'neutral' | 'green'
 
 const FAVICON_SIZE = 32
+// Canvas fills need literal colours (no CSS vars) -- these mirror the theme's
+// --color-success (green) and --color-text-secondary (neutral) by value.
+const NEUTRAL_HEX = '#5f6368'
 const COLORS: Record<Exclude<FaviconState, 'neutral'>, string> = {
-  green: '#16a34a',
+  green: '#188038',
 }
 
 // mm:ss below one hour, h:mm:ss from one hour on -- the tab-title timer
@@ -34,7 +37,7 @@ export function drawFavicon(
   ctx.clearRect(0, 0, size, size)
   ctx.beginPath()
   ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2)
-  ctx.fillStyle = state === 'neutral' ? '#94a3b8' : COLORS[state]
+  ctx.fillStyle = state === 'neutral' ? NEUTRAL_HEX : COLORS[state]
   ctx.fill()
 }
 

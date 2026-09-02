@@ -174,7 +174,7 @@ export default function TaskPicker({
       {open && (
         <div
           data-testid="task-picker-options"
-          className="absolute left-0 z-20 mt-1 max-h-96 w-72 overflow-y-auto rounded-lg border border-border bg-surface p-1 shadow-xl"
+          className="absolute left-0 z-20 mt-1 max-h-96 w-72 overflow-y-auto rounded-lg border border-border bg-surface p-1 shadow-2"
         >
           {rows.length === 0 && recurrentRows.length === 0 && (
             <p className="px-2 py-2 text-xs text-text-secondary">{emptyMessage}</p>

@@ -41,8 +41,8 @@ export default function ScheduleExistingTaskDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-96 rounded-lg border border-border bg-surface p-4 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim">
+      <div className="w-96 rounded-lg border border-border bg-surface p-4 shadow-2">
         <h2 className="mb-3 text-sm font-semibold text-text-primary">Schedule existing task</h2>
         <p className="mb-3 text-xs text-text-secondary">
           {format(range.start, 'EEEE, MMM d, HH:mm')} – {format(range.end, 'HH:mm')}

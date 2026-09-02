@@ -22,9 +22,10 @@ export function primaryChipColor(colors: string[]): string {
 
 // Pulled-in Google Calendar events aren't tied to a task, so they can't use
 // chipFillStyle's color logic -- a fixed neutral/outlined look keeps them
-// visually distinct from the user's own scheduled work.
+// visually distinct from the user's own scheduled work. Applied as an inline
+// style on the chip, so the theme CSS vars resolve.
 export const EXTERNAL_EVENT_STYLE: CSSProperties = {
-  backgroundColor: '#e5e7eb',
-  color: '#374151',
-  border: '1px solid #9ca3af',
+  backgroundColor: 'var(--color-surface-hover)',
+  color: 'var(--color-text-primary)',
+  border: '1px solid var(--color-border)',
 }

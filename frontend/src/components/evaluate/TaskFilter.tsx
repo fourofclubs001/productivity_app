@@ -121,7 +121,7 @@ export default function TaskFilter({
         Tasks: {selectedIds.length > 0 ? selectedIds.length : 'All'}
       </button>
       {open && (
-        <div className="absolute right-0 z-20 mt-1 max-h-96 w-64 overflow-y-auto rounded-lg border border-border bg-surface p-2 shadow-xl">
+        <div className="absolute right-0 z-20 mt-1 max-h-96 w-64 overflow-y-auto rounded-lg border border-border bg-surface p-2 shadow-2">
           {selectedIds.length > 0 && (
             <button
               type="button"
