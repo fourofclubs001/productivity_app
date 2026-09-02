@@ -107,24 +107,24 @@ export default function PlanView() {
           />
         </div>
         <div
-          className="relative shrink-0 border-r border-border"
-          style={{ width: detailPanel.width }}
+          className={`relative shrink-0 overflow-hidden transition-[width] duration-150 ${
+            selectedTask ? 'border-r border-border' : ''
+          }`}
+          style={{ width: selectedTask ? detailPanel.width : 0 }}
         >
-          {selectedTask ? (
+          {selectedTask && (
             <TaskDetailPanel
               task={selectedTask}
               tasksById={tasksById}
               onAddChild={setDialogParentId}
             />
-          ) : (
-            <div className="flex h-full items-center justify-center text-sm text-text-secondary">
-              Select a task to see its details
-            </div>
           )}
           <div
             onMouseDown={detailPanel.startResize}
             title="Drag to resize"
-            className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-accent/50"
+            className={`absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-accent/50 ${
+              selectedTask ? '' : 'hidden'
+            }`}
           />
         </div>
         <div className="min-w-0 flex-1">

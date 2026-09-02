@@ -27,7 +27,7 @@ describe('TaskTree', () => {
     expect(screen.getByText('Parent')).toBeInTheDocument()
     expect(screen.queryByText('Child')).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByText('▸'))
+    fireEvent.click(screen.getByRole('button', { name: 'Expand' }))
     expect(screen.getByText('Child')).toBeInTheDocument()
   })
 
@@ -44,8 +44,8 @@ describe('TaskTree', () => {
       />,
     )
 
-    fireEvent.click(screen.getAllByText('▸')[0])
-    fireEvent.click(screen.getAllByText('▸')[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'Expand' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'Expand' })[0])
 
     expect(screen.getAllByText('Shared child')).toHaveLength(2)
   })

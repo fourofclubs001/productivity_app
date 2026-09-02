@@ -177,7 +177,7 @@ describe('TaskTreeNode', () => {
     renderNode(task, { overId: 't1', action: { kind: 'reorder', afterId: null, beforeId: 't1' } })
 
     const row = screen.getByText('Row task').closest('.group')!
-    expect(row).not.toHaveClass('outline-accent')
+    expect(row).not.toHaveClass('ring-accent')
     const line = screen.getByTestId('drop-reorder-line')
     expect(line).toHaveClass('top-0')
   })
@@ -194,7 +194,7 @@ describe('TaskTreeNode', () => {
     renderNode(task, { overId: 't1', action: { kind: 'reparent', parentId: 't1' } })
 
     const row = screen.getByText('Row task').closest('.group')!
-    expect(row).toHaveClass('outline-accent')
+    expect(row).toHaveClass('ring-accent')
     expect(screen.queryByTestId('drop-reorder-line')).not.toBeInTheDocument()
   })
 
@@ -203,7 +203,7 @@ describe('TaskTreeNode', () => {
     renderNode(task, { overId: 'other', action: { kind: 'reparent', parentId: 'other' } })
 
     const row = screen.getByText('Row task').closest('.group')!
-    expect(row).not.toHaveClass('outline-accent')
+    expect(row).not.toHaveClass('ring-accent')
     expect(screen.queryByTestId('drop-reorder-line')).not.toBeInTheDocument()
   })
 })

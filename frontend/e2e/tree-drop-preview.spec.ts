@@ -39,13 +39,13 @@ test('shows a live reparent outline mid-drag over the middle third, then a reord
   // Hover the middle third of B -- the reparent zone. No line, just the
   // full-row outline, and nothing has actually moved yet (still mid-drag).
   await page.mouse.move(boxB.x + boxB.width / 2, boxB.y + boxB.height / 2, { steps: 10 })
-  await expect(rowB).toHaveClass(/outline-accent/)
+  await expect(rowB).toHaveClass(/ring-accent/)
   await expect(page.getByTestId('drop-reorder-line')).not.toBeVisible()
 
   // Move to B's top edge -- the reorder zone. The outline goes away in
   // favor of a thin line at the shared boundary, still before any drop.
   await page.mouse.move(boxB.x + boxB.width / 2, boxB.y + boxB.height * 0.1, { steps: 10 })
-  await expect(rowB).not.toHaveClass(/outline-accent/)
+  await expect(rowB).not.toHaveClass(/ring-accent/)
   const line = page.getByTestId('drop-reorder-line')
   await expect(line).toBeVisible()
   await expect(line).toHaveClass(/top-0/)

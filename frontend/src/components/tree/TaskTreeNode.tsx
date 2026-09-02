@@ -10,6 +10,7 @@ import { useUndo, type UndoEntry } from '../../undo/UndoProvider'
 import AlertDialog from '../common/AlertDialog'
 import ConfirmDialog from '../common/ConfirmDialog'
 import Menu from '../common/Menu'
+import { ChevronRight, MoreVertical, Plus } from '../common/icons'
 import ColorDots from './ColorDots'
 import StateBadge from './StateBadge'
 import DeleteWithChildrenDialog from './DeleteWithChildrenDialog'
@@ -158,10 +159,12 @@ export default function TaskTreeNode({
         }}
         {...listeners}
         {...attributes}
-        className={`group relative flex cursor-pointer items-center gap-1.5 rounded px-1 py-1 text-sm ${
-          isSelected ? 'bg-accent-soft text-accent' : 'text-text-primary hover:bg-surface-hover'
+        className={`group relative flex h-7 cursor-grab items-center gap-2 rounded-sm px-1.5 text-ui active:cursor-grabbing ${
+          isSelected
+            ? 'bg-accent-soft text-accent hover:bg-accent-soft'
+            : 'text-text-primary hover:bg-surface-hover'
         } ${isDragging ? 'opacity-40' : ''} ${
-          isReparentPreview ? 'outline outline-2 outline-accent' : ''
+          isReparentPreview ? 'bg-accent-soft/60 ring-1 ring-inset ring-accent' : ''
         }`}
         style={{ paddingLeft: depth * 16 + 4 }}
         onClick={() => onSelect(taskId)}
@@ -178,6 +181,7 @@ export default function TaskTreeNode({
         )}
         <button
           type="button"
+          aria-label={task.is_leaf ? undefined : isExpanded ? 'Collapse' : 'Expand'}
           onClick={(event) => {
             event.stopPropagation()
             onToggleExpand(taskId)
@@ -186,22 +190,46 @@ export default function TaskTreeNode({
             task.is_leaf ? 'invisible' : ''
           }`}
         >
-          {task.is_leaf ? '' : isExpanded ? '▾' : '▸'}
+          {!task.is_leaf && (
+            <ChevronRight
+              className={`h-3.5 w-3.5 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+            />
+          )}
         </button>
         <ColorDots colors={task.effective_colors} />
         <span className="flex-1 truncate">{task.name}</span>
-        <StateBadge state={task.state} />
-        <button
-          type="button"
-          title="Add sub-task"
-          onClick={(event) => {
-            event.stopPropagation()
-            onAddChild(taskId)
-          }}
-          className="invisible h-4 w-4 shrink-0 text-center leading-none text-text-secondary hover:text-text-primary group-hover:visible"
-        >
-          +
-        </button>
+        {/* Hide the badge for the two "quiet" states -- a column of gray
+            "Backlog" pills on leaves is just noise; a kept former-goal
+            reading Backlog still shows its badge. Done leaves are already
+            hidden from Plan entirely. */}
+        {!(task.is_leaf && task.state === 'backlog') && task.state !== 'done' && (
+          <StateBadge state={task.state} />
+        )}
+        <div className="flex shrink-0 items-center opacity-0 group-hover:opacity-100">
+          <button
+            type="button"
+            title="Add sub-task"
+            onClick={(event) => {
+              event.stopPropagation()
+              onAddChild(taskId)
+            }}
+            className="flex h-5 w-5 items-center justify-center rounded-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            title="Task actions"
+            aria-label="Task actions"
+            onClick={(event) => {
+              event.stopPropagation()
+              setContextMenu({ x: event.clientX, y: event.clientY })
+            }}
+            className="flex h-5 w-5 items-center justify-center rounded-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+          >
+            <MoreVertical className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
       {isExpanded && !task.is_leaf && (
         <div>
