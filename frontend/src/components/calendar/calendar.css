@@ -23,16 +23,28 @@
 }
 
 .rbc-label {
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
   font-size: 11px;
 }
 
-.rbc-time-gutter .rbc-timeslot-group {
-  color: var(--color-text-secondary);
+/* Sit the hour label on its gridline rather than below it (Google). */
+.rbc-time-gutter .rbc-timeslot-group .rbc-label {
+  position: relative;
+  top: -0.6em;
 }
 
+.rbc-time-gutter .rbc-timeslot-group {
+  color: var(--color-text-tertiary);
+}
+
+/* Google's hour height -- a 30-min chip is then tall enough for a title. */
+.rbc-timeslot-group {
+  min-height: 48px;
+}
+
+/* Today's column is no longer tinted -- the header circle marks it (UX-17). */
 .rbc-today {
-  background-color: var(--color-accent-soft);
+  background-color: transparent;
 }
 
 .rbc-off-range-bg {
@@ -44,15 +56,37 @@
   height: 2px;
 }
 
+.rbc-current-time-indicator::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-danger);
+}
+
 .rbc-event {
-  border-radius: 6px;
+  border-radius: 4px;
   font-size: 12px;
-  padding: 2px 6px;
+  font-weight: 500;
+  padding: 2px 4px 2px 6px;
   box-shadow: none;
 }
 
+.rbc-event .rbc-event-label {
+  font-size: 11px;
+  opacity: 0.85;
+  font-weight: 400;
+}
+
+/* A double ring that reads on any chip colour. */
 .rbc-event.rbc-selected {
-  outline: 2px solid var(--color-text-primary);
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--color-surface),
+    0 0 0 4px var(--color-accent);
 }
 
 .rbc-slot-selection {
@@ -84,10 +118,25 @@
   text-transform: uppercase;
 }
 
+.calendar-day-header .day-name.is-today {
+  color: var(--color-accent);
+}
+
 .calendar-day-header .day-number {
   font-size: 20px;
   font-weight: 500;
   color: var(--color-text-primary);
+  width: 1.6em;
+  height: 1.6em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.calendar-day-header .day-number.is-today {
+  background: var(--color-accent);
+  color: #fff;
 }
 
 .calendar-timezone-label {

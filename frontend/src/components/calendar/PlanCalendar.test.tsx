@@ -71,10 +71,10 @@ describe('PlanCalendar', () => {
   it('disables Prev on the current week and enables it after navigating forward', () => {
     renderCalendar(new Map())
 
-    const prevButton = screen.getByText('← Prev').closest('button')!
+    const prevButton = screen.getByRole('button', { name: 'Previous week' })
     expect(prevButton).toBeDisabled()
 
-    fireEvent.click(screen.getByText('Next →'))
+    fireEvent.click(screen.getByRole('button', { name: 'Next week' }))
     expect(prevButton).not.toBeDisabled()
   })
 

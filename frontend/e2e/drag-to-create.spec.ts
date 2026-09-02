@@ -15,11 +15,15 @@ async function createTask(request: APIRequestContext, name: string) {
  * they don't collide with each other's chips within the same run.
  */
 async function dragSelectEmptySlot(page: Page, yOffset: number) {
+  // Measure the x from the last day column but the y from the *visible*
+  // scroll viewport -- the grid scrolls to 07:00 on load (v08 UX-18), so
+  // the day slot's own top can be scrolled out of view.
   const daySlot = page.locator('.rbc-day-slot').last()
-  const box = await daySlot.boundingBox()
-  if (!box) throw new Error('day slot not found')
-  const x = box.x + box.width / 2
-  const startY = box.y + yOffset
+  const slotBox = await daySlot.boundingBox()
+  const viewport = await page.locator('.rbc-time-content').boundingBox()
+  if (!slotBox || !viewport) throw new Error('calendar grid not found')
+  const x = slotBox.x + slotBox.width / 2
+  const startY = viewport.y + yOffset
   await page.mouse.move(x, startY)
   await page.mouse.down()
   await page.mouse.move(x, startY + 60, { steps: 5 })

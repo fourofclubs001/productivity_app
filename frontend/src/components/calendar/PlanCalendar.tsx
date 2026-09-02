@@ -40,10 +40,14 @@ import {
   makeUpdateTimeEntry,
 } from '../../lib/intervalUndoEntries'
 import { useUndo } from '../../undo/UndoProvider'
-import { chipFillStyle, EXTERNAL_EVENT_STYLE, trackedChipStyle } from './eventColor'
+import { chipFillStyle, chipTextColor, EXTERNAL_EVENT_STYLE, trackedChipStyle } from './eventColor'
 import CalendarDayHeader from './CalendarDayHeader'
 import CalendarTimezoneLabel from './CalendarTimezoneLabel'
 import Menu from '../common/Menu'
+import Button from '../common/Button'
+import { ChevronLeft, ChevronRight } from '../common/icons'
+
+const SCROLL_TO = new Date(1970, 0, 1, 7, 0, 0)
 import AlertDialog from '../common/AlertDialog'
 import EditIntervalTimeModal from './EditIntervalTimeModal'
 import EditEntryTimeModal from './EditEntryTimeModal'
@@ -458,24 +462,33 @@ export default function PlanCalendar({
     <div className="flex h-full flex-col p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <button
-            type="button"
+          <Button
+            variant="icon"
+            size="sm"
+            aria-label="Previous week"
             disabled={isCurrentWeek}
             onClick={() => setWeekAnchor((prev) => shiftWeek(prev, -1))}
-            className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-hover disabled:opacity-30"
           >
-            ← Prev
-          </button>
-          <button
-            type="button"
+            <ChevronLeft />
+          </Button>
+          <Button
+            variant="icon"
+            size="sm"
+            aria-label="Next week"
             onClick={() => setWeekAnchor((prev) => shiftWeek(prev, 1))}
-            className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-hover"
           >
-            Next →
-          </button>
-          <span className="text-sm text-text-secondary">
-            Week of {formatWeekLabel(weekAnchor)}
-            {isCurrentWeek && <span className="ml-1 text-text-secondary">(current)</span>}
+            <ChevronRight />
+          </Button>
+          <Button
+            variant="outlined"
+            size="sm"
+            disabled={isCurrentWeek}
+            onClick={() => setWeekAnchor(mondayOf(utcNow()))}
+          >
+            Today
+          </Button>
+          <span className="text-base font-medium text-text-primary">
+            {formatWeekLabel(weekAnchor)}
           </span>
         </div>
         <div className="flex items-center gap-3 text-2xs text-text-tertiary">
@@ -496,7 +509,7 @@ export default function PlanCalendar({
 
       <div
         ref={setCalendarRef}
-        className={`min-h-0 flex-1 ${isOver ? 'ring-2 ring-accent' : ''}`}
+        className={`min-h-0 flex-1 rounded-sm transition-colors ${isOver ? 'bg-accent-soft/40' : ''}`}
       >
         <DnDCalendar
           localizer={localizer}
@@ -505,6 +518,7 @@ export default function PlanCalendar({
           views={['week']}
           date={weekAnchor}
           onNavigate={() => {}}
+          scrollToTime={SCROLL_TO}
           toolbar={false}
           selectable
           onSelectSlot={(slotInfo: { start: Date | string; end: Date | string }) => {
@@ -553,6 +567,7 @@ export default function PlanCalendar({
             return {
               style: {
                 ...chipFillStyle(event.colors),
+                color: chipTextColor(event.colors),
                 border: 'none',
                 opacity: event.id === draggingEventId ? 0 : isFullyPast(event, now) ? 0.55 : 1,
               },

@@ -13,11 +13,29 @@ export function chipFillStyle(colors: string[]): CSSProperties {
   if (hexColors.length === 0) return { backgroundColor: FALLBACK_HEX }
   if (hexColors.length === 1) return { backgroundColor: hexColors[0] }
   const [first, second] = hexColors
-  return { background: `linear-gradient(135deg, ${first} 50%, ${second} 50%)` }
+  // A thin light seam softens the hard 50/50 diagonal (it read as a glitch).
+  return {
+    background: `linear-gradient(135deg, ${first} 0 49%, var(--color-surface) 49% 51%, ${second} 51%)`,
+  }
 }
 
 export function primaryChipColor(colors: string[]): string {
   return COLOR_HEX[colors[0]] ?? FALLBACK_HEX
+}
+
+function relativeLuminance(hex: string): number {
+  const n = hex.replace('#', '')
+  const channel = (i: number) => {
+    const c = parseInt(n.slice(i, i + 2), 16) / 255
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  }
+  return 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4)
+}
+
+// Dark text on light chips (yellow/sage/pink), white on the rest -- the
+// fixed white was failing contrast on the pale hues (v08 UX-19).
+export function chipTextColor(colors: string[]): string {
+  return relativeLuminance(primaryChipColor(colors)) > 0.55 ? 'var(--color-text-primary)' : '#ffffff'
 }
 
 // Tracked-time (Entry) chips on the merged Plan calendar: same hue as the
@@ -41,4 +59,5 @@ export const EXTERNAL_EVENT_STYLE: CSSProperties = {
   backgroundColor: 'var(--color-surface-hover)',
   color: 'var(--color-text-primary)',
   border: '1px solid var(--color-border)',
+  borderLeft: '3px solid var(--color-text-secondary)',
 }

@@ -13,13 +13,13 @@ describe('chipFillStyle', () => {
 
   it('returns a diagonal split gradient for exactly two colors', () => {
     expect(chipFillStyle(['red', 'blue'])).toEqual({
-      background: `linear-gradient(135deg, ${COLOR_HEX.red} 50%, ${COLOR_HEX.blue} 50%)`,
+      background: `linear-gradient(135deg, ${COLOR_HEX.red} 0 49%, var(--color-surface) 49% 51%, ${COLOR_HEX.blue} 51%)`,
     })
   })
 
   it('falls back to the first two colors for three or more', () => {
     expect(chipFillStyle(['red', 'blue', 'green'])).toEqual({
-      background: `linear-gradient(135deg, ${COLOR_HEX.red} 50%, ${COLOR_HEX.blue} 50%)`,
+      background: `linear-gradient(135deg, ${COLOR_HEX.red} 0 49%, var(--color-surface) 49% 51%, ${COLOR_HEX.blue} 51%)`,
     })
   })
 
