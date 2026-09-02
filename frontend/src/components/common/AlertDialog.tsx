@@ -1,3 +1,6 @@
+import Dialog from './Dialog'
+import Button from './Button'
+
 export default function AlertDialog({
   message,
   onClose,
@@ -6,19 +9,15 @@ export default function AlertDialog({
   onClose: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim">
-      <div className="w-96 rounded-lg border border-border bg-surface p-4 shadow-2">
-        <p className="text-sm text-text-primary">{message}</p>
-        <div className="mt-4 flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover"
-          >
-            OK
-          </button>
-        </div>
-      </div>
-    </div>
+    <Dialog
+      onClose={onClose}
+      footer={
+        <Button variant="primary" onClick={onClose}>
+          OK
+        </Button>
+      }
+    >
+      <p className="text-sm text-text-primary">{message}</p>
+    </Dialog>
   )
 }

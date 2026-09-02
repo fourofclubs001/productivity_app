@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { format } from 'date-fns'
 import { useCreateTask } from '../../api/tasks'
 import { useCreateInterval } from '../../api/intervals'
+import Dialog from '../common/Dialog'
+import Button from '../common/Button'
 
 /** Creates a brand-new, non-recurring, root-level leaf task and schedules it
  * into a Plan-calendar drag-selected time range in one step (v05 item 9) --
@@ -37,11 +39,7 @@ export default function QuickCreateTaskDialog({
       {
         onSuccess: (task) => {
           createInterval.mutate(
-            {
-              task_id: task.id,
-              start: range.start.toISOString(),
-              end: range.end.toISOString(),
-            },
+            { task_id: task.id, start: range.start.toISOString(), end: range.end.toISOString() },
             {
               onSuccess: onCreated,
               onError: (error) => setErrorMessage((error as Error).message),
@@ -54,51 +52,41 @@ export default function QuickCreateTaskDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim">
-      <form
-        onSubmit={handleSubmit}
-        className="w-96 rounded-lg border border-border bg-surface p-4 shadow-2"
-      >
-        <h2 className="mb-3 text-sm font-semibold text-text-primary">New task</h2>
-        <p className="mb-3 text-xs text-text-secondary">
-          {format(range.start, 'EEEE, MMM d, HH:mm')} – {format(range.end, 'HH:mm')}
-        </p>
-        <label className="mb-2 block text-xs text-text-secondary">
-          Name
-          <input
-            autoFocus
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            className="mt-1 w-full rounded border border-border bg-surface px-2 py-1 text-sm text-text-primary focus:border-accent focus:outline-none"
-          />
-        </label>
-        <label className="mb-3 block text-xs text-text-secondary">
-          Definition of done
-          <textarea
-            value={definitionOfDone}
-            onChange={(event) => setDefinitionOfDone(event.target.value)}
-            rows={2}
-            className="mt-1 w-full rounded border border-border bg-surface px-2 py-1 text-sm text-text-primary focus:border-accent focus:outline-none"
-          />
-        </label>
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary"
-          >
+    <Dialog
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      title="New task"
+      subtitle={`${format(range.start, 'EEEE, MMM d, HH:mm')} – ${format(range.end, 'HH:mm')}`}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={!canSubmit || isPending}
-            className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
-          >
+          </Button>
+          <Button type="submit" disabled={!canSubmit || isPending}>
             Create
-          </button>
-        </div>
-        {errorMessage && <p className="mt-2 text-xs text-danger">{errorMessage}</p>}
-      </form>
-    </div>
+          </Button>
+        </>
+      }
+    >
+      <label className="mb-2 block text-xs text-text-secondary">
+        Name
+        <input
+          autoFocus
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          className="mt-1 w-full"
+        />
+      </label>
+      <label className="block text-xs text-text-secondary">
+        Definition of done
+        <textarea
+          value={definitionOfDone}
+          onChange={(event) => setDefinitionOfDone(event.target.value)}
+          rows={2}
+          className="mt-1 w-full"
+        />
+      </label>
+      {errorMessage && <p className="mt-2 text-xs text-danger">{errorMessage}</p>}
+    </Dialog>
   )
 }

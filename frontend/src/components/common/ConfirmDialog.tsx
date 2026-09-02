@@ -1,35 +1,34 @@
+import Dialog from './Dialog'
+import Button from './Button'
+
 export default function ConfirmDialog({
   message,
   confirmLabel = 'Confirm',
+  confirmVariant = 'danger',
   onConfirm,
   onCancel,
 }: {
   message: string
   confirmLabel?: string
+  confirmVariant?: 'danger' | 'primary'
   onConfirm: () => void
   onCancel: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim">
-      <div className="w-96 rounded-lg border border-border bg-surface p-4 shadow-2">
-        <p className="text-sm text-text-primary">{message}</p>
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary"
-          >
+    <Dialog
+      onClose={onCancel}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onCancel}>
             Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            className="rounded bg-danger px-3 py-1.5 text-xs font-medium text-white hover:bg-danger-hover"
-          >
+          </Button>
+          <Button variant={confirmVariant} onClick={onConfirm}>
             {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </>
+      }
+    >
+      <p className="text-sm text-text-primary">{message}</p>
+    </Dialog>
   )
 }

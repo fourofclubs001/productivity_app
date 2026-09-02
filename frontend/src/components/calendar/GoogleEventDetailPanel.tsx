@@ -1,5 +1,7 @@
 import { format } from 'date-fns'
 import type { GoogleEvent } from '../../types'
+import Dialog from '../common/Dialog'
+import Button from '../common/Button'
 
 // Read-only -- pulled-in Google Calendar events aren't owned by this app
 // (M40), so there's nothing here to edit, only to view.
@@ -11,37 +13,26 @@ export default function GoogleEventDetailPanel({
   onClose: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim">
-      <div
-        className="w-96 rounded-lg border border-border bg-surface p-4 shadow-2"
-        data-testid="google-event-detail-panel"
-      >
-        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
-          Google Calendar event
-        </p>
-        <h2 className="mb-2 text-lg font-semibold text-text-primary">{event.title}</h2>
-        <p className="mb-3 text-sm text-text-secondary">
-          {format(new Date(event.start), 'EEE MMM d, HH:mm')} –{' '}
-          {format(new Date(event.end), 'HH:mm')}
-        </p>
-        <div>
-          <label className="block text-xs font-medium uppercase tracking-wide text-text-secondary">
-            Description
-          </label>
-          <p className="mt-1 whitespace-pre-wrap text-sm text-text-primary">
-            {event.description || 'No description'}
-          </p>
-        </div>
-        <div className="mt-4 flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded bg-surface-alt px-3 py-1.5 text-xs font-medium text-text-primary hover:bg-surface-hover"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
+    <Dialog
+      onClose={onClose}
+      testId="google-event-detail-panel"
+      title={event.title}
+      subtitle={`${format(new Date(event.start), 'EEE MMM d, HH:mm')} – ${format(
+        new Date(event.end),
+        'HH:mm',
+      )}`}
+      footer={
+        <Button variant="neutral" onClick={onClose}>
+          Close
+        </Button>
+      }
+    >
+      <p className="text-2xs font-medium uppercase tracking-wider text-text-secondary">
+        Google Calendar event
+      </p>
+      <p className="mt-2 whitespace-pre-wrap text-sm text-text-primary">
+        {event.description || 'No description'}
+      </p>
+    </Dialog>
   )
 }

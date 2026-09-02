@@ -1,3 +1,6 @@
+import Dialog from '../common/Dialog'
+import Button from '../common/Button'
+
 export default function StopTimerConfirmModal({
   taskName,
   definitionOfDone,
@@ -14,41 +17,25 @@ export default function StopTimerConfirmModal({
   isPending: boolean
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim">
-      <div className="w-96 rounded-lg border border-border bg-surface p-4 shadow-2">
-        <h2 className="mb-3 text-sm font-semibold text-text-primary">
-          Is the definition of done fulfilled?
-        </h2>
-        <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
-          {taskName}
-        </p>
-        <p className="mb-4 mt-1 text-sm text-text-primary">{definitionOfDone}</p>
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary"
-          >
+    <Dialog
+      onClose={onCancel}
+      title="Is the definition of done fulfilled?"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onCancel}>
             Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onStopOnly}
-            disabled={isPending}
-            className="rounded bg-surface-alt px-3 py-1.5 text-xs font-medium text-text-primary hover:bg-surface-hover disabled:opacity-50"
-          >
+          </Button>
+          <Button variant="neutral" onClick={onStopOnly} disabled={isPending}>
             No, stop the timer
-          </button>
-          <button
-            type="button"
-            onClick={onMarkDone}
-            disabled={isPending}
-            className="rounded bg-success px-3 py-1.5 text-xs font-medium text-white hover:bg-success-hover disabled:opacity-50"
-          >
+          </Button>
+          <Button variant="success" onClick={onMarkDone} disabled={isPending}>
             Yes
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </>
+      }
+    >
+      <p className="text-2xs font-medium uppercase tracking-wider text-text-secondary">{taskName}</p>
+      <p className="mt-1 text-sm text-text-primary">{definitionOfDone}</p>
+    </Dialog>
   )
 }

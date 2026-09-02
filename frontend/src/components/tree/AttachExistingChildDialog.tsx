@@ -4,6 +4,8 @@ import { ancestorIds, descendantIds } from '../../lib/taskTree'
 import { useAddParent, useRemoveParent } from '../../api/tasks'
 import { makeSetParentsEntry } from '../../lib/reparentUndo'
 import { useUndo } from '../../undo/UndoProvider'
+import Dialog from '../common/Dialog'
+import Button from '../common/Button'
 import TaskPicker from '../timer/TaskPicker'
 
 // Reparents (moves) an existing task under `parentTask`, detaching it from
@@ -22,11 +24,6 @@ export default function AttachExistingChildDialog({
   const removeParent = useRemoveParent()
   const { pushUndo } = useUndo()
 
-  // Excludes: parentTask itself, its own descendants, and its own ancestors
-  // (cycle prevention -- the backend also enforces this via CycleError, but
-  // this keeps the picker from ever offering an obviously-invalid,
-  // guaranteed-to-fail choice), plus any candidate that's already a direct
-  // child of parentTask (attaching it again would be a no-op).
   const excludedIds = useMemo(() => {
     const excluded = descendantIds(parentTask.id, tasksById)
     for (const id of ancestorIds(parentTask.id, tasksById)) excluded.add(id)
@@ -58,36 +55,28 @@ export default function AttachExistingChildDialog({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim"
-      data-testid="attach-existing-child-dialog"
+    <Dialog
+      onClose={onClose}
+      testId="attach-existing-child-dialog"
+      title="Attach existing task"
+      subtitle={`Move an existing task to become a child of "${parentTask.name}".`}
+      footer={
+        <Button variant="ghost" onClick={onClose}>
+          Cancel
+        </Button>
+      }
     >
-      <div className="w-96 rounded-lg border border-border bg-surface p-4 shadow-2">
-        <h2 className="mb-1 text-sm font-semibold text-text-primary">Attach existing task</h2>
-        <p className="mb-3 text-xs text-text-secondary">
-          Move an existing task to become a child of "{parentTask.name}".
-        </p>
-        <TaskPicker
-          tasks={Array.from(tasksById.values())}
-          selectedId=""
-          onSelect={attach}
-          isHidden={(candidate) =>
-            excludedIds.has(candidate.id) || candidate.parent_ids.includes(parentTask.id)
-          }
-          isSelectable={() => true}
-          placeholder="Select a task…"
-          emptyMessage="No tasks available to attach"
-        />
-        <div className="mt-4 flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
+      <TaskPicker
+        tasks={Array.from(tasksById.values())}
+        selectedId=""
+        onSelect={attach}
+        isHidden={(candidate) =>
+          excludedIds.has(candidate.id) || candidate.parent_ids.includes(parentTask.id)
+        }
+        isSelectable={() => true}
+        placeholder="Select a task…"
+        emptyMessage="No tasks available to attach"
+      />
+    </Dialog>
   )
 }

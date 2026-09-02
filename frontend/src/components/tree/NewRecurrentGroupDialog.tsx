@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { Task } from '../../types'
 import { useCreateRecurrentGroup } from '../../api/recurrentTasks'
+import Dialog from '../common/Dialog'
+import Button from '../common/Button'
 
 export default function NewRecurrentGroupDialog({
   onClose,
@@ -21,41 +23,34 @@ export default function NewRecurrentGroupDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim">
-      <form
-        onSubmit={handleSubmit}
-        className="w-80 rounded-lg border border-border bg-surface p-4 shadow-2"
-      >
-        <h2 className="mb-3 text-sm font-semibold text-text-primary">New recurrent group</h2>
-        <label className="mb-3 block text-xs text-text-secondary">
-          Name
-          <input
-            autoFocus
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            className="mt-1 w-full rounded border border-border bg-surface px-2 py-1 text-sm text-text-primary focus:border-accent focus:outline-none"
-          />
-        </label>
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary"
-          >
+    <Dialog
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      className="w-[340px]"
+      title="New recurrent group"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={!canSubmit || createRecurrentGroup.isPending}
-            className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
-          >
+          </Button>
+          <Button type="submit" disabled={!canSubmit || createRecurrentGroup.isPending}>
             Create
-          </button>
-        </div>
-        {createRecurrentGroup.isError && (
-          <p className="mt-2 text-xs text-danger">{(createRecurrentGroup.error as Error).message}</p>
-        )}
-      </form>
-    </div>
+          </Button>
+        </>
+      }
+    >
+      <label className="block text-xs text-text-secondary">
+        Name
+        <input
+          autoFocus
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          className="mt-1 w-full"
+        />
+      </label>
+      {createRecurrentGroup.isError && (
+        <p className="mt-2 text-xs text-danger">{(createRecurrentGroup.error as Error).message}</p>
+      )}
+    </Dialog>
   )
 }

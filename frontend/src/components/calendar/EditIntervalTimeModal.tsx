@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { Interval } from '../../types'
 import { useUpdateInterval } from '../../api/intervals'
+import Dialog from '../common/Dialog'
+import Button from '../common/Button'
 import IntervalTimeFields, {
   intervalTimeToDates,
   intervalToTimeValue,
@@ -32,34 +34,26 @@ export default function EditIntervalTimeModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim">
-      <form
-        onSubmit={handleSubmit}
-        className="w-96 rounded-lg border border-border bg-surface p-4 shadow-2"
-      >
-        <h2 className="mb-3 text-sm font-semibold text-text-primary">Edit time</h2>
-        <IntervalTimeFields value={value} onChange={setValue} />
-        {!canSubmit && <p className="mt-2 text-xs text-danger">End must be after start.</p>}
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary"
-          >
+    <Dialog
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      title="Edit time"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={!canSubmit || updateInterval.isPending}
-            className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
-          >
+          </Button>
+          <Button type="submit" disabled={!canSubmit || updateInterval.isPending}>
             Save
-          </button>
-        </div>
-      </form>
+          </Button>
+        </>
+      }
+    >
+      <IntervalTimeFields value={value} onChange={setValue} />
+      {!canSubmit && <p className="mt-2 text-xs text-danger">End must be after start.</p>}
       {alertMessage && (
         <AlertDialog message={alertMessage} onClose={() => setAlertMessage(null)} />
       )}
-    </div>
+    </Dialog>
   )
 }

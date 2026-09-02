@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { format } from 'date-fns'
 import type { Task } from '../../types'
 import { useCreateInterval } from '../../api/intervals'
+import Dialog from '../common/Dialog'
+import Button from '../common/Button'
 import TaskPicker from '../timer/TaskPicker'
 
 /** Schedules an already-existing task into a Plan-calendar drag-selected
@@ -28,11 +30,7 @@ export default function ScheduleExistingTaskDialog({
     if (!selectedTaskId) return
     setErrorMessage(null)
     createInterval.mutate(
-      {
-        task_id: selectedTaskId,
-        start: range.start.toISOString(),
-        end: range.end.toISOString(),
-      },
+      { task_id: selectedTaskId, start: range.start.toISOString(), end: range.end.toISOString() },
       {
         onSuccess: onScheduled,
         onError: (error) => setErrorMessage((error as Error).message),
@@ -41,32 +39,23 @@ export default function ScheduleExistingTaskDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim">
-      <div className="w-96 rounded-lg border border-border bg-surface p-4 shadow-2">
-        <h2 className="mb-3 text-sm font-semibold text-text-primary">Schedule existing task</h2>
-        <p className="mb-3 text-xs text-text-secondary">
-          {format(range.start, 'EEEE, MMM d, HH:mm')} – {format(range.end, 'HH:mm')}
-        </p>
-        <TaskPicker tasks={tasks} selectedId={selectedTaskId} onSelect={setSelectedTaskId} />
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary"
-          >
+    <Dialog
+      onClose={onClose}
+      title="Schedule existing task"
+      subtitle={`${format(range.start, 'EEEE, MMM d, HH:mm')} – ${format(range.end, 'HH:mm')}`}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSchedule}
-            disabled={!selectedTaskId || createInterval.isPending}
-            className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
-          >
+          </Button>
+          <Button onClick={handleSchedule} disabled={!selectedTaskId || createInterval.isPending}>
             Schedule
-          </button>
-        </div>
-        {errorMessage && <p className="mt-2 text-xs text-danger">{errorMessage}</p>}
-      </div>
-    </div>
+          </Button>
+        </>
+      }
+    >
+      <TaskPicker tasks={tasks} selectedId={selectedTaskId} onSelect={setSelectedTaskId} />
+      {errorMessage && <p className="mt-2 text-xs text-danger">{errorMessage}</p>}
+    </Dialog>
   )
 }
